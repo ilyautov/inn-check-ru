@@ -1,0 +1,19 @@
+{
+  "name": "inn-check-ru",
+  "owner": {
+    "name": "Ilya Utov",
+    "email": "ilyautov@gmail.com"
+  },
+  "metadata": {
+    "description": "Проверка контрагента по ИНН перед сделкой: светофор риска по открытым реестрам (ЕГРЮЛ, ФССП, суды, банкротства), круговая сверка агрегаторов. | Counterparty due-diligence by Russian tax ID (INN) over open registries.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "inn-check-ru",
+      "source": "./",
+      "description": "Проверка контрагента по ИНН: quick-scan по deal-killer-сигналам за минуты, полное досье по запросу, светофор 🟢/🟡/🔴 с рекомендацией «отсрочка / предоплата / избегать». Данные из реальных реестров, каждая цифра с источником и датой. | Counterparty risk check by INN over EGRUL/FSSP/courts/bankruptcy registries.",
+      "category": "business"
+    }
+  ]
+}

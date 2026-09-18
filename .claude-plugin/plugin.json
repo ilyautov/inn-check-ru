@@ -1,0 +1,10 @@
+{
+  "name": "inn-check-ru",
+  "version": "1.0.0",
+  "description": "Проверка контрагента по ИНН: ЕГРЮЛ, ФССП, суды, банкротства, финансы → светофор риска 🟢/🟡/🔴 с рекомендацией. | Russian counterparty due-diligence by INN over open registries.",
+  "author": {
+    "name": "Ilya Utov",
+    "email": "ilyautov@gmail.com"
+  },
+  "skills": ["./"]
+}

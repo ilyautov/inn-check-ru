@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ruff
+        run: |
+          pip install ruff
+          ruff check scripts/
+
+      - name: skill frontmatter is valid YAML
+        run: |
+          pip install pyyaml
+          python3 - <<'EOF'
+          import pathlib, yaml
+          text = pathlib.Path("SKILL.md").read_text(encoding="utf-8")
+          assert text.startswith("---"), "SKILL.md must start with frontmatter"
+          fm = yaml.safe_load(text.split("---")[1])
+          for key in ("name", "description"):
+              assert fm.get(key), f"frontmatter missing {key}"
+          assert fm["name"] == "inn-check-ru"
+          print("frontmatter ok:", fm["name"])
+          EOF
