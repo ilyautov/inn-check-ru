@@ -23,6 +23,9 @@ jobs:
       - name: fin_scoring eval (офлайн, фикстуры)
         run: python3 eval/run_fin_eval.py
 
+      - name: diff_counterparty eval (офлайн, фикстуры)
+        run: python3 eval/run_diff_eval.py
+
       - name: skill frontmatter is valid YAML
         run: |
           pip install pyyaml

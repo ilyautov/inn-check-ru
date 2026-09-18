@@ -4,7 +4,11 @@ fetch_counterparty.py — проверка российского контраг
 бесплатные открытые JSON-эндпоинты ФНС. Только стандартная библиотека.
 
 Использование:
-    python3 fetch_counterparty.py <ИНН>
+    python3 fetch_counterparty.py <ИНН> [--save]
+
+--save дополнительно сохраняет снимок в
+~/.cache/inn-check-ru/snapshots/<ИНН>/<дата>_<время>.json — для мониторинга
+изменений через diff_counterparty.py.
 
 Вывод: единый JSON в stdout (UTF-8) со структурой:
     {
@@ -656,15 +660,40 @@ def validate_inn(inn):
     return inn
 
 
+def save_snapshot(inn, result):
+    """Снимок проверки для мониторинга (diff_counterparty.py).
+
+    ~/.cache/inn-check-ru/snapshots/<ИНН>/<дата>_<время>.json — по снимку на
+    запуск; сравниваются два последних. Не падает: сбой записи — предупреждение
+    в stderr, JSON в stdout всё равно уходит.
+    """
+    try:
+        snap_dir = os.path.join(
+            os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru")),
+            "snapshots", inn)
+        os.makedirs(snap_dir, exist_ok=True)
+        name = time.strftime("%Y-%m-%d_%H-%M-%S") + ".json"
+        path = os.path.join(snap_dir, name)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(result, fh, ensure_ascii=False, indent=2)
+        sys.stderr.write("снимок сохранён: %s\n" % path)
+        return path
+    except OSError as e:
+        sys.stderr.write("ВНИМАНИЕ: снимок не сохранён (%s)\n" % e)
+        return None
+
+
 def main(argv):
-    if len(argv) != 2:
-        sys.stderr.write("Использование: python3 fetch_counterparty.py <ИНН>\n")
+    args = [a for a in argv[1:] if a != "--save"]
+    do_save = len(args) != len(argv) - 1
+    if len(args) != 1:
+        sys.stderr.write("Использование: python3 fetch_counterparty.py <ИНН> [--save]\n")
         return 2
-    inn = validate_inn(argv[1])
+    inn = validate_inn(args[0])
     if inn is None:
         out = {"ошибка": "Некорректный ИНН: ожидается 10 или 12 цифр с верным "
                          "контрольным числом (алгоритм ФНС) — вероятна опечатка",
-               "ввод": argv[1]}
+               "ввод": args[0]}
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
         return 1
 
@@ -705,6 +734,8 @@ def main(argv):
             "банкротство": "скриптом не покрыто",
         },
     }
+    if do_save:
+        save_snapshot(inn, result)
     sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return 0
 
