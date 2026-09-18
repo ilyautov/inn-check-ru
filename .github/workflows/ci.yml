@@ -18,7 +18,10 @@ jobs:
       - name: ruff
         run: |
           pip install ruff
-          ruff check scripts/
+          ruff check scripts/ eval/
+
+      - name: fin_scoring eval (офлайн, фикстуры)
+        run: python3 eval/run_fin_eval.py
 
       - name: skill frontmatter is valid YAML
         run: |

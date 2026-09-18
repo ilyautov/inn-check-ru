@@ -11,14 +11,19 @@ fetch_counterparty.py — проверка российского контраг
       "инн": "...",
       "егрюл":   {...},   # карточка из ЕГРЮЛ (название, ОГРН, директор, адрес, статус)
       "риски":   {...},   # риск-флаги из сервиса «Прозрачный бизнес»
-      "финансы": {...},   # бухотчётность из ГИР БО (выручка, прибыль, активы)
+      "финансы": {...},   # бухотчётность из ГИР БО (выручка, прибыль, активы, строки)
+      "мсп":     {...},   # Реестр МСП (категория, численность) — эндпоинт НЕ верифицирован
+      "спецреестры": {...},  # service.nalog.ru: дисквалификация/задолженность/
+                             # недостоверность — эндпоинты НЕ верифицированы
       "фссп":        {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
       "суды":        {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
       "банкротство": {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
       "_доступность": {   # что реально отдал каждый источник из текущей среды
           "егрюл":  "...",
           "риски":  "...",
-          "финансы":"..."
+          "финансы":"...",
+          "мсп":    "...",
+          "спецреестры": "..."
       }
     }
 Блоки фссп/суды/банкротство скрипт не покрывает (нужен браузер/токен) — они
@@ -368,6 +373,123 @@ def _map_pb_flags(ul):
     return r
 
 
+# Маркер честности для эндпоинтов, добавленных в 1.1.0 и не прогнанных вживую:
+# семейство proc.json по аналогии с pb.nalog.ru, структура ответа не проверена.
+NOTE_UNVERIFIED = "эндпоинт не верифицирован (разведка с не-РФ IP 19.09.2026)"
+
+
+def fetch_msp(opener, inn):
+    """Реестр МСП (rmsp.nalog.ru): статус МСП, категория, численность.
+
+    Эндпоинт-семейство proc.json как у pb.nalog.ru. НЕ ВЕРИФИЦИРОВАН
+    (разведка с не-РФ IP 19.09.2026) — при любой деградации честное
+    «не проверено», скрипт не падает.
+    """
+    inn_q = urllib.parse.quote(str(inn))
+    url = ("https://rmsp.nalog.ru/search-proc.json"
+           "?mode=search-all&queryAll=%s&page=1&pageSize=15" % inn_q)
+    try:
+        status, text = _http_get(opener, url, referer="https://rmsp.nalog.ru/")
+    except Exception as e:
+        return None, "%s; недоступен (%s)" % (NOTE_UNVERIFIED, type(e).__name__)
+    j = _safe_json(text)
+    if j is None:
+        return None, "%s; ответ не-JSON (HTTP %s)" % (NOTE_UNVERIFIED, status)
+    rows = _g(j, "data") or _g(j, "content") or []
+    if not isinstance(rows, list):
+        rows = []
+    row = None
+    for item in rows:
+        if str(_g(item, "inn") or "") == str(inn):
+            row = item
+            break
+    if row is None and rows:
+        row = rows[0]
+    if not isinstance(row, dict):
+        return None, "%s; записи по ИНН не найдены" % NOTE_UNVERIFIED
+    return {
+        "статус_мсп": True,
+        "категория": (_g(row, "category") or _g(row, "categoryName")
+                      or _g(row, "category_name")),
+        "численность": (_g(row, "ssch") or _g(row, "employeesCnt")
+                        or _g(row, "staffCount")),
+        "дата_включения": _g(row, "dateOfInclusion") or _g(row, "startDate"),
+    }, "ok; " + NOTE_UNVERIFIED
+
+
+def _service_nalog_query(opener, path, inn):
+    """Спецреестры service.nalog.ru — двухшаговый флоу proc.json +
+    search-result/{token} по образцу egrul.nalog.ru. НЕ ВЕРИФИЦИРОВАН."""
+    base = "https://service.nalog.ru/%s/" % path
+    body = urllib.parse.urlencode({
+        "captcha": "",
+        "captchaToken": "",
+        "query": str(inn),
+        "page": "1",
+        "pageSize": "10",
+    }).encode("utf-8")
+    headers = {
+        "User-Agent": UA,
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": base,
+    }
+    if _time_left() <= 0:
+        return None, "пропущен: бюджет времени исчерпан (COUNTERPARTY_DEADLINE)"
+    try:
+        req = urllib.request.Request(base + "proc.json", data=body,
+                                     headers=headers, method="POST")
+        resp = opener.open(req, timeout=min(TIMEOUT, max(1.0, _time_left())))
+        post_json = _safe_json(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return None, "недоступен (HTTP %s на POST)" % e.code
+    except Exception as e:
+        return None, "недоступен (%s)" % type(e).__name__
+
+    token = _g(post_json, "t")
+    if not token:
+        return None, "POST не вернул token (структура изменилась)"
+
+    for _ in range(POLL_TRIES):
+        if _time_left() <= POLL_DELAY:
+            return None, "token получен, бюджет времени исчерпан"
+        time.sleep(POLL_DELAY)
+        try:
+            status, text = _http_get(
+                opener, base + "search-result/%s" % token, referer=base)
+        except Exception as e:
+            return None, "недоступен на poll (%s)" % type(e).__name__
+        j = _safe_json(text)
+        if j is not None:
+            return j, "ok"
+    return None, "token получен, результат не пришёл"
+
+
+def fetch_special_registries(opener, inn):
+    """Спецреестры ФНС (service.nalog.ru): дисквалификация руководителя,
+    налоговая задолженность >1000 ₽, недостоверность сведений ЕГРЮЛ.
+
+    НЕ ВЕРИФИЦИРОВАНО (разведка с не-РФ IP 19.09.2026). Каждый подблок
+    деградирует независимо: недоступен -> «не проверено» + причина.
+    """
+    checks = (
+        ("дисквалификация_руководителя", "dismissal"),
+        ("налоговая_задолженность", "zd"),
+        ("недостоверность_сведений", "invalid"),
+    )
+    out, notes = {}, []
+    for key, path in checks:
+        data, av = _service_nalog_query(opener, path, inn)
+        if data is None:
+            out[key] = {"статус": "не проверено", "причина": av}
+            notes.append("%s: %s" % (key, av))
+        else:
+            out[key] = {"статус": "проверено", "данные": data}
+            notes.append("%s: ok" % key)
+    return out, NOTE_UNVERIFIED + " | " + "; ".join(notes)
+
+
 def fetch_finance(opener, inn):
     ref = "https://bo.nalog.gov.ru/"
     inn_q = urllib.parse.quote(str(inn))
@@ -445,6 +567,7 @@ def fetch_finance(opener, inn):
             "активы": _g(rec, "actives"),          # баланс, стр.1600
             "прибыль_убыток": None,                # чистая прибыль, стр.2400
             "дата_отчётности": _g(rec, "actualBfoDate"),
+            "строки": {},                          # сырые строки баланса (для fin_scoring)
         }
         bfo_id = _g(rec, "id")
         if bfo_id is not None:
@@ -456,6 +579,7 @@ def fetch_finance(opener, inn):
                 year["выручка"] = detail.get("выручка")
             if year["активы"] is None:
                 year["активы"] = detail.get("активы")
+            year["строки"] = detail.get("строки") or {}
         finance["отчётность_по_годам"].append(year)
 
     if not finance["отчётность_по_годам"]:
@@ -473,7 +597,7 @@ def _fetch_financials_detail(opener, bfo_id, ref):
       - balance.current1600         — итог актива баланса (стр.1600)
     Тысячи рублей. Возвращает dict с ключами прибыль/выручка/активы (или None).
     """
-    out = {"прибыль": None, "выручка": None, "активы": None}
+    out = {"прибыль": None, "выручка": None, "активы": None, "строки": {}}
     try:
         status, text = _http_get(
             opener, "https://bo.nalog.gov.ru/nbo/bfo/%s/details" % bfo_id,
@@ -497,6 +621,12 @@ def _fetch_financials_detail(opener, bfo_id, ref):
         _g(form, "balance", "current1600")
         or _g(form, "balance", "current1700")
     )
+    # Сырые строки баланса для fin_scoring.py (traceability): капитал и
+    # резервы, оборотные активы, денежные средства, обязательства.
+    for code in ("1300", "1200", "1250", "1400", "1500"):
+        val = _g(form, "balance", "current%s" % code)
+        if val is not None:
+            out["строки"][code] = val
     return out
 
 
@@ -543,6 +673,8 @@ def main(argv):
     egrul_data, egrul_av = fetch_egrul(opener, inn)
     risks_data, risks_av = fetch_risks(opener, inn)
     fin_data, fin_av = fetch_finance(opener, inn)
+    msp_data, msp_av = fetch_msp(opener, inn)
+    spec_data, spec_av = fetch_special_registries(opener, inn)
 
     # Блоки, которые скрипт НЕ собирает, но которые обязательны для решения о
     # сделке — возвращаем явно, чтобы досье не выглядело полным без них.
@@ -553,6 +685,9 @@ def main(argv):
         "егрюл": egrul_data,
         "риски": risks_data,
         "финансы": fin_data,
+        "мсп": msp_data if msp_data is not None
+               else {"статус": "не проверено", "причина": msp_av},
+        "спецреестры": spec_data,
         "фссп": {"статус": ne_sobrano,
                  "источник": "fssp.gov.ru — исполнительные производства (долги)"},
         "суды": {"статус": ne_sobrano,
@@ -563,6 +698,8 @@ def main(argv):
             "егрюл": egrul_av,
             "риски": risks_av,
             "финансы": fin_av,
+            "мсп": msp_av,
+            "спецреестры": spec_av,
             "фссп": "скриптом не покрыто",
             "суды": "скриптом не покрыто",
             "банкротство": "скриптом не покрыто",
