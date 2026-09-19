@@ -37,6 +37,9 @@ jobs:
       - name: version gate (одна версия везде)
         run: python3 eval/run_version_gate.py
 
+      - name: гейт рабочих процессов (имена шагов, ссылки на скрипты)
+        run: python3 eval/run_workflows_gate.py
+
       - name: social preview на актуальных счётчиках
         run: |
           pip install pillow
@@ -82,10 +85,10 @@ jobs:
       - name: батч-проверка (офлайн)
         run: python3 eval/run_batch_eval.py
 
-      - name: мониторинг: отпечатки и список наблюдения (офлайн)
+      - name: "мониторинг: отпечатки и список наблюдения (офлайн)"
         run: python3 eval/run_watchlist_eval.py
 
-      - name: санкционные перечни: парсер и сверка (офлайн)
+      - name: "санкционные перечни: парсер и сверка (офлайн)"
         run: python3 eval/run_sanctions_eval.py
 
       - name: колесо содержит canon и CLI работает из чистого venv
@@ -107,6 +110,18 @@ jobs:
           assert isinstance(canon, dict) and "ндс_усн_освобождение" in canon, canon
           print("canon из колеса ok:", sorted(canon))
           PY
+
+      - name: "отраслевые нормы: агрегация и порог публикации (офлайн)"
+        run: python3 eval/run_benchmarks_eval.py
+
+      - name: "бумажный НДС: признаки и три состояния (офлайн)"
+        run: python3 eval/run_paper_vat_eval.py
+
+      - name: "досье осмотрительности: Markdown и DOCX (офлайн)"
+        run: python3 eval/run_dossier_eval.py
+
+      - name: извлечение ИНН из документов (офлайн)
+        run: python3 eval/run_extract_eval.py
 
       - name: mcp server smoke test
         run: |

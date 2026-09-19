@@ -57,6 +57,11 @@ py-modules = [
   "batch_check",
   "snapshot",
   "watchlist",
+  "opendata_refresh",
+  "benchmarks",
+  "paper_vat",
+  "dossier",
+  "extract_inn",
 ]
 packages = ["inn_check_ru_mcp", "inn_check_ru_data"]
 
