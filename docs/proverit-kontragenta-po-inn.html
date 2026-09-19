@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как проверить контрагента по ИНН бесплатно: пошагово | inn-check-ru</title>
+<meta name="description" content="Проверка контрагента по ИНН бесплатно и за минуты: quick-scan по deal-killer-сигналам, затем полное досье. Какие реестры смотрим (ЕГРЮЛ, ГИР БО, МСП, ФССП, суды, банкротства), что считается кодом, честные ограничения.">
+<meta property="og:title" content="Как проверить контрагента по ИНН бесплатно">
+<meta property="og:description" content="Один ИНН → светофор риска с рекомендацией за пару минут. 18 открытых реестров, quick-scan и полное досье, каждая цифра с источником.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/proverit-kontragenta-po-inn.html">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/proverit-kontragenta-po-inn.html">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span> inn-check-ru <small>· AI Frontier</small></a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverka-ip-po-inn.html">ИП</a>
+      <a href="priznaki-odnodnevki.html">Однодневки</a>
+      <a href="droblenie-biznesa.html">Дробление</a>
+      <a href="monitoring-kontragentov.html">Мониторинг</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="wrap page">
+  <div class="kicker">кластер: проверка по ИНН</div>
+  <h1>Как проверить контрагента по ИНН бесплатно</h1>
+  <p class="lead">Отгрузить в долг, внести предоплату, подписать договор на год — и через месяц узнать, что контрагент в банкротстве. Всё это было открыто ещё до сделки: в ЕГРЮЛ, ФССП, картотеке арбитража и ЕФРСБ. Проверка по ИНН сводит эти реестры в один светофор 🟢/🟡/🔴 за те минуты, что есть у собственника.</p>
+
+  <h2>Быстрый путь: две минуты</h2>
+  <ol>
+    <li>Поставьте скилл: <code>npx skills add ilyautov/inn-check-ru</code> (или ZIP с <a href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip">последнего релиза</a>).</li>
+    <li>Скажите агенту: «проверь поставщика по ИНН … перед предоплатой».</li>
+    <li>Получите карточку: светофор, 1–2 причины, рекомендация (отсрочка / только предоплата / избегать), что проверено и что нет.</li>
+  </ol>
+  <p>Без агента то же делает движок напрямую: <code>python3 scripts/fetch_counterparty.py &lt;ИНН&gt;</code> — один JSON по источникам ФНС.</p>
+
+  <h2>Что проверяется: quick-scan против полного досье</h2>
+  <p><strong>Quick-scan (всегда первым)</strong> идёт только по deal-killer-сигналам — тем, что одни делают сделку опасной: ликвидация или реорганизация, банкротство, недостоверность сведений в ЕГРЮЛ, дисквалификация директора, санкционная сверка (офлайн, секунды), долги крупнее суммы сделки. Нашёлся хоть один — 🔴 и дальше можно не собирать: ~70% отсева происходит здесь.</p>
+  <p><strong>Полное досье</strong> — по запросу «разверни карточку»: финансовый профиль кодом из строк ГИР БО, признаки однодневки и дробления, граф связей, суды и банкротства через браузерный слой, мониторинг изменений снимками.</p>
+
+  <h2>Какие реестры смотрим</h2>
+  <table>
+    <tr><th>Слой</th><th>Что даёт</th><th>Доступ</th></tr>
+    <tr><td>ЕГРЮЛ/ЕГРИП</td><td>реквизиты, статус, директор, дата регистрации</td><td>скрипт, без ключа</td></tr>
+    <tr><td>Прозрачный бизнес</td><td>массовый адрес/директор, недостоверность, спецрежим</td><td>скрипт, без ключа</td></tr>
+    <tr><td>ГИР БО</td><td>выручка, прибыль, активы по годам</td><td>скрипт, без ключа</td></tr>
+    <tr><td>Реестр МСП ✅</td><td>статус МСП, категория, исключение из реестра</td><td>скрипт, верифицирован</td></tr>
+    <tr><td>Санкции РФМ + OFAC + EU</td><td>террористы/экстремисты, SDN, список ЕС</td><td>офлайн-кэш, секунды</td></tr>
+    <tr><td>ФССП, суды, банкротства</td><td>долги, арбитраж, ЕФРСБ</td><td>браузер/агрегатор</td></tr>
+    <tr><td>Граф связей (checko)</td><td>общие директора/учредители, соседи по адресу</td><td>бесплатный ключ или браузер</td></tr>
+  </table>
+  <p>Полный каскад из 18 реестров — в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/SKILL.md">SKILL.md</a>.</p>
+
+  <h2>Почему не просто один агрегатор</h2>
+  <p>В живом тесте (15.06.2026) одна компания у пяти бесплатных агрегаторов дала число судебных дел от ~500 до ~1500 — а один подмешал чужие банкротные «намерения». Поэтому правило скилла: <strong>факт — это совпадение трёх и более источников; расхождение — флаг, а не повод выбрать красивую цифру</strong>. Каждая цифра в досье идёт с источником, датой и tier-маркером (✅/⚠️/❌).</p>
+
+  <h2>Честные ограничения</h2>
+  <ul>
+    <li>Суды и банкротства — браузерный слой: голый скрипт за DDoS-Guard не проходит, официальный API ФССП отключён с 2022 года.</li>
+    <li>Учредители и аффилированность — через checko (бесплатный ключ) или браузер; рёбра графа помечены «⚠️ один источник, требует пересечения».</li>
+    <li>Пороги светофора — эвристика из методичек ФНС, открытая и настраиваемая; статистической калибровки по выборке пока нет.</li>
+    <li>Светофор — оценка для собственника, не приговор контрагенту и не юридическая гарантия. Для крупной сделки — рабочий лист для юриста.</li>
+  </ul>
+  <p>Полный список: <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">KNOWN_LIMITS.md</a>.</p>
+
+  <div class="related">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="proverka-ip-po-inn.html">Проверка ИП по ИНН — отдельный светофор и что закрыто законом</a></li>
+      <li><a href="priznaki-odnodnevki.html">Признаки фирмы-однодневки: чеклист по методике ФНС</a></li>
+      <li><a href="droblenie-biznesa.html">Дробление бизнеса: 8 признаков, проверяемых кодом</a></li>
+      <li><a href="monitoring-kontragentov.html">Мониторинг контрагентов снимками — бесплатно</a></li>
+    </ul>
+  </div>
+
+  <div class="cta-row" style="margin:32px 0">
+    <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ Открыть на GitHub</a>
+    <a class="btn btn-ghost" href="index.html#install">Установка</a>
+  </div>
+</article>
+</main>
+<footer>
+  <div class="wrap foot-grid">
+    <div><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a></div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a></div>
+  </div>
+</footer>
+</body>
+</html>

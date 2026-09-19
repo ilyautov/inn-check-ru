@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка ИП по ИНН: отдельный светофор | inn-check-ru</title>
+<meta name="description" content="Как проверить ИП по ИНН: статус в ЕГРИП, самозанятость (НПД), спецрежим, МСП, внесудебное банкротство физлиц, два поиска ФССП. Что принципиально недоступно по ИП (выручка, адрес, налоговый долг) — и почему это закон, а не баг.">
+<meta property="og:title" content="Проверка ИП по ИНН: отдельный светофор">
+<meta property="og:description" content="ЕГРИП, НПД-статус, МСП, внесудебное банкротство, два поиска ФССП. И честный список того, что по ИП закрыто законом.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/proverka-ip-po-inn.html">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/proverka-ip-po-inn.html">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span> inn-check-ru <small>· AI Frontier</small></a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
+      <a href="priznaki-odnodnevki.html">Однодневки</a>
+      <a href="droblenie-biznesa.html">Дробление</a>
+      <a href="monitoring-kontragentov.html">Мониторинг</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="wrap page">
+  <div class="kicker">кластер: проверка ИП</div>
+  <h1>Проверка ИП по ИНН</h1>
+  <p class="lead">ИП — другой объект проверки: публичной отчётности нет, адреса нет, зато есть статус самозанятого и внесудебное банкротство физлиц. По 12-значному ИНН скилл сам переключается на контур ИП — и не пытается выдать за факт то, что закрыто законом.</p>
+
+  <h2>Композитный светофор ИП</h2>
+  <ul>
+    <li><strong>Возраст и статус</strong> (ЕГРИП ✅) — действующий ли, когда зарегистрирован.</li>
+    <li><strong>НПД-статус</strong> — самозанятый ли (npd.nalog.ru check-status, единственный официальный публичный API ФНС).</li>
+    <li><strong>Спецрежим и численность</strong> — УСН/патент и ССЧ из «Прозрачного бизнеса» (поиск ИП идёт отдельным режимом search-ip).</li>
+    <li><strong>МСП</strong> — в реестре ли; <strong>исключение из реестра = стоп-сигнал</strong> 🟡 минимум.</li>
+    <li><strong>Дисквалификация</strong> — спецреестры/браузер.</li>
+    <li><strong>ФССП — обязательно два поиска</strong>: ИП как юрлицо по ИНН и физлицо по ФИО + дата рождения + регион. Официального API ФССП больше нет — только браузер.</li>
+    <li><strong>ЕФРСБ</strong> — включая внесудебное банкротство физлиц, которого нет в арбитражной картотеке.</li>
+    <li><strong>Контракты ЕИС</strong> — выигранные закупки как сигнал «живой бизнес».</li>
+  </ul>
+
+  <h2>Самозанятый или ИП: почему это важно перед оплатой</h2>
+  <p>Если контрагент работает как самозанятый (плательщик НПД), его чеки можно учитывать в расходах и не удерживать НДФЛ — но только если статус действующий на дату чека. Скилл проверяет это через официальный сервис ФНС check-status (схема по официальному описанию API; с не-РФ IP сервис недоступен — в этом случае честное «не проверено», а не выдуманный статус).</p>
+
+  <h2>Принципиально недоступно по ИП (закрыто законом, не кодом)</h2>
+  <ul>
+    <li><strong>Выручка и баланс</strong> — у ИП нет публичной отчётности; финансовый профиль кодом неприменим, ответ — «не проверено».</li>
+    <li><strong>Налоговая задолженность</strong> — спецреестр ФНС публикует её только по юрлицам (ст. 102 НК РФ).</li>
+    <li><strong>Адрес ИП</strong> — закрыт 152-ФЗ «О персональных данных»: сигналы «массовый адрес» и «недостоверность адреса» к ИП неприменимы, чеклист однодневки для ИП считается без них.</li>
+    <li><strong>ОгрДоступ</strong> — краевой случай ограничения доступа к сведениям от ФНС: «не нашёлся» ≠ «не существует», помечается отдельно.</li>
+  </ul>
+
+  <h2>Как запустить</h2>
+  <div class="code">python3 scripts/fetch_counterparty.py &lt;ИНН ИП&gt;
+<span class="c"># поле "тип": "ип" — движок сам разводит по длине ИНН (10 знаков ООО, 12 — ИП)</span></div>
+  <p>В агенте: «проверь этого ИП по ИНН перед оплатой» — quick-scan с учётом ИП-контура соберётся сам.</p>
+
+  <div class="related">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="proverit-kontragenta-po-inn.html">Как проверить контрагента по ИНН бесплатно</a></li>
+      <li><a href="priznaki-odnodnevki.html">Признаки фирмы-однодневки</a></li>
+      <li><a href="monitoring-kontragentov.html">Мониторинг контрагентов снимками</a></li>
+    </ul>
+  </div>
+
+  <div class="cta-row" style="margin:32px 0">
+    <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ Открыть на GitHub</a>
+    <a class="btn btn-ghost" href="index.html#install">Установка</a>
+  </div>
+</article>
+</main>
+<footer>
+  <div class="wrap foot-grid">
+    <div><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a></div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a></div>
+  </div>
+</footer>
+</body>
+</html>

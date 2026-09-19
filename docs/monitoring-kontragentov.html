@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мониторинг контрагентов: снимки и diff бесплатно | inn-check-ru</title>
+<meta name="description" content="Мониторинг контрагентов перед каждой крупной отгрузкой: снимок проверки и diff — смена статуса на ликвидацию, новый директор, недостоверность сведений, ухудшение финансов. Офлайн, с датами «было/стало», бесплатно — то, за что сервисы берут деньги.">
+<meta property="og:title" content="Мониторинг контрагентов: снимки и diff бесплатно">
+<meta property="og:description" content="Снимок перед отгрузкой, diff показывает, что изменилось: статус 🔴, директор 🟡, недостоверность 🔴. Leading indicators с датами «было/стало».">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/monitoring-kontragentov.html">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/monitoring-kontragentov.html">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span> inn-check-ru <small>· AI Frontier</small></a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
+      <a href="proverka-ip-po-inn.html">ИП</a>
+      <a href="priznaki-odnodnevki.html">Однодневки</a>
+      <a href="droblenie-biznesa.html">Дробление</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="wrap page">
+  <div class="kicker">кластер: мониторинг</div>
+  <h1>Мониторинг контрагентов: снимки и diff</h1>
+  <p class="lead">Проверить контрагента один раз — мало: ликвидация, смена директора или отметка о недостоверности могут появиться между проверкой и отгрузкой. Мониторинг здесь — не обещание «поставить на контроль», а механика: снимок + diff, офлайн, бесплатно.</p>
+
+  <h2>Как это работает</h2>
+  <div class="steps">
+    <div class="step"><div><h3>Снимок перед каждой крупной отгрузкой</h3><p><code>python3 scripts/fetch_counterparty.py &lt;ИНН&gt; --save</code> сохраняет JSON проверки в <code>~/.cache/inn-check-ru/snapshots/</code>.</p></div></div>
+    <div class="step"><div><h3>Diff двух последних снимков</h3><p><code>python3 scripts/diff_counterparty.py &lt;ИНН&gt;</code> показывает, что изменилось — JSON или светофорной карточкой (<code>--human</code>).</p></div></div>
+    <div class="step"><div><h3>Решение по leading indicators</h3><p>Каждое изменение — с датами «было/стало» и severity. Появился 🔴 — отгрузку стоп, перепроверка.</p></div></div>
+  </div>
+
+  <h2>Что ловит diff</h2>
+  <table>
+    <tr><th>Изменение</th><th>Severity</th><th>Почему важно</th></tr>
+    <tr><td>статус → ликвидация/реорганизация</td><td>🔴</td><td>deal-killer, сделку стоп</td></tr>
+    <tr><td>появилась недостоверность сведений</td><td>🔴</td><td>ФНС не подтверждает адрес/директора</td></tr>
+    <tr><td>чистые активы ушли ниже нуля</td><td>🔴</td><td>движение к ст. 30 ФЗ-14</td></tr>
+    <tr><td>смена руководителя</td><td>🟡</td><td>переспросите, кто реально управляет</td></tr>
+    <tr><td>2+ смены директора за год</td><td>🟡</td><td>признак однодневки</td></tr>
+    <tr><td>смена адреса</td><td>🟡</td><td>стандартный leading indicator</td></tr>
+    <tr><td>появилась налоговая задолженность</td><td>🟡</td><td>деньги уходят мимо налоговой</td></tr>
+    <tr><td>выручка упала &gt; 50% (новый год)</td><td>🟡</td><td>пороги общие с финансовым скорингом</td></tr>
+  </table>
+  <p>Без изменений diff честно отвечает «изменений нет»; с одним снимком — «сравнивать не с чем, вернитесь позже». Снятие недостоверности — отдельное инфо-изменение: новости бывают и хорошие.</p>
+
+  <h2>То, за что сервисы берут деньги, — бесплатно</h2>
+  <p>«Совокупная выручка связанных компаний» и алерты об изменениях в карточке — платные функции корпоративных сервисов. Здесь они считаются тем же открытым кодом поверх тех же открытых реестров: мониторинг стоит ровно столько, сколько ваша дисциплина делать снимок перед отгрузкой (или одна строка в кроне агента).</p>
+
+  <h2>Чего мониторинг не ловит</h2>
+  <p>Суды и банкротства снимками не покрываются — движок их не собирает (браузерный слой). Перед крупной отгрузкой они проверяются отдельно, по каскаду. Честный список — в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">KNOWN_LIMITS.md</a>.</p>
+
+  <div class="related">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="proverit-kontragenta-po-inn.html">Как проверить контрагента по ИНН бесплатно</a></li>
+      <li><a href="priznaki-odnodnevki.html">Признаки фирмы-однодневки</a></li>
+      <li><a href="droblenie-biznesa.html">Дробление бизнеса: признаки кодом</a></li>
+    </ul>
+  </div>
+
+  <div class="cta-row" style="margin:32px 0">
+    <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ Открыть на GitHub</a>
+    <a class="btn btn-ghost" href="index.html#install">Установка</a>
+  </div>
+</article>
+</main>
+<footer>
+  <div class="wrap foot-grid">
+    <div><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a></div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a></div>
+  </div>
+</footer>
+</body>
+</html>

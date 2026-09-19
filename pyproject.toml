@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 # Версия одна на репозиторий: гейт eval/run_version_gate.py.
 [project]
 name = "inn-check-ru"
-version = "1.6.0"
+version = "1.6.1"
 description = "Проверка российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом. CLI и MCP-сервер."
 readme = "README.md"
 license = "Apache-2.0"

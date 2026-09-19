@@ -5,15 +5,17 @@
 > **Не отгружай в долг вслепую.** Открытый AI-скилл, который по одному ИНН собирает открытые реестры (ЕГРЮЛ, ФССП, суды, банкротства, финансы) и выдаёт **светофор риска 🟢/🟡/🔴** с рекомендацией: отсрочка, только предоплата или избегать. Для Claude Code, Cursor, Codex, ChatGPT и Gemini. Бесплатно, Apache-2.0, данные — из настоящих реестров, а не из головы модели.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.6.0-blueviolet)](CHANGELOG.md)
+[![Версия](https://img.shields.io/badge/версия-1.6.1-blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/inn-check-ru?style=social)](https://github.com/ilyautov/inn-check-ru/stargazers)
 [![skills.sh](https://skills.sh/b/ilyautov/inn-check-ru)](https://skills.sh/ilyautov/inn-check-ru/inn-check-ru)
 
 <p align="center">
-  <a href="https://github.com/ilyautov/inn-check-ru">
+  <a href="https://inn-check-ru.aifrontier.tech/">
     <img src="assets/social-preview.png" alt="inn-check-ru: проверка контрагента по ИНН — светофор риска по реестрам ЕГРЮЛ, ФССП, судов, банкротств, санкции и граф связей, каждая цифра с источником и датой" width="720">
   </a>
 </p>
+
+📖 **Сайт проекта:** [inn-check-ru.aifrontier.tech](https://inn-check-ru.aifrontier.tech/) — разборы по кластерам: [проверка по ИНН](https://inn-check-ru.aifrontier.tech/proverit-kontragenta-po-inn.html), [ИП](https://inn-check-ru.aifrontier.tech/proverka-ip-po-inn.html), [однодневки](https://inn-check-ru.aifrontier.tech/priznaki-odnodnevki.html), [дробление](https://inn-check-ru.aifrontier.tech/droblenie-biznesa.html), [мониторинг](https://inn-check-ru.aifrontier.tech/monitoring-kontragentov.html).
 
 ```
 🚦 ООО «Ромашка», ИНН 7700000000 — на 15.06.2026

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Признаки фирмы-однодневки: чеклист по методике ФНС | inn-check-ru</title>
+<meta name="description" content="7 признаков однодневки, проверяемых кодом из открытых данных: возраст, УК 10 000 ₽, массовый адрес/директор, автономия &lt;0.1, выручка без сотрудников. Плюс финансовая патология: чистые активы ниже нуля два года — ст. 30 ФЗ-14. 3+ признака → осторожно, 5+ → избегать.">
+<meta property="og:title" content="Признаки фирмы-однодневки: чеклист по методике ФНС">
+<meta property="og:description" content="Чеклист, который считается кодом из уже собранных реестров: 3+ признака → 🟡, 5+ → 🔴. Эвристика, не приговор.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/priznaki-odnodnevki.html">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/priznaki-odnodnevki.html">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span> inn-check-ru <small>· AI Frontier</small></a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
+      <a href="proverka-ip-po-inn.html">ИП</a>
+      <a href="droblenie-biznesa.html">Дробление</a>
+      <a href="monitoring-kontragentov.html">Мониторинг</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="wrap page">
+  <div class="kicker">кластер: однодневки</div>
+  <h1>Признаки фирмы-однодневки: чеклист, который считает код</h1>
+  <p class="lead">«Не однодневка ли?» — вопрос, на который нельзя отвечать по ощущению. Скилл считает признаки кодом из уже собранных сигналов (ЕГРЮЛ, риск-флаги ФНС, финансовый профиль) — отдельный источник не нужен.</p>
+
+  <h2>Чеклист из 7 признаков</h2>
+  <ol>
+    <li>возраст компании &lt; 1 года;</li>
+    <li>уставный капитал = 10 000 ₽ (минимум по ст. 14 ФЗ-14);</li>
+    <li>массовый адрес ИЛИ массовый директор;</li>
+    <li>численность 0–1 чел. при выручке &gt; 50 млн ₽;</li>
+    <li>коэффициент автономии &lt; 0.1 — собственного капитала меньше 10% активов;</li>
+    <li>выручка без основных средств и сотрудников;</li>
+    <li>частая смена директора/адреса (по истории изменений).</li>
+  </ol>
+  <p><strong>Правило: 3+ признака → минимум 🟡, 5+ → 🔴.</strong> Это эвристика, не приговор: молодая компания с УК 10 000 ₽ может быть честным стартапом. Чеклист повышает тревожность и требует добивки (офис, штат, реальные операции), а не выносит вердикт сам.</p>
+
+  <h2>Финансовая патология — тоже кодом</h2>
+  <p>Из строк бухгалтерской отчётности ГИР БО (приказ Минфина № 66н) считаются:</p>
+  <table>
+    <tr><th>Сигнал</th><th>Расчёт</th><th>Порог</th></tr>
+    <tr><td>🔴 Чистые активы &lt; 0 два года</td><td>строка 1300</td><td>риск обязательной ликвидации, ст. 30 ФЗ-14</td></tr>
+    <tr><td>🟡 ЧА ниже уставного капитала</td><td>1300 vs УК</td><td>обязанность снизить УК или ликвидироваться</td></tr>
+    <tr><td>🟡 Автономия</td><td>1300 / 1600</td><td>&lt; 0.1 — живёт на чужие деньги</td></tr>
+    <tr><td>🟡 Текущая ликвидность</td><td>1200 / 1500</td><td>&lt; 1 — долгов больше, чем оборотных активов</td></tr>
+    <tr><td>🟡 Падение выручки</td><td>строка 2110 г/г</td><td>&gt; 50% — бизнес схлопывается</td></tr>
+    <tr><td>🟡 Убыток 2+ года подряд</td><td>строка 2400</td><td>проедает капитал</td></tr>
+    <tr><td>🟡 Транзитный профиль</td><td>рост 2110 при ССЧ ~0</td><td>&gt; 300% — прокладка, а не операционный бизнес</td></tr>
+  </table>
+  <p>Красный флаг по чистым активам — deal-killer наравне с ликвидацией: по ст. 30 ФЗ-14 общество с отрицательными чистыми активами два года подряд обязано снизить уставный капитал или ликвидироваться, а ФНС вправе требовать ликвидации через суд. Каждый флаг возвращается с сырой строкой баланса и годом — число можно перепроверить по первичке.</p>
+
+  <h2>Ранние сигналы, которые ЕГРЮЛ ещё не показывает</h2>
+  <p>Намерения о ликвидации, реорганизации, уменьшении УК, залог доли и смена директора публикуются в Вестнике госрегистрации и сообщениях Федресурса — а в ЕГРЮЛ попадают с опозданием в недели. Чистый ЕГРЮЛ эти сигналы не отменяет: в полном досье они проверяются отдельным браузерным слоем.</p>
+
+  <div class="related">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="proverit-kontragenta-po-inn.html">Как проверить контрагента по ИНН бесплатно</a></li>
+      <li><a href="droblenie-biznesa.html">Дробление бизнеса: 8 признаков кодом</a></li>
+      <li><a href="proverka-ip-po-inn.html">Проверка ИП по ИНН</a></li>
+      <li><a href="monitoring-kontragentov.html">Мониторинг контрагентов снимками</a></li>
+    </ul>
+  </div>
+
+  <div class="cta-row" style="margin:32px 0">
+    <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ Открыть на GitHub</a>
+    <a class="btn btn-ghost" href="index.html#install">Установка</a>
+  </div>
+</article>
+</main>
+<footer>
+  <div class="wrap foot-grid">
+    <div><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a></div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a></div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка контрагента по ИНН — светофор риска в AI-агенте | inn-check-ru</title>
+<meta name="description" content="Открытый AI-скилл: по одному ИНН собирает 18 открытых реестров (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU) и выдаёт светофор риска 🟢/🟡/🔴 с рекомендацией. 22 сигнала считаются кодом, каждая цифра — с источником и датой. Apache-2.0.">
+<meta property="og:title" content="Проверка контрагента по ИНН — светофор риска в вашем AI-агенте">
+<meta property="og:description" content="18 реестров, 22 сигнала риска кодом, санкции офлайн, граф связей и признаки дробления. Каждая цифра с источником и датой — где данных нет, честное «не проверено».">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "inn-check-ru",
+  "alternateName": "Проверка контрагента по ИНН",
+  "description": "Открытый AI-скилл проверки российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом, мониторинг снимками.",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "macOS, Windows, Linux",
+  "url": "https://inn-check-ru.aifrontier.tech/",
+  "codeRepository": "https://github.com/ilyautov/inn-check-ru",
+  "downloadUrl": "https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip",
+  "programmingLanguage": "Python",
+  "license": "https://opensource.org/licenses/Apache-2.0",
+  "isAccessibleForFree": true,
+  "inLanguage": "ru",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "RUB"},
+  "author": {"@type": "Person", "name": "Ilya Utov", "url": "https://github.com/ilyautov"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"Как проверить контрагента по ИНН бесплатно?","acceptedAnswer":{"@type":"Answer","text":"Поставьте скилл одной командой npx skills add ilyautov/inn-check-ru и скажите агенту «проверь поставщика по ИНН». За пару минут quick-scan сверит deal-killer-сигналы (ликвидация, банкротство, недостоверность ЕГРЮЛ, дисквалификация, санкции) по открытым реестрам и выдаст светофор с рекомендацией."}},
+    {"@type":"Question","name":"Почему нельзя просто посмотреть один агрегатор?","acceptedAnswer":{"@type":"Answer","text":"В живом тесте одна компания у пяти агрегаторов дала число судебных дел от ~500 до ~1500 — у каждого своя методология подсчёта, а один подмешал чужие банкротные «намерения». Скилл считает фактом только совпадение трёх и более источников, а расхождение показывает как флаг."}},
+    {"@type":"Question","name":"Работает без API-ключей?","acceptedAnswer":{"@type":"Answer","text":"Базовый контур — полностью без ключей: ЕГРЮЛ, риск-флаги ФНС, финансы ГИР БО, Реестр МСП, санкции офлайн. Граф связей просит бесплатный ключ checko (или сбор связей браузером), суды и банкротства глубже — через браузер."}},
+    {"@type":"Question","name":"Чем это отличается от Контур.Фокуса и СПАРК?","acceptedAnswer":{"@type":"Answer","text":"Это не замена, а другая задача: скилл живёт внутри вашего AI-агента, сводит несколько источников и показывает расхождения вместо одной уверенной цифры, а его код и пороги открыты и настраиваемы. Для крупной сделки светофор — рабочий лист для юриста, не последнее слово."}},
+    {"@type":"Question","name":"Куда уходят мои данные?","acceptedAnswer":{"@type":"Answer","text":"Скилл работает там же, где ваш агент. Наружу уходит только проверяемый ИНН (или ФИО для санкционной сверки) в открытые реестры по TLS; санкционные перечни и дампы после скачивания сверяются локально. Телеметрии у проекта нет."}},
+    {"@type":"Question","name":"Это бесплатно?","acceptedAnswer":{"@type":"Answer","text":"Да, открытый код под лицензией Apache-2.0. Берите, форкайте, проверяйте логику — пороги светофора видны и настраиваются."}}
+  ]
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html" aria-label="inn-check-ru, на главную">
+      <span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span>
+      inn-check-ru <small>· AI Frontier</small>
+    </a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
+      <a href="proverka-ip-po-inn.html">ИП</a>
+      <a href="priznaki-odnodnevki.html">Однодневки</a>
+      <a href="droblenie-biznesa.html">Дробление</a>
+      <a href="monitoring-kontragentov.html">Мониторинг</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="wrap">
+      <div class="kicker">inn-check-ru · Apache-2.0</div>
+      <h1>Проверка контрагента по ИНН — <span class="cta-t">светофор риска</span> в вашем AI-агенте</h1>
+      <p class="sub">Один ИНН на вход — 🟢/🟡/🔴 с рекомендацией на выходе: отсрочка, только предоплата или избегать. 18 открытых реестров, 22 сигнала риска, посчитанных кодом. Каждая цифра — с источником и датой; где данных нет — честное «не проверено», а не правдоподобная выдумка.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru" aria-label="Открыть репозиторий на GitHub">★ Открыть на GitHub</a>
+        <a class="btn btn-ghost" href="#install">Установка одной командой</a>
+      </div>
+      <div class="trust-mini"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><span>Открытый код · 18 реестров · 22 сигнала кодом · санкции РФМ/OFAC/EU офлайн · Claude Code, Cursor, Codex, Gemini, MCP</span></div>
+    </div>
+  </section>
+
+  <section class="s alt" id="demo">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">как выглядит ответ</div>
+        <h2>Не простыня, а карточка за пару минут</h2>
+        <p>Quick-scan идёт только по deal-killer-сигналам. Нашёлся хоть один — сбор можно останавливать: примерно 70% отсева происходит именно здесь.</p>
+      </div>
+      <div class="card-light">🚦 ООО «Ромашка», ИНН 7700000000 — на 15.06.2026
+
+<span class="red">🔴 Отсрочку не давать. Только 100% предоплата или отказ.</span>
+
+Почему: компания в стадии ликвидации; 4 исп. производства ФССП на 3,1 млн ₽ — больше суммы сделки.
+Уровень поднят сигналами: ликвидация (ЕГРЮЛ) + ФССП 3,1 млн > сумма сделки 1,2 млн.
+Рекомендация: избегать отсрочки; при острой нужде — только предоплата.
+Вердикт сменится, если: ликвидация отменена И производства погашены (🔴→🟡).
+Мониторить: банкротное заявление в ЕФРСБ.
+Что проверено: ЕГРЮЛ ✅, ФССП ✅ (15.06.2026). Что НЕ проверено: суды (kad.arbitr — вручную).</div>
+      <p class="card-note">Пример иллюстративный, данные условные. Формат карточки — единый во всех стеках.</p>
+    </div>
+  </section>
+
+  <section class="proof">
+    <div class="wrap">
+      <div class="kicker">почему не один агрегатор</div>
+      <h2>Одна компания, пять агрегаторов, четыре разных числа</h2>
+      <p class="proof-lead">Живой тест 15.06.2026: прогнали одну компанию через пять бесплатных агрегаторов. Число судебных дел разошлось почти втрое — у каждого своя методология подсчёта:</p>
+      <div class="nums" aria-label="Разные числа судебных дел у разных агрегаторов">
+        <span class="n">~500</span><span class="ne">≠</span>
+        <span class="n">~1000</span><span class="ne">≠</span>
+        <span class="n">~1500</span>
+      </div>
+      <p class="small">Один агрегатор вдобавок подмешал чужие банкротные «намерения». Зато выручка и число исполнительных производств совпали у всех — надёжный сигнал. Цифры намеренно округлены; проверяйте на своих контрагентах сами.</p>
+      <p class="verdict">Отсюда главный принцип: <b>факт — это то, что совпало у трёх и более источников.</b> Расхождение — флаг, а не повод выбрать самую красивую цифру.</p>
+    </div>
+  </section>
+
+  <section class="s" id="what">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">что проверяет</div>
+        <h2>18 реестров, 22 сигнала — кодом, а не из головы модели</h2>
+        <p>Движок на чистом Python stdlib. Числа не выдумываются моделью — они трассируются к строке реестра; tier-маркеры (✅ подтверждено / ⚠️ один источник / ❌ не подтверждено) едут с каждым фактом.</p>
+      </div>
+      <div class="grid3">
+        <div class="card">
+          <h3>Реестры без ключей</h3>
+          <p>ЕГРЮЛ/ЕГРИП, риск-флаги «Прозрачного бизнеса», ГИР БО, Реестр МСП (✅ верифицирован), статус самозанятого (НПД), ЕРКНМ и РНП по дампам — одна команда, один JSON.</p>
+          <span class="tag">fetch_counterparty.py</span>
+        </div>
+        <div class="card">
+          <h3>Финансовая патология кодом</h3>
+          <p>Чистые активы ниже нуля два года (ст. 30 ФЗ-14 — 🔴 deal-killer), автономия, ликвидность, падение выручки, транзитный профиль. Каждый флаг — с сырой строкой баланса.</p>
+          <span class="tag">fin_scoring.py</span>
+        </div>
+        <div class="card">
+          <h3>Санкции офлайн</h3>
+          <p>Перечни РФМ, OFAC SDN и EU Consolidated качаются один раз в кэш — дальше сверка директора и компании локально, за секунды. По ФИО — честная пометка «проверьте дату рождения».</p>
+          <span class="tag">sanctions_check.py</span>
+        </div>
+        <div class="card">
+          <h3>Граф связей и дробление</h3>
+          <p>Общие директора и учредители, соседи по адресу, правопреемство — граф глубины 2. Признаки дробления по методике ФНС с формулировочной дисциплиной: «N признаков», никогда «это дробление».</p>
+          <span class="tag">affiliates_graph.py</span>
+        </div>
+        <div class="card">
+          <h3>ИП — отдельный светофор</h3>
+          <p>ЕГРИП, НПД-статус, спецрежим, МСП, внесудебное банкротство физлиц, два поиска ФССП. Что закрыто законом (выручка, адрес, налоговый долг ИП) — честно «не проверено».</p>
+          <span class="tag">12-значный ИНН</span>
+        </div>
+        <div class="card">
+          <h3>Мониторинг снимками</h3>
+          <p>Снимок перед каждой крупной отгрузкой, diff показывает, что изменилось: статус 🔴, директор 🟡, недостоверность 🔴 — с датами «было/стало». То, за что сервисы берут деньги, — бесплатно.</p>
+          <span class="tag">diff_counterparty.py</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s alt" id="install">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">установка</div>
+        <h2>Одна команда — в любой агент</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><div><h3>skills.sh — Claude Code, Cursor, Codex, Gemini и ещё десятки</h3><p><code>npx skills add ilyautov/inn-check-ru</code> — затем просто скажите агенту: «проверь поставщика по ИНН перед предоплатой».</p></div></div>
+        <div class="step"><div><h3>Плагин Claude Code</h3><p><code>/plugin marketplace add ilyautov/inn-check-ru</code>, затем <code>/plugin install inn-check-ru@inn-check-ru</code>.</p></div></div>
+        <div class="step"><div><h3>MCP-сервер</h3><p><code>claude mcp add inn-check-ru -- python3 mcp/server.py</code> — 6 read-only инструментов в MCP-сессии (счёт из Диадока → проверка до подписи).</p></div></div>
+        <div class="step"><div><h3>ZIP для claude.ai</h3><p>Готовый архив последнего релиза: <a href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip">inn-check-ru.zip</a> → Settings → Capabilities → Skills → Upload.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="s" id="limits">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">честно</div>
+        <h2>Чего скилл не умеет</h2>
+        <p>Полный список — в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">KNOWN_LIMITS.md</a>. Главное:</p>
+      </div>
+      <div class="chips">
+        <span class="chip">суды и банкротства — браузерный слой</span>
+        <span class="chip">у ИП нет публичной отчётности (закон)</span>
+        <span class="chip">учредители — через checko/браузер</span>
+        <span class="chip">пороги эвристические, настраиваемые</span>
+        <span class="chip">светофор — оценка, не приговор</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="s alt" id="faq">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="kicker">вопросы</div>
+        <h2>Частые вопросы</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Как проверить контрагента по ИНН бесплатно?</summary><p>Поставьте скилл одной командой <code>npx skills add ilyautov/inn-check-ru</code> и скажите агенту «проверь поставщика по ИНН». Quick-scan за пару минут сверит deal-killer-сигналы по открытым реестрам и выдаст светофор с рекомендацией. Подробно — на странице <a href="proverit-kontragenta-po-inn.html">проверки по ИНН</a>.</p></details>
+        <details><summary>Почему нельзя просто посмотреть один агрегатор?</summary><p>Потому что счётчики агрегаторов не совпадают: в живом тесте число судов по одной компании разошлось от ~500 до ~1500. Скилл считает фактом совпадение ≥3 источников, а расхождение показывает как флаг — вместо одной уверенной (и, возможно, чужой) цифры.</p></details>
+        <details><summary>Работает без API-ключей?</summary><p>Базовый контур — полностью без ключей: ЕГРЮЛ, риск-флаги ФНС, финансы ГИР БО, Реестр МСП, санкции офлайн. Граф связей просит бесплатный ключ checko (или сбор связей браузером через --offline-граф), суды и банкротства глубже — через браузер.</p></details>
+        <details><summary>Чем это отличается от Контур.Фокуса и СПАРК?</summary><p>Не замена, а другая задача: скилл живёт внутри вашего AI-агента рядом с остальной работой, сводит несколько источников и показывает расхождения. Код и пороги открыты — логику можно проверить, а не верить чёрному ящику скоринга. Для крупной сделки светофор — рабочий лист для юриста.</p></details>
+        <details><summary>Куда уходят мои данные?</summary><p>Скилл работает там же, где ваш агент. Наружу уходит только проверяемый ИНН (или ФИО для санкционной сверки) в открытые реестры по TLS; санкционные перечни и дампы после скачивания сверяются локально. Телеметрии у проекта нет — подробности в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md">PRIVACY_POLICY.md</a>.</p></details>
+        <details><summary>Это бесплатно?</summary><p>Да, открытый код под лицензией Apache-2.0. Берите, форкайте, проверяйте логику — пороги светофора видны и настраиваются.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="s">
+    <div class="wrap">
+      <div class="oss">
+        <div class="kicker">открытый код</div>
+        <h2>Звезда на GitHub — лучший способ сказать спасибо</h2>
+        <p>По ней проект находят другие собственники, которые торгуют в долг вслепую. Багрепорты, расхождения цифр с реестрами и новые источники — в Issues, шаблоны для них уже есть.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ github.com/ilyautov/inn-check-ru</a>
+          <a class="btn btn-ghost" href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip">Скачать ZIP</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-grid">
+    <div>
+      <span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span>
+      <strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a> · <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">Ограничения</a> · <a href="https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md">Приватность</a>
+    </div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a> · <a href="https://ilyautov.github.io/">все проекты</a></div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+# inn-check-ru
+
+> Открытый AI-скилл проверки российского контрагента по ИНН: светофор риска 🟢/🟡/🔴 по 18 открытым реестрам, 22 сигнала кодом, каждая цифра с источником и датой.
+
+Проект лаборатории AI Frontier. Лицензия Apache-2.0, код: https://github.com/ilyautov/inn-check-ru
+Граница системы: светофор — оценка риска по открытым данным, не юридическая или кредитная гарантия; решение за собственником. Одиночному агрегатору не верим: факт = совпадение ≥3 источников.
+
+## Установка
+
+- Скилл в любого агента: `npx skills add ilyautov/inn-check-ru` (Claude Code, Cursor, Codex, Gemini CLI и др.)
+- Плагин Claude Code: `/plugin marketplace add ilyautov/inn-check-ru`, затем `/plugin install inn-check-ru@inn-check-ru`
+- MCP-сервер (6 read-only инструментов): https://github.com/ilyautov/inn-check-ru/tree/main/mcp
+- ZIP для claude.ai: https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip
+
+## Страницы
+
+- [Главная](https://inn-check-ru.aifrontier.tech/): светофор-карточка, почему не один агрегатор (500/1000/1500), что проверяет, установка, FAQ.
+- [Как проверить контрагента по ИНН бесплатно](https://inn-check-ru.aifrontier.tech/proverit-kontragenta-po-inn.html): quick-scan vs полное досье, реестры, честные ограничения.
+- [Проверка ИП по ИНН](https://inn-check-ru.aifrontier.tech/proverka-ip-po-inn.html): отдельный светофор ИП, НПД/самозанятые, что закрыто законом.
+- [Признаки фирмы-однодневки](https://inn-check-ru.aifrontier.tech/priznaki-odnodnevki.html): чеклист из 7 признаков по методике ФНС, финансовая патология кодом (ст. 30 ФЗ-14).
+- [Дробление бизнеса](https://inn-check-ru.aifrontier.tech/droblenie-biznesa.html): 8 признаков кодом, пороги 2026 (НДС 20 млн), формулировочная дисциплина «аффилированность ≠ дробление».
+- [Мониторинг контрагентов](https://inn-check-ru.aifrontier.tech/monitoring-kontragentov.html): снимки + diff, leading indicators с датами «было/стало».
+
+## Прочее
+
+- [Известные ограничения (KNOWN_LIMITS)](https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md): чего скилл не умеет, со статусами.
+- [Политика конфиденциальности](https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md): наружу уходит только проверяемый ИНН в открытые реестры по TLS.
+- [Лаборатория AI Frontier](https://aifrontier.tech/sistemy/inn-check-ru/): описание системы и её границ.
+- [Все проекты автора](https://ilyautov.github.io/): витрина открытых проектов.

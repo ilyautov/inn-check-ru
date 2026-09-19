@@ -2,6 +2,15 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — semver.
 
+## [1.6.1] — 2026-09-19
+
+Лендинг на GitHub Pages: inn-check-ru.aifrontier.tech. Логика проверки не менялась.
+
+### Added
+- `docs/` — статический сайт из 6 страниц под поисковые кластеры: главная (hero, светофор-карточка, «почему не один агрегатор», FAQ с JSON-LD), `proverit-kontragenta-po-inn.html`, `proverka-ip-po-inn.html`, `priznaki-odnodnevki.html`, `droblenie-biznesa.html`, `monitoring-kontragentov.html`. Тёмная фирменная тема (палитра social-preview), системные шрифты, работает с file://, без трекеров и CDN.
+- Инфраструктура сайта: `docs/styles.css`, `CNAME`, `robots.txt`, `llms.txt`, `.nojekyll`, `scripts/build_sitemap.py` → `docs/sitemap.xml` (lastmod по git, паттерн humanizer-ru), og-теги и canonical на каждой странице, кластерная перелинковка.
+- README: hero-картинка теперь ссылается на сайт, строка «📖 Сайт проекта»; homepage репозитория → inn-check-ru.aifrontier.tech.
+
 ## [1.6.0] — 2026-09-19
 
 «Стандарт флагманов»: оформление и инфраструктура доведены до уровня эталонных репо автора (humanizer-ru, marketplaces-mcp-ru). Логика проверки не менялась.

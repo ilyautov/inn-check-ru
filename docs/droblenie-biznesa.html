@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дробление бизнеса: признаки, проверяемые кодом | inn-check-ru</title>
+<meta name="description" content="8 признаков дробления бизнеса из открытых данных: общий директор/учредитель, единый адрес, все на УСН, каждая компания под порогом НДС 20 млн — а группа в сумме над ним. Пороги 2026, письмо ФНС БВ-4-7/8051@, формулировочная дисциплина: аффилированность ≠ дробление.">
+<meta property="og:title" content="Дробление бизнеса: признаки, проверяемые кодом">
+<meta property="og:description" content="Граф связей + чеклист из методики ФНС: каждая компания под 20 млн, группа в сумме 72 млн. Вывод — всегда «N признаков, совпадающих с типовыми доводами ФНС».">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://inn-check-ru.aifrontier.tech/droblenie-biznesa.html">
+<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/droblenie-biznesa.html">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span> inn-check-ru <small>· AI Frontier</small></a>
+    <nav class="nav-links" aria-label="Основная навигация">
+      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
+      <a href="proverka-ip-po-inn.html">ИП</a>
+      <a href="priznaki-odnodnevki.html">Однодневки</a>
+      <a href="monitoring-kontragentov.html">Мониторинг</a>
+      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main>
+<article class="wrap page">
+  <div class="kicker">кластер: дробление бизнеса</div>
+  <h1>Дробление бизнеса: признаки, которые считает код</h1>
+  <p class="lead">С 2026 года у дробления появился главный мотив: освобождение от НДС на УСН держится только до 20 млн ₽ выручки в год. «Каждая компания группы под порогом, а вместе — сильно над» теперь вычисляется из открытых данных напрямую.</p>
+
+  <h2>8 признаков, проверяемых кодом</h2>
+  <ol>
+    <li>общий директор у группы компаний;</li>
+    <li>общий учредитель у группы;</li>
+    <li>единый адрес регистрации;</li>
+    <li>идентичный основной ОКВЭД;</li>
+    <li>все компании группы на УСН;</li>
+    <li><strong>каждая компания под порогом освобождения от НДС (20 млн ₽ в 2026), а группа в сумме над ним</strong>;</li>
+    <li>совокупная выручка группы над лимитом УСН (490,5 млн ₽);</li>
+    <li>численность ~0 при ненулевой выручке у нескольких компаний группы.</li>
+  </ol>
+  <p>Синтетический пример из тестов скилла: 4 компании с общим директором, адресом и УСН, выручка 18 млн у каждой — по одной чисто, а группа 72 млн — это 7 совпадающих признаков из 8.</p>
+
+  <h2>Пороги 2026 — из версионируемого канона</h2>
+  <table>
+    <tr><th>Порог</th><th>2026</th><th>Дальше</th></tr>
+    <tr><td>Освобождение от НДС на УСН</td><td>20 млн ₽</td><td>15 млн (2027), 10 млн (2028)</td></tr>
+    <tr><td>Лимит УСН</td><td>490,5 млн ₽</td><td>индексация</td></tr>
+    <tr><td>Переходный лимит УСН</td><td>337,5 млн ₽</td><td>—</td></tr>
+  </table>
+  <p>Каждое число живёт в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/data/canon_ru.json">data/canon_ru.json</a> со ссылкой на первоисточник и датой проверки (19.09.2026) — скоринг читает пороги оттуда, а не из констант кода.</p>
+
+  <h2>Формулировочная дисциплина: аффилированность ≠ дробление</h2>
+  <p>Суды прямо говорят: <strong>аффилированность сама по себе не доказывает дробление</strong>. ФНС доказывает совокупностью признаков плюс вторичный контур — IP-адреса клиент-банка, финпотоки, единая 1С — которого в открытых данных нет. Поэтому вывод скоринга всегда звучит одинаково:</p>
+  <div class="card-light">«N признаков, совпадающих с типовыми доводами ФНС по спорам о дроблении
+(письмо БВ-4-7/8051@ от 16.07.2024)» — и никогда «это дробление».</div>
+  <p>Светофор здесь — раннее предупреждение контрагенту и собственнику, а не заключение. 3+ признака → 🟡, 5+ → 🔴 (синхронно с чеклистом однодневки).</p>
+
+  <h2>Как это работает технически</h2>
+  <ol>
+    <li><code>affiliates_graph.py &lt;ИНН&gt;</code> строит граф глубины 2 по checko API (бесплатный ключ; без ключа — связи собираются браузером через <code>--offline-граф</code>). Рёбра помечены «⚠️ один источник, требует пересечения».</li>
+    <li><code>droblenie_check.py</code> считает чеклист по графу и выручке ГИР БО; если выручка досталась не по всем компаниям — честное «по N из M».</li>
+    <li>Ключевые связи перед решением пересекаются вторым источником (ЕГРЮЛ-выписка, rusprofile, СБИС) — принцип «одиночному источнику не верим» действует и на граф.</li>
+  </ol>
+
+  <div class="related">
+    <h2>Читайте также</h2>
+    <ul>
+      <li><a href="priznaki-odnodnevki.html">Признаки фирмы-однодневки: чеклист по методике ФНС</a></li>
+      <li><a href="proverit-kontragenta-po-inn.html">Как проверить контрагента по ИНН бесплатно</a></li>
+      <li><a href="monitoring-kontragentov.html">Мониторинг контрагентов снимками</a></li>
+    </ul>
+  </div>
+
+  <div class="cta-row" style="margin:32px 0">
+    <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ Открыть на GitHub</a>
+    <a class="btn btn-ghost" href="index.html#install">Установка</a>
+  </div>
+</article>
+</main>
+<footer>
+  <div class="wrap foot-grid">
+    <div><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a></div>
+    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a></div>
+  </div>
+</footer>
+</body>
+</html>
