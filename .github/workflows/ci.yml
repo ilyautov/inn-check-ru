@@ -26,6 +26,9 @@ jobs:
       - name: diff_counterparty eval (офлайн, фикстуры)
         run: python3 eval/run_diff_eval.py
 
+      - name: graph + droblenie eval (офлайн, фикстуры)
+        run: python3 eval/run_graph_eval.py
+
       - name: skill frontmatter is valid YAML
         run: |
           pip install pyyaml
