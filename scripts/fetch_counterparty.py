@@ -98,6 +98,13 @@ def _build_ssl_context():
     """
     ctx = ssl.create_default_context()
     ca_bundle = os.environ.get("COUNTERPARTY_CA_BUNDLE")
+    if not ca_bundle:
+        # scripts/install_ca.py кладёт корень Национального УЦ Минцифры сюда —
+        # подхватываем автоматически, верификация остаётся включённой.
+        cached = os.path.expanduser(os.path.join(
+            "~", ".cache", "inn-check-ru", "ca", "russian_trusted_bundle.pem"))
+        if os.path.isfile(cached):
+            ca_bundle = cached
     if ca_bundle:
         ctx.load_verify_locations(cafile=ca_bundle)
     if os.environ.get("COUNTERPARTY_INSECURE") == "1":
