@@ -54,6 +54,9 @@ py-modules = [
   "install_ca",
   "profiles",
   "sources",
+  "batch_check",
+  "snapshot",
+  "watchlist",
 ]
 packages = ["inn_check_ru_mcp", "inn_check_ru_data"]
 
