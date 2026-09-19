@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ilyautov/inn-check-ru",
+  "title": "inn-check-ru",
+  "description": "Проверка контрагента РФ по ИНН: светофор риска по реестрам, финансы и санкции кодом.",
+  "repository": {
+    "url": "https://github.com/ilyautov/inn-check-ru",
+    "source": "github"
+  },
+  "version": "1.6.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "inn-check-ru",
+      "version": "1.6.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--from",
+          "value": "inn-check-ru"
+        },
+        {
+          "type": "positional",
+          "value": "inn-check-ru-mcp",
+          "valueHint": "inn-check-ru-mcp"
+        }
+      ]
+    }
+  ]
+}

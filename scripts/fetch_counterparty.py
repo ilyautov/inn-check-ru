@@ -874,3 +874,8 @@ def main(argv):
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
+
+
+def cli():
+    """console_script `inn-check-ru` (pyproject.toml) — та же main(sys.argv)."""
+    return sys.exit(main(sys.argv))

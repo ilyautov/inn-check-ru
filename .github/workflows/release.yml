@@ -1,0 +1,33 @@
+name: Release
+
+# На каждый тег v*: собрать ZIP скилла (SKILL.md в корне архива) и прикрепить
+# к GitHub Release. Паттерн marketplaces-mcp-ru.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build release zip
+        run: python scripts/build_release_zip.py
+      - name: Publish artifacts to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Создать Release при первом прогоне тега; при повторных — дозалить.
+        # `gh release upload` без существующего Release падает "release not found".
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.zip \
+              --title "$GITHUB_REF_NAME" --generate-notes
+          fi

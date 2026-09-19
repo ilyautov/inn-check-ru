@@ -18,6 +18,12 @@ import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = os.path.join(REPO_ROOT, "scripts")
+if not os.path.isdir(SCRIPTS):
+    # установка колесом: движок лежит py-модулями рядом в site-packages
+    import importlib.util as _ilu
+    _spec = _ilu.find_spec("fetch_counterparty")
+    if _spec and _spec.origin:
+        SCRIPTS = os.path.dirname(_spec.origin)
 # полный сбор по сети может идти десятки секунд (egrul-поллинг)
 TIMEOUT = float(os.environ.get("INN_CHECK_MCP_TIMEOUT", "150"))
 

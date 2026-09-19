@@ -2,6 +2,23 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — semver.
 
+## [1.6.0] — 2026-09-19
+
+«Стандарт флагманов»: оформление и инфраструктура доведены до уровня эталонных репо автора (humanizer-ru, marketplaces-mcp-ru). Логика проверки не менялась.
+
+### Added
+- `assets/social-preview.png` (1200×630) — генерируется `scripts/make_social_preview.py` из честных счётчиков (18 реестров каскада, 22 сигнала риска: fin_scoring + дробление + однодневка); CI-гейт свежести (`.social-preview-counters` + `--check`), фирменная палитра семьи.
+- README: hero-блок с картинкой, бейджи версии (→ CHANGELOG) и skills.sh, светофор-карточка поднята в шапку; ссылка на `releases/latest/download/inn-check-ru.zip` в установке для claude.ai.
+- `.github/ISSUE_TEMPLATE/`: bug_report, registry_mismatch (расхождение с реестром), verdict_dispute (спорный вердикт), config.yml; `dependabot.yml`.
+- `.github/workflows/security.yml` (gitleaks + trufflehog + `scripts/security/` — запрет секретных файлов и скан MCP-конфигов, паттерн marketplaces) и `supply-chain.yml` (OSV + pip-audit по `mcp/requirements.txt` + cron).
+- `eval/run_version_gate.py` — гейт «одна версия везде» (SKILL frontmatter, плагин-манифесты, CHANGELOG, бейдж README, pyproject, server.json + лимит description ≤100), шаг в CI; actions запинены по SHA с комментариями версий.
+- `scripts/build_release_zip.py` + `.github/workflows/release.yml` — на тег v* собирается ZIP скилла (SKILL.md в корне архива) и создаётся GitHub Release с `--generate-notes`; `PUBLISHING.md` — runbook релизов.
+- Манифесты агентов: `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `gemini-extension.json` + `GEMINI.md`; `server.json` для MCP Registry (публикация — ручной шаг, см. PUBLISHING.md); `PRIVACY_POLICY.md` (скилл ходит во внешние реестры — задокументировано, что уходит).
+- `pyproject.toml` — пакет `inn-check-ru` (py-modules из scripts/, движок без копии кода), console-команды `inn-check-ru` (fetch) и `inn-check-ru-mcp` (extra `mcp`); `.github/workflows/publish-pypi.yml` — OIDC Trusted Publishing (pending publisher — ручная разовая настройка).
+
+### Notes
+- Social preview в Settings репозитория — ручной шаг: API для загрузки нет (проверено 19.09.2026).
+
 ## [1.5.0] — 2026-09-19
 
 «MCP-обёртка»: один движок, два интерфейса в одном репозитории.

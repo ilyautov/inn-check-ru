@@ -1,0 +1,26 @@
+{
+  "name": "inn-check-ru",
+  "version": "1.6.0",
+  "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом, мониторинг снимками. | Counterparty due-diligence by Russian INN over open registries, code-computed risk flags.",
+  "author": {
+    "name": "Ilya Utov",
+    "email": "ilyautov@gmail.com",
+    "url": "https://github.com/ilyautov"
+  },
+  "homepage": "https://github.com/ilyautov/inn-check-ru",
+  "repository": "https://github.com/ilyautov/inn-check-ru",
+  "license": "Apache-2.0",
+  "keywords": ["inn", "egrul", "counterparty", "due-diligence", "kyc", "sanctions", "russia", "fns"],
+  "skills": "./",
+  "interface": {
+    "displayName": "INN Check RU",
+    "shortDescription": "Светофор риска контрагента по ИНН",
+    "longDescription": "Проверка контрагента перед сделкой: quick-scan по deal-killer-сигналам за минуты, полное досье по каскаду открытых реестров, светофор 🟢/🟡/🔴 с рекомендацией. Числа считаются кодом и трассируются к первоисточнику; где данных нет — честное «не проверено».",
+    "developerName": "Ilya Utov",
+    "category": "Business",
+    "capabilities": ["Read"],
+    "websiteURL": "https://github.com/ilyautov/inn-check-ru",
+    "privacyPolicyURL": "https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md",
+    "defaultPrompt": ["Проверь контрагента по ИНН 7700000000 перед предоплатой"]
+  }
+}

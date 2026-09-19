@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+# Пакет на PyPI: тот же движок, что едет со скиллом, без копии кода.
+# py-modules показывают на scripts/ (плоские модули — структура скилла не
+# ломается: `python3 scripts/...` и `npx skills add` работают как раньше),
+# MCP-обёртка едет пакетом inn_check_ru_mcp из mcp/.
+# Версия одна на репозиторий: гейт eval/run_version_gate.py.
+[project]
+name = "inn-check-ru"
+version = "1.6.0"
+description = "Проверка российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом. CLI и MCP-сервер."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Ilya Utov" }]
+keywords = ["inn", "egrul", "counterparty", "due-diligence", "kyc", "sanctions", "russia", "mcp", "agent-skill"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Natural Language :: Russian",
+  "Programming Language :: Python :: 3",
+  "Topic :: Utilities",
+]
+# движок — чистый stdlib; MCP SDK нужен только MCP-обёртке (extra mcp)
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.2,<2"]
+
+[project.urls]
+Repository = "https://github.com/ilyautov/inn-check-ru"
+Changelog = "https://github.com/ilyautov/inn-check-ru/blob/main/CHANGELOG.md"
+
+[project.scripts]
+inn-check-ru = "fetch_counterparty:cli"
+inn-check-ru-mcp = "inn_check_ru_mcp.server:entry"
+
+[tool.setuptools]
+py-modules = [
+  "fetch_counterparty",
+  "fin_scoring",
+  "sanctions_check",
+  "affiliates_graph",
+  "droblenie_check",
+  "diff_counterparty",
+  "registries_refresh",
+]
+packages = ["inn_check_ru_mcp"]
+
+[tool.setuptools.package-dir]
+"" = "scripts"
+inn_check_ru_mcp = "mcp"

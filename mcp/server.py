@@ -26,7 +26,10 @@ except ImportError:
         "pip install mcp — подробности в mcp/README.md\n")
     sys.exit(1)
 
-import tools_impl
+try:
+    from . import tools_impl  # установка колесом (пакет inn_check_ru_mcp)
+except ImportError:
+    import tools_impl  # запуск скриптом из mcp/
 
 mcp_server = FastMCP("inn-check-ru")
 
@@ -109,5 +112,10 @@ def counterparty_diff(inn: str) -> dict:
     return tools_impl.counterparty_diff(inn)
 
 
-if __name__ == "__main__":
+def entry():
+    """console_script `inn-check-ru-mcp` (pyproject.toml)."""
     mcp_server.run()
+
+
+if __name__ == "__main__":
+    entry()

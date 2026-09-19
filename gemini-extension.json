@@ -1,0 +1,12 @@
+{
+  "name": "inn-check-ru",
+  "version": "1.6.0",
+  "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам, финансовая патология и признаки дробления кодом. Counterparty due-diligence by Russian INN.",
+  "mcpServers": {
+    "inn-check-ru": {
+      "command": "python3",
+      "args": ["${extensionPath}/mcp/server.py"]
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}
