@@ -1,0 +1,29 @@
+{
+ "data": [
+  {
+   "id": 326508100214173,
+   "ogrn": "326508100214173",
+   "inn": "504110181262",
+   "isnew": 1,
+   "category": 1,
+   "regioncode": "50",
+   "dtregistry": "10.05.2026 00:00:00",
+   "is_active": 1,
+   "nptype": "IP",
+   "okved1": "49.41",
+   "okved1name": "Деятельность автомобильного грузового транспорта",
+   "citytype": "г.",
+   "cityname": "Реутов",
+   "name_ex": "ИВАНОВ ДИМИТЪР ИВАНОВ",
+   "has_licenses": 0,
+   "has_contracts": 0,
+   "is_hitech": 0,
+   "is_partnership": 0,
+   "pr_soc": 0,
+   "is_pp": 0,
+   "cnt": 1,
+   "token": "72A10688055A5D9A814329A1B58748E8E19BF9233DC1CDAA95DED60818651D6DAF0BF24635DE0309C98E591B4EB8EFA4"
+  }
+ ],
+ "rowCount": 1
+}

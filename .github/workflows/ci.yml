@@ -29,6 +29,9 @@ jobs:
       - name: graph + droblenie eval (офлайн, фикстуры)
         run: python3 eval/run_graph_eval.py
 
+      - name: registries eval (офлайн, фикстуры)
+        run: python3 eval/run_registries_eval.py
+
       - name: skill frontmatter is valid YAML
         run: |
           pip install pyyaml

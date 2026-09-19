@@ -1,0 +1,12 @@
+{
+  "id": "fixture-uuid-ip",
+  "ip": {
+    "data": [
+      {
+        "specialRegime": "УСН",
+        "ssch": 0,
+        "taxDebt": null
+      }
+    ]
+  }
+}

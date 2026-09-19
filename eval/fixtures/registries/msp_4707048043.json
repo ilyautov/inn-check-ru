@@ -1,0 +1,29 @@
+{
+ "data": [
+  {
+   "id": 1224700016750,
+   "ogrn": "1224700016750",
+   "inn": "4707048043",
+   "isnew": 0,
+   "category": 1,
+   "regioncode": "47",
+   "dtregistry": "10.10.2022 00:00:00",
+   "is_active": 1,
+   "nptype": "UL",
+   "okved1": "35.22",
+   "okved1name": "Распределение газообразного топлива по газораспределительным сетям",
+   "citytype": "г.",
+   "cityname": "Сосновый Бор",
+   "name_ex": "ПОТРЕБИТЕЛЬСКИЙ КООПЕРАТИВ \"РОМАШКА-ГАЗ\" ПО ОБСЛУЖИВАНИЮ ЖИЛЫХ ДОМОВ В СНТ \"РОМАШКА\"",
+   "has_licenses": 0,
+   "has_contracts": 0,
+   "is_hitech": 0,
+   "is_partnership": 0,
+   "pr_soc": 0,
+   "is_pp": 1,
+   "cnt": 1,
+   "token": "75CD175B55F89358E2619D5B5B4370AABD4F49B0E5F66380522E1899CCCF32B65C4C9BE61376E8D137B780A38707FE4D64DD5045E3AA5FABCF73AE3B61A8CE4D"
+  }
+ ],
+ "rowCount": 1
+}

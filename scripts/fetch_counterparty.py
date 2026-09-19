@@ -13,22 +13,20 @@ fetch_counterparty.py — проверка российского контраг
 Вывод: единый JSON в stdout (UTF-8) со структурой:
     {
       "инн": "...",
-      "егрюл":   {...},   # карточка из ЕГРЮЛ (название, ОГРН, директор, адрес, статус)
-      "риски":   {...},   # риск-флаги из сервиса «Прозрачный бизнес»
+      "тип":    "юрлицо|ип",  # по длине ИНН (10/12 знаков)
+      "егрюл":   {...},   # карточка из ЕГРЮЛ/ЕГРИП (название, ОГРН, директор, адрес, статус)
+      "риски":   {...},   # риск-флаги «Прозрачного бизнеса» (ИП — через mode=search-ip)
       "финансы": {...},   # бухотчётность из ГИР БО (выручка, прибыль, активы, строки)
-      "мсп":     {...},   # Реестр МСП (категория, численность) — эндпоинт НЕ верифицирован
+      "мсп":     {...},   # Реестр МСП — ВЕРИФИЦИРОВАН живым запросом 19.09.2026
+      "нпд":     {...},   # статус самозанятого (npd.nalog.ru check-status, офиц. API)
       "спецреестры": {...},  # service.nalog.ru: дисквалификация/задолженность/
                              # недостоверность — эндпоинты НЕ верифицированы
-      "фссп":        {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
+      "еркнм":   {...},   # плановые проверки — офлайн-сверка по кэшу дампов
+      "рнп":     {...},   # недобросовестный поставщик — офлайн-сверка по кэшу
+      "фссп":        {...},  # НЕ собирается: официальный API мёртв с 10.03.2022
       "суды":        {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
       "банкротство": {...},  # НЕ собирается скриптом — явная заглушка со ссылкой на каскад
-      "_доступность": {   # что реально отдал каждый источник из текущей среды
-          "егрюл":  "...",
-          "риски":  "...",
-          "финансы":"...",
-          "мсп":    "...",
-          "спецреестры": "..."
-      }
+      "_доступность": {...}  # что реально отдал каждый источник из текущей среды
     }
 Блоки фссп/суды/банкротство скрипт не покрывает (нужен браузер/токен) — они
 возвращаются с явным статусом «не собрано», чтобы досье из трёх источников ФНС
@@ -259,8 +257,10 @@ def fetch_risks(opener, inn):
     #   -> {"id":"<uuid>","captchaRequired":false}  (HTTP 200)
     # Лишний параметр text= и page/pageSize ломали запрос в HTTP 400
     # с pbSearchCaptcha. Их убрали.
-    # Сначала «прогреваем» сессию заходом на search.html (cookie jar opener'а).
+    # Для 12-значного ИНН (ИП) — отдельный режим search-ip (дефект v1.3.1:
+    # search-ul по ИП ничего не находил), по ИП отдаются спецрежим и ССЧ.
     inn_q = urllib.parse.quote(str(inn))
+    mode, qparam = _pb_mode(inn)
     referer = "https://pb.nalog.ru/search.html"
     try:
         _http_get(opener, referer, accept="text/html,application/xhtml+xml,*/*")
@@ -269,7 +269,7 @@ def fetch_risks(opener, inn):
 
     search_url = (
         "https://pb.nalog.ru/search-proc.json"
-        "?mode=search-ul&queryUl=%s" % inn_q
+        "?mode=%s&%s=%s" % (mode, qparam, inn_q)
     )
     try:
         status, text = _http_get(opener, search_url, referer=referer)
@@ -288,13 +288,13 @@ def fetch_risks(opener, inn):
         return _empty_risks(), "поиск не вернул id (HTTP %s)" % status
 
     # Шаг 2 — забор результата по id через тот же search-proc.json,
-    # но с mode=search-ul-result. Это реальный result-эндпоинт фронта pb.
+    # но с mode=<mode>-result. Это реальный result-эндпоинт фронта pb.
     result_json = None
     last_status = None
     captcha_on_result = False
     result_url = (
         "https://pb.nalog.ru/search-proc.json"
-        "?id=%s&method=get-response&mode=search-ul-result" % search_id
+        "?id=%s&method=get-response&mode=%s-result" % (search_id, mode)
     )
     for _ in range(POLL_TRIES):
         if _time_left() <= POLL_DELAY:
@@ -316,8 +316,9 @@ def fetch_risks(opener, inn):
         ):
             captcha_on_result = True
             break
-        # Готовый результат содержит блок ul/yul с данными.
-        if _g(rj, "ul") is not None or _g(rj, "yul") is not None:
+        # Готовый результат содержит блок ul/yul (юрлица) или ip (ИП) с данными.
+        if _g(rj, "ul") is not None or _g(rj, "yul") is not None \
+                or _g(rj, "ip") is not None:
             result_json = rj
             break
 
@@ -342,6 +343,8 @@ def fetch_risks(opener, inn):
         _g(result_json, "ul", "data", 0)
         or _g(result_json, "yul", "data", 0)
         or _g(result_json, "ul")
+        or _g(result_json, "ip", "data", 0)
+        or _g(result_json, "ip")
         or _g(result_json, "data", 0)
         or {}
     )
@@ -377,48 +380,153 @@ def _map_pb_flags(ul):
     return r
 
 
-# Маркер честности для эндпоинтов, добавленных в 1.1.0 и не прогнанных вживую:
-# семейство proc.json по аналогии с pb.nalog.ru, структура ответа не проверена.
+# Маркер честности для эндпоинтов, не прогнанных вживую.
 NOTE_UNVERIFIED = "эндпоинт не верифицирован (разведка с не-РФ IP 19.09.2026)"
+
+МСП_КАТЕГОРИИ = {1: "микропредприятие", 2: "малое предприятие",
+                3: "среднее предприятие"}
+
+
+def _parse_msp_row(row):
+    """Разбор записи rmsp.nalog.ru search-proc.json. Формат верифицирован
+    живым запросом 19.09.2026: inn, category (1/2/3), dtregistry, is_active,
+    nptype (UL/IP), okved1, okved1name, cityname, od2_sschr."""
+    if not isinstance(row, dict):
+        return None
+    return {
+        "статус_мсп": ("в реестре" if row.get("is_active") == 1
+                       else "исключена из реестра"),
+        "категория": МСП_КАТЕГОРИИ.get(row.get("category"),
+                                      row.get("category")),
+        "код_категории": row.get("category"),
+        "дата_включения": row.get("dtregistry"),
+        "оквэд": row.get("okved1"),
+        "оквэд_наименование": row.get("okved1name"),
+        "город": row.get("cityname"),
+        "численность": row.get("od2_sschr"),
+        "тип": "ип" if row.get("nptype") == "IP" else "юрлицо",
+    }
 
 
 def fetch_msp(opener, inn):
-    """Реестр МСП (rmsp.nalog.ru): статус МСП, категория, численность.
-
-    Эндпоинт-семейство proc.json как у pb.nalog.ru. НЕ ВЕРИФИЦИРОВАН
-    (разведка с не-РФ IP 19.09.2026) — при любой деградации честное
-    «не проверено», скрипт не падает.
-    """
+    """Реестр МСП (rmsp.nalog.ru) — ВЕРИФИЦИРОВАН живым запросом 19.09.2026:
+    search-proc.json?query=<ИНН> -> data[] (работает с любого IP)."""
     inn_q = urllib.parse.quote(str(inn))
-    url = ("https://rmsp.nalog.ru/search-proc.json"
-           "?mode=search-all&queryAll=%s&page=1&pageSize=15" % inn_q)
+    url = "https://rmsp.nalog.ru/search-proc.json?query=%s" % inn_q
     try:
         status, text = _http_get(opener, url, referer="https://rmsp.nalog.ru/")
     except Exception as e:
-        return None, "%s; недоступен (%s)" % (NOTE_UNVERIFIED, type(e).__name__)
+        return None, "недоступен (%s)" % type(e).__name__
     j = _safe_json(text)
     if j is None:
-        return None, "%s; ответ не-JSON (HTTP %s)" % (NOTE_UNVERIFIED, status)
-    rows = _g(j, "data") or _g(j, "content") or []
+        return None, "ответ не-JSON (HTTP %s)" % status
+    rows = j.get("data") or []
     if not isinstance(rows, list):
         rows = []
     row = None
     for item in rows:
-        if str(_g(item, "inn") or "") == str(inn):
+        if isinstance(item, dict) and str(item.get("inn") or "") == str(inn):
             row = item
             break
     if row is None and rows:
         row = rows[0]
     if not isinstance(row, dict):
-        return None, "%s; записи по ИНН не найдены" % NOTE_UNVERIFIED
+        return {"статус_мсп": "не в реестре",
+                "пояснение": "не найдена в Едином реестре МСП (крупная "
+                             "компания либо исключена) — для МСБ-контрагента "
+                             "это стоп-сигнал"}, "ok: записи нет (не в реестре)"
+    out = _parse_msp_row(row)
+    if out is None:
+        return None, "запись неожиданного формата"
+    return out, "ok (верифицировано живым запросом 19.09.2026)"
+
+
+def _parse_npd(j, inn):
+    """Разбор ответа npd.nalog.ru check-status. Схема по официальному
+    описанию API сервиса (npd.nalog.ru/check-status); живой прогон отложен —
+    с не-РФ IP сервис отвечает 406/403 (проверено 19.09.2026)."""
+    if not isinstance(j, dict):
+        return None
+    status = j.get("status")
+    if status is None:
+        status = j.get("самозанятый")
     return {
-        "статус_мсп": True,
-        "категория": (_g(row, "category") or _g(row, "categoryName")
-                      or _g(row, "category_name")),
-        "численность": (_g(row, "ssch") or _g(row, "employeesCnt")
-                        or _g(row, "staffCount")),
-        "дата_включения": _g(row, "dateOfInclusion") or _g(row, "startDate"),
-    }, "ok; " + NOTE_UNVERIFIED
+        "инн": j.get("inn", str(inn)),
+        "статус_нпд": status,
+        "сообщение": j.get("message"),
+        "дата_проверки": j.get("date") or time.strftime("%d.%m.%Y"),
+    }
+
+
+def fetch_npd(opener, inn):
+    """Статус самозанятого (плательщика НПД) — единственный сервис ФНС
+    с официальным публичным API. Graceful: недоступен -> «не проверено»."""
+    note = ("схема по официальному описанию API (npd.nalog.ru/check-status), "
+            "живой прогон — с РФ-IP (с не-РФ IP 406/403, проверено 19.09.2026)")
+    url = "https://npd.nalog.ru/api/v1/status"
+    body = json.dumps({"inn": str(inn),
+                       "date": time.strftime("%d.%m.%Y")}).encode("utf-8")
+    headers = {"User-Agent": UA, "Accept": "application/json",
+               "Content-Type": "application/json",
+               "Referer": "https://npd.nalog.ru/check-status/"}
+    try:
+        req = urllib.request.Request(url, data=body, headers=headers,
+                                     method="POST")
+        resp = opener.open(req, timeout=min(TIMEOUT, max(1.0, _time_left())))
+        j = _safe_json(resp.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        return None, "%s; HTTP %s" % (note, e.code)
+    except Exception as e:
+        return None, "%s; недоступен (%s)" % (note, type(e).__name__)
+    out = _parse_npd(j, inn)
+    if out is None:
+        return None, "%s; ответ не-JSON" % note
+    return out, "ok; " + note
+
+
+def _load_registries_module():
+    """registries_refresh.py через importlib (паттерн diff_counterparty)."""
+    import importlib.util
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "registries_refresh",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "registries_refresh.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+def fetch_registry_cache(реестр, inn):
+    """Офлайн-сверка по локальному кэшу дампов (ЕРКНМ/РНП). Без кэша —
+    честное «не проверено» с инструкцией; сеть здесь не дёргается."""
+    mod = _load_registries_module()
+    if mod is None:
+        return {"статус": "не проверено",
+                "причина": "registries_refresh.py не найден рядом со скриптом"}
+    try:
+        res, note = mod.lookup(реестр, inn)
+    except Exception as e:
+        return {"статус": "не проверено",
+                "причина": "сбой сверки (%s)" % type(e).__name__}
+    if res is None:
+        return {"статус": "не проверено", "причина": note}
+    res["статус"] = "проверено"
+    return res
+
+
+def _тип_контрагента(inn):
+    return "ип" if len(str(inn)) == 12 else "юрлицо"
+
+
+def _pb_mode(inn):
+    """pb.nalog.ru разделяет поиск юрлиц и ИП разными mode (проверено на live
+    для search-ul; search-ip — по той же схеме, пометка верификации в выводе)."""
+    if _тип_контрагента(inn) == "ип":
+        return "search-ip", "queryIp"
+    return "search-ul", "queryUl"
 
 
 def _service_nalog_query(opener, path, inn):
@@ -704,32 +812,56 @@ def main(argv):
     fin_data, fin_av = fetch_finance(opener, inn)
     msp_data, msp_av = fetch_msp(opener, inn)
     spec_data, spec_av = fetch_special_registries(opener, inn)
+    npd_data, npd_av = fetch_npd(opener, inn)
+    # ЕРКНМ/РНП — офлайн-сверка по локальному кэшу дампов (сеть не дёргается)
+    erknm_data = fetch_registry_cache("еркнм", inn)
+    rnp_data = fetch_registry_cache("рнп", inn)
 
     # Блоки, которые скрипт НЕ собирает, но которые обязательны для решения о
     # сделке — возвращаем явно, чтобы досье не выглядело полным без них.
+    # ФССП: официальный API (api-ip.fssp.gov.ru) отключён с 10.03.2022 и не
+    # восстановлен — слой только браузерный; для ИП обязательно ДВА поиска
+    # (ИП как юрлицо по ИНН + физлицо по ФИО+дата рождения+регион).
     ne_sobrano = ("не собрано скриптом — обязательный шаг каскада, "
                   "см. SKILL.md (браузер/агрегаторы)")
+    fssp_note = ("официальный API ФССП отключён с 10.03.2022 — поиск вручную "
+                 "на fssp.gov.ru или через агрегатор"
+                 + ("; для ИП — ДВА поиска: как юрлицо по ИНН и как физлицо "
+                    "по ФИО+дата рождения+регион"
+                    if _тип_контрагента(inn) == "ип" else ""))
     result = {
         "инн": inn,
+        "тип": _тип_контрагента(inn),
         "егрюл": egrul_data,
         "риски": risks_data,
         "финансы": fin_data,
         "мсп": msp_data if msp_data is not None
                else {"статус": "не проверено", "причина": msp_av},
+        "нпд": npd_data if npd_data is not None
+               else {"статус": "не проверено", "причина": npd_av},
         "спецреестры": spec_data,
-        "фссп": {"статус": ne_sobrano,
+        "еркнм": erknm_data,
+        "рнп": rnp_data,
+        "фссп": {"статус": ne_sobrano, "примечание": fssp_note,
                  "источник": "fssp.gov.ru — исполнительные производства (долги)"},
         "суды": {"статус": ne_sobrano,
                  "источник": "kad.arbitr.ru — картотека арбитражных дел"},
         "банкротство": {"статус": ne_sobrano,
-                        "источник": "bankrot.fedresurs.ru — ЕФРСБ"},
+                        "источник": "bankrot.fedresurs.ru — ЕФРСБ"
+                        + (" (для ИП — включая внесудебное банкротство физлиц)"
+                           if _тип_контрагента(inn) == "ип" else "")},
         "_доступность": {
             "егрюл": egrul_av,
             "риски": risks_av,
             "финансы": fin_av,
             "мсп": msp_av,
+            "нпд": npd_av,
             "спецреестры": spec_av,
-            "фссп": "скриптом не покрыто",
+            "еркнм": erknm_data.get("статус") if isinstance(erknm_data, dict)
+                     else "не проверено",
+            "рнп": rnp_data.get("статус") if isinstance(rnp_data, dict)
+                   else "не проверено",
+            "фссп": "скриптом не покрыто (официальный API мёртв с 2022)",
             "суды": "скриптом не покрыто",
             "банкротство": "скриптом не покрыто",
         },

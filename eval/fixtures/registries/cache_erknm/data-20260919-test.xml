@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<erknmDump generated="2026-09-19">
+  <record>
+    <erId>66000000001</erId>
+    <inn>7707083893</inn>
+    <objectName>ПАО СБЕРБАНК (синтетическая фикстура)</objectName>
+    <knmoType>плановая проверка</knmoType>
+    <dateStart>2026-10-01</dateStart>
+  </record>
+  <record>
+    <erId>66000000002</erId>
+    <inn>504110181262</inn>
+    <objectName>ИП ИВАНОВ Д.И. (синтетическая фикстура)</objectName>
+    <knmoType>контрольный надзор</knmoType>
+    <dateStart>2026-11-15</dateStart>
+  </record>
+</erknmDump>
