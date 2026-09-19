@@ -6,8 +6,12 @@ affiliates_graph.py — граф связей контрагента (общие
 Использование:
     export CHECKO_API_KEY=...        # бесплатно после регистрации: checko.ru/integration/api
     python3 affiliates_graph.py <ИНН>
+    python3 affiliates_graph.py --offline-граф файл.json   # связи, собранные вручную
 
 Без ключа — честный JSON «не проверено» (exit 0), quick-scan не ломается.
+--offline-граф принимает заранее собранные узлы/рёбра из любого источника
+(браузер, другой агрегатор) в том же формате — checko заменяемый слой,
+а не требование.
 
 Логика: целевая компания -> директор + учредители -> их компании
 (СвязРуковод/СвязУчред) + соседи по адресу (МассАдрес) + правопреемство.
@@ -16,7 +20,11 @@ MAX_NODES узлов — при превышении пометка «усече
 (v2/company) взята из документации 19.09.2026; парсинг defensive — всё, что
 не распарсилось, уходит в «не_проверено».
 
-Выход JSON: узлы (карточки с типом связи) + рёбра {от, до, тип, через},
+Доверие: принцип «одиночному источнику не верим» действует и здесь — каждый
+узел/ребро получает tier (⚠️ один источник checko / ✅ ЕГРЮЛ для цели),
+корневой блок — «оговорка» о необходимости пересечения вторым источником.
+
+Выход JSON: узлы (карточки с типом связи) + рёбра {от, до, тип, через, tier},
 дата построения, источник. Граф — вход для droblenie_check.py.
 """
 
@@ -35,6 +43,15 @@ MAX_DEPTH = 2
 TIMEOUT = 25
 PAUSE = 0.4  # вежливая задержка между запросами к API
 UA = "inn-check-ru/1.3 (affiliates_graph)"
+
+# Принцип проекта «одиночному источнику не верим» распространяется и на граф:
+# рёбра из checko — ⚠️ один источник, целевая карточка сверяется с ЕГРЮЛ — ✅.
+TIER_CHECKO = "⚠️ один источник (checko API), требует пересечения"
+TIER_OFFLINE = "⚠️ ручной сбор (offline-граф), требует пересечения"
+TIER_TARGET = "✅ ЕГРЮЛ"
+ОГОВОРКА = ("рёбра графа построены по одному агрегатору; перед решением "
+            "по группе пересечите ключевые связи вторым источником "
+            "(ЕГРЮЛ-выписка, rusprofile, СБИС)")
 
 
 def fetch_company(key, inn=None, ogrn=None):
@@ -170,6 +187,7 @@ def build_graph(fetcher, inn, max_nodes=MAX_NODES, max_depth=MAX_DEPTH,
             "ссч": card.get("ссч"),
             "глубина": глубина,
             "типы_связи": [тип_связи] if тип_связи else ["цель"],
+            "tier": TIER_TARGET if глубина == 0 else TIER_CHECKO,
         }
         return огрн
 
@@ -228,7 +246,8 @@ def build_graph(fetcher, inn, max_nodes=MAX_NODES, max_depth=MAX_DEPTH,
                 if to_id and (from_id, to_id, тип) not in [
                         (r["от"], r["до"], r["тип"]) for r in рёбра]:
                     рёбра.append({"от": from_id, "до": to_id,
-                                  "тип": тип, "через": через})
+                                  "тип": тип, "через": через,
+                                  "tier": TIER_CHECKO})
         frontier = next_frontier
         depth += 1
 
@@ -242,21 +261,94 @@ def build_graph(fetcher, inn, max_nodes=MAX_NODES, max_depth=MAX_DEPTH,
         "узлы": list(узлы.values()),
         "рёбра": рёбра,
         "не_проверено": не_проверено,
+        "оговорка": ОГОВОРКА,
         "источник": "checko API (%s), схема v2/company по документации 19.09.2026"
                     % API_URL,
         "дата_построения": time.strftime("%Y-%m-%d"),
     }
 
 
+def normalize_offline(data, имя_файла="offline-граф"):
+    """Нормализует заранее собранные связи (ручной сбор через браузер, другой
+    агрегатор) в формат графа: checko становится заменяемым слоем, а не
+    требованием. Вход: {"цель"?, "узлы": [...], "рёбра": [...]}. Сеть не
+    дёргается; отсутствующие tier проставляются как ⚠️ ручной сбор."""
+    if not isinstance(data, dict) or not isinstance(data.get("узлы"), list) \
+            or not isinstance(data.get("рёбра"), list):
+        return {"статус": "не проверено",
+                "причина": "offline-граф должен содержать списки «узлы» и «рёбра» "
+                           "в формате affiliates_graph (%s)" % имя_файла}
+    узлы, рёбра = [], []
+    for u in data["узлы"]:
+        if not isinstance(u, dict):
+            continue
+        node = dict(u)
+        целевой = node.get("глубина") == 0 or "цель" in (
+            node.get("типы_связи") or [])
+        node.setdefault("типы_связи", ["цель"] if целевой else [])
+        node.setdefault("глубина", 0 if целевой else 1)
+        node["tier"] = node.get("tier") or (
+            TIER_TARGET if целевой else TIER_OFFLINE)
+        узлы.append(node)
+    for r in data["рёбра"]:
+        if not isinstance(r, dict) or not r.get("от") or not r.get("до"):
+            continue
+        edge = {"от": r["от"], "до": r["до"],
+                "тип": r.get("тип"), "через": r.get("через"),
+                "tier": r.get("tier") or TIER_OFFLINE}
+        рёбра.append(edge)
+    цель = data.get("цель")
+    if not цель:
+        for node in узлы:
+            if node.get("глубина") == 0:
+                цель = {"инн": node.get("инн"), "огрн": node.get("огрн"),
+                        "название": node.get("название")}
+                break
+    return {
+        "статус": "ок",
+        "цель": цель,
+        "узлов": len(узлы),
+        "рёбер": len(рёбра),
+        "усечено": False,
+        "узлы": узлы,
+        "рёбра": рёбра,
+        "не_проверено": [],
+        "оговорка": ОГОВОРКА,
+        "источник": "offline-граф (ручной сбор): %s" % имя_файла,
+        "дата_построения": time.strftime("%Y-%m-%d"),
+    }
+
+
 def main(argv):
-    if len(argv) != 2:
-        sys.stderr.write("Использование: python3 affiliates_graph.py <ИНН>\n")
+    args = argv[1:]
+    if "--offline-граф" in args:
+        i = args.index("--offline-граф")
+        if i + 1 >= len(args):
+            sys.stderr.write("После --offline-граф нужен путь к JSON\n")
+            return 2
+        path = args[i + 1]
+        try:
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError) as e:
+            out = {"статус": "не проверено",
+                   "причина": "offline-граф не читается как JSON (%s)" % e}
+            sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+            return 1
+        out = normalize_offline(data, имя_файла=path)
+        sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+        return 0
+    if len(args) != 1:
+        sys.stderr.write(
+            "Использование: python3 affiliates_graph.py <ИНН> | "
+            "--offline-граф файл.json\n")
         return 2
     key = os.environ.get("CHECKO_API_KEY")
     if not key:
         out = {"статус": "не проверено",
                "причина": "нужен CHECKO_API_KEY, бесплатно: "
-                          "checko.ru/integration/api",
+                          "checko.ru/integration/api — либо соберите связи "
+                          "браузером и подайте через --offline-граф",
                "источник": "checko API (%s)" % API_URL}
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
         return 0

@@ -54,6 +54,18 @@ def case_group(ag, dc, canon):
     типы = {r["тип"] for r in graph.get("рёбра", [])}
     for t in ("общий_директор", "общий_учредитель", "адрес"):
         check(errors, t in типы, "нет рёбер типа %s (есть: %s)" % (t, типы))
+    # tier-маркировка: рёбра ⚠️ один источник, цель ✅ ЕГРЮЛ, оговорка в корне
+    check(errors, bool(graph.get("оговорка")), "нет корневой «оговорка»")
+    for r in graph.get("рёбра", []):
+        check(errors, "⚠️" in (r.get("tier") or ""),
+              "у ребра нет ⚠️-tier: %s" % r)
+    целевые = [u for u in graph.get("узлы", []) if u.get("глубина") == 0]
+    check(errors, len(целевые) == 1 and "✅" in (целевые[0].get("tier") or ""),
+          "у целевого узла нет ✅-tier: %s" % (целевые or None))
+    for u in graph.get("узлы", []):
+        if u.get("глубина") != 0:
+            check(errors, "⚠️" in (u.get("tier") or ""),
+                  "у связанного узла нет ⚠️-tier: %s" % u.get("название"))
 
     revenues = json.loads((FIXTURES / "revenues_group.json").read_text())
     out = dc.score(graph, выручка_map=revenues, canon=canon)
@@ -69,6 +81,9 @@ def case_group(ag, dc, canon):
           "оценка не по формулировочной дисциплине: %r" % out.get("оценка"))
     check(errors, "дробление подтверждено" not in json.dumps(out, ensure_ascii=False),
           "запрещённая формулировка «дробление подтверждено»")
+    check(errors, "одного агрегатора" in out.get("предупреждение_источников", ""),
+          "нет предупреждения об одном источнике: %r"
+          % out.get("предупреждение_источников"))
     vg = out.get("выручка_группы", {})
     check(errors, vg.get("сумма") == 72000000,
           "выручка группы %r != 72000000" % vg.get("сумма"))
@@ -88,6 +103,38 @@ def case_healthy(ag, dc, canon):
           "признаков %r > 1" % out.get("признаков_совпало"))
     check(errors, out.get("severity") == "🟢",
           "severity %r != 🟢" % out.get("severity"))
+    return errors
+
+
+def case_offline_graph(ag, dc, canon):
+    """Офлайн-вход: граф, собранный build_graph, подаём обратно через
+    normalize_offline — checko заменяем ручным слоем, droblenie работает."""
+    errors = []
+    graph = ag.build_graph(make_fixture_fetcher(), "7700000001", pause=0)
+    # имитируем ручной сбор: убираем tier/оговорку, как будто файл собран руками
+    ручной = {"узлы": [{k: v for k, v in u.items() if k != "tier"}
+                       for u in graph["узлы"]],
+              "рёбра": [{k: v for k, v in r.items() if k != "tier"}
+                        for r in graph["рёбра"]]}
+    off = ag.normalize_offline(ручной, имя_файла="тест.json")
+    check(errors, off.get("статус") == "ок", "offline: статус %r" % off.get("статус"))
+    check(errors, bool(off.get("оговорка")), "offline: нет «оговорка»")
+    for r in off.get("рёбра", []):
+        check(errors, "⚠️" in (r.get("tier") or ""),
+              "offline: у ребра нет ⚠️-tier: %s" % r)
+    целевые = [u for u in off.get("узлы", []) if u.get("глубина") == 0]
+    check(errors, len(целевые) == 1 and "✅" in (целевые[0].get("tier") or ""),
+          "offline: у цели нет ✅-tier")
+    revenues = json.loads((FIXTURES / "revenues_group.json").read_text())
+    out = dc.score(off, выручка_map=revenues, canon=canon)
+    check(errors, out.get("признаков_совпало", 0) >= 4,
+          "offline: признаков %r < 4" % out.get("признаков_совпало"))
+    check(errors, "одного агрегатора" in out.get("предупреждение_источников", ""),
+          "offline: нет предупреждения об одном источнике")
+    # битый вход -> честное «не проверено»
+    bad = ag.normalize_offline({"узлы": "не-список"})
+    check(errors, bad.get("статус") == "не проверено",
+          "битый offline-вход: статус %r" % bad.get("статус"))
     return errors
 
 
@@ -112,6 +159,7 @@ def main():
     cases = {
         "группа-4-компании": case_group(ag, dc, canon),
         "здоровая-контрольная": case_healthy(ag, dc, canon),
+        "offline-граф": case_offline_graph(ag, dc, canon),
         "канон-отсутствует": case_no_canon(ag, dc),
     }
     failed = 0
