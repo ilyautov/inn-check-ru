@@ -99,6 +99,10 @@ jobs:
           # без grep -q: под pipefail ранний выход grep роняет unzip по SIGPIPE
           unzip -Z1 "$RUNNER_TEMP"/whl/*.whl | grep -Fx 'inn_check_ru_data/canon_ru.json' \
             || { echo "в колесе нет inn_check_ru_data/canon_ru.json" >&2; exit 1; }
+          # без таблицы норм benchmarks из установленного пакета отвечает
+          # «нормы не построены» на каждый запрос
+          unzip -Z1 "$RUNNER_TEMP"/whl/*.whl | grep -Fx 'inn_check_ru_data/benchmarks_ru.json' \
+            || { echo "в колесе нет inn_check_ru_data/benchmarks_ru.json" >&2; exit 1; }
           python -m venv "$RUNNER_TEMP/whl-venv"
           "$RUNNER_TEMP/whl-venv/bin/pip" install --quiet "$RUNNER_TEMP"/whl/*.whl
           cd "$RUNNER_TEMP"   # не из checkout: иначе канон найдётся по пути репозитория
@@ -109,6 +113,13 @@ jobs:
           canon = d._load_canon()
           assert isinstance(canon, dict) and "ндс_усн_освобождение" in canon, canon
           print("canon из колеса ok:", sorted(canon))
+          import benchmarks, sources
+          таблица, причина = benchmarks.загрузить()
+          assert таблица, "нормы из колеса не читаются: %s" % причина
+          print("нормы из колеса ok:", таблица["групп"], "групп")
+          assert "ндс_вычет" in sources.PROFILE_IDS, sources.PROFILE_IDS
+          import dossier, extract_inn, opendata_refresh, paper_vat  # noqa: F401
+          print("модули волны 3 импортируются из колеса")
           PY
 
       - name: "отраслевые нормы: агрегация и порог публикации (офлайн)"
