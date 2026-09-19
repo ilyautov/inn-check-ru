@@ -37,6 +37,19 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+
+def _ssl_context():
+    """Общий TLS-контекст движка: fetch_counterparty._build_ssl_context() подхватывает
+    корень УЦ Минцифры (scripts/install_ca.py) и COUNTERPARTY_CA_BUNDLE; без него
+    fedsfm.ru и rosstat.gov.ru падают на верификации. Верификация всегда включена."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from fetch_counterparty import _build_ssl_context
+        return _build_ssl_context()
+    except Exception:
+        return ssl.create_default_context()
+
+
 API_URL = "https://api.checko.ru/v2/company"
 MAX_NODES = 100
 MAX_DEPTH = 2
@@ -62,7 +75,7 @@ def fetch_company(key, inn=None, ogrn=None):
     else:
         params["inn"] = str(inn)
     url = API_URL + "?" + urllib.parse.urlencode(params)
-    ctx = ssl.create_default_context()
+    ctx = _ssl_context()
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:

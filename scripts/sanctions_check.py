@@ -37,6 +37,19 @@ import ssl
 import sys
 import time
 import urllib.request
+
+
+def _ssl_context():
+    """Общий TLS-контекст движка: fetch_counterparty._build_ssl_context() подхватывает
+    корень УЦ Минцифры (scripts/install_ca.py) и COUNTERPARTY_CA_BUNDLE; без него
+    fedsfm.ru и rosstat.gov.ru падают на верификации. Верификация всегда включена."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from fetch_counterparty import _build_ssl_context
+        return _build_ssl_context()
+    except Exception:
+        return ssl.create_default_context()
+
 import xml.etree.ElementTree as ET
 
 CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru"))
@@ -88,7 +101,7 @@ def _download(src):
     """Скачивает один список в кэш. TLS включён. Не падает при сбое сети."""
     info = SOURCES[src]
     os.makedirs(CACHE_DIR, exist_ok=True)
-    ctx = ssl.create_default_context()
+    ctx = _ssl_context()
     req = urllib.request.Request(info["url"], headers={"User-Agent": UA})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:

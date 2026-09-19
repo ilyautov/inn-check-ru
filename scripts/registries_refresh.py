@@ -33,6 +33,19 @@ import sys
 import time
 import urllib.request
 
+
+def _ssl_context():
+    """Общий TLS-контекст движка: fetch_counterparty._build_ssl_context() подхватывает
+    корень УЦ Минцифры (scripts/install_ca.py) и COUNTERPARTY_CA_BUNDLE; без него
+    fedsfm.ru и rosstat.gov.ru падают на верификации. Верификация всегда включена."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from fetch_counterparty import _build_ssl_context
+        return _build_ssl_context()
+    except Exception:
+        return ssl.create_default_context()
+
+
 CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru"))
 CACHE_TTL_DAYS = 30
 TIMEOUT = 120
@@ -81,7 +94,7 @@ def _download(reg):
     при неудаче честная инструкция для ручного скачивания."""
     info = REGISTRIES[reg]
     os.makedirs(info["dir"], exist_ok=True)
-    ctx = ssl.create_default_context()
+    ctx = _ssl_context()
     errors = []
     for url in info["urls"]:
         req = urllib.request.Request(url, headers={"User-Agent": UA})

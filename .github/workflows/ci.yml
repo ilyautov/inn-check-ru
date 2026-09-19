@@ -64,6 +64,41 @@ jobs:
       - name: registries eval (офлайн, фикстуры)
         run: python3 eval/run_registries_eval.py
 
+      - name: реестр источников валиден
+        run: python3 scripts/sources.py
+
+      - name: fetch парсеры против записанных ответов ФНС + дрейф схемы (офлайн)
+        run: python3 eval/run_fetch_eval.py
+
+      - name: check_access классификатор (офлайн)
+        run: python3 eval/run_access_eval.py
+
+      - name: install_ca конвертация и отпечатки (офлайн)
+        run: python3 eval/run_ca_eval.py
+
+      - name: профили цели проверки (офлайн)
+        run: python3 eval/run_profiles_eval.py
+
+      - name: колесо содержит canon и CLI работает из чистого venv
+        shell: bash
+        run: |
+          python -m pip install --quiet build
+          python -m build --wheel --outdir "$RUNNER_TEMP/whl"
+          # без grep -q: под pipefail ранний выход grep роняет unzip по SIGPIPE
+          unzip -Z1 "$RUNNER_TEMP"/whl/*.whl | grep -Fx 'inn_check_ru_data/canon_ru.json' \
+            || { echo "в колесе нет inn_check_ru_data/canon_ru.json" >&2; exit 1; }
+          python -m venv "$RUNNER_TEMP/whl-venv"
+          "$RUNNER_TEMP/whl-venv/bin/pip" install --quiet "$RUNNER_TEMP"/whl/*.whl
+          cd "$RUNNER_TEMP"   # не из checkout: иначе канон найдётся по пути репозитория
+          out=$("$RUNNER_TEMP/whl-venv/bin/inn-check-ru" 123 || true)   # exit 1 ожидаем
+          grep -F 'Некорректный ИНН' <<<"$out"
+          "$RUNNER_TEMP/whl-venv/bin/python" - <<'PY'
+          import droblenie_check as d
+          canon = d._load_canon()
+          assert isinstance(canon, dict) and "ндс_усн_освобождение" in canon, canon
+          print("canon из колеса ok:", sorted(canon))
+          PY
+
       - name: mcp server smoke test
         run: |
           pip install -r mcp/requirements.txt

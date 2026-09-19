@@ -1,0 +1,38 @@
+{
+ "dtQueryEnd": "19.09.2026 19:33:55",
+ "dtQueryBegin": "19.09.2026 19:33:55",
+ "data": [],
+ "queryTime": 1,
+ "rowCount": 0,
+ "rowLimit": 0,
+ "pageNav": {
+  "pages": [
+   [
+    "1",
+    null
+   ]
+  ],
+  "pageSizes": [
+   [
+    "5",
+    "<token>"
+   ],
+   [
+    "10",
+    null
+   ],
+   [
+    "25",
+    "<token>"
+   ],
+   [
+    "50",
+    "<token>"
+   ],
+   [
+    "100",
+    "<token>"
+   ]
+  ]
+ }
+}

@@ -39,16 +39,31 @@ CANON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "..", "data", "canon_ru.json")
 
 
-def _load_canon(path=CANON_PATH):
+def _read_canon_text(path):
+    """Текст канона: путь репозитория (скилл, ZIP, git) -> package-data
+    inn_check_ru_data из установленного колеса (pip/uvx). Нет нигде -> None."""
     try:
         with open(path, encoding="utf-8") as fh:
-            j = json.load(fh)
-        пороги = j.get("пороги")
-        if not isinstance(пороги, dict):
-            return None
-        return пороги
-    except (OSError, ValueError):
+            return fh.read()
+    except OSError:
+        pass
+    try:
+        from importlib.resources import files
+        return (files("inn_check_ru_data") / "canon_ru.json").read_text(
+            encoding="utf-8")
+    except Exception:  # нет пакета/ресурса/битый файл: канон «не проверено»
         return None
+
+
+def _load_canon(path=CANON_PATH):
+    text = _read_canon_text(path)
+    if text is None:
+        return None
+    try:
+        пороги = json.loads(text).get("пороги")
+    except (ValueError, AttributeError):
+        return None
+    return пороги if isinstance(пороги, dict) else None
 
 
 def _load_fetch_module():

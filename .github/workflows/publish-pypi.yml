@@ -81,6 +81,29 @@ jobs:
           python -m pip install --quiet build
           python -m build
 
+      # Колесо без канона порогов публиковать нельзя: droblenie_check из
+      # установленного пакета отвечал бы «не проверено». Ставим колесо в
+      # чистый venv и проверяем из другой директории (не из checkout).
+      - name: Колесо содержит canon и CLI работает из чистого venv
+        if: steps.check.outputs.skip == '0'
+        shell: bash
+        run: |
+          # без grep -q: под pipefail ранний выход grep роняет unzip по SIGPIPE
+          unzip -Z1 dist/*.whl | grep -Fx 'inn_check_ru_data/canon_ru.json' \
+            || { echo "в колесе нет inn_check_ru_data/canon_ru.json" >&2; exit 1; }
+          python -m venv "$RUNNER_TEMP/whl-venv"
+          "$RUNNER_TEMP/whl-venv/bin/pip" install --quiet dist/*.whl
+          cd "$RUNNER_TEMP"
+          # некорректный ИНН -> JSON с ошибкой и exit 1: это и есть ожидаемый ответ
+          out=$("$RUNNER_TEMP/whl-venv/bin/inn-check-ru" 123 || true)
+          grep -F 'Некорректный ИНН' <<<"$out"
+          "$RUNNER_TEMP/whl-venv/bin/python" - <<'PY'
+          import droblenie_check as d
+          canon = d._load_canon()
+          assert isinstance(canon, dict) and "ндс_усн_освобождение" in canon, canon
+          print("canon из колеса ok:", sorted(canon))
+          PY
+
       - name: Публикация
         if: steps.check.outputs.skip == '0'
         uses: pypa/gh-action-pypi-publish@ed0c695935afd0fd88331604a3c3fbd4d3fa0ea1 # v1.13.0

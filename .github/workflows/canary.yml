@@ -1,0 +1,32 @@
+name: canary
+
+# Еженедельная сетевая проверка: не «работает ли код», а «не сменила ли ФНС схему».
+# Гоняет парсеры на канареечных ИНН из scripts/sources.py и падает, если целевые поля
+# пустые. Падение = блок в проде уже отдаёт «не проверено», а не «чисто» (задача 1
+# роадмапа), но починить парсер нужно. Раннер GitHub — не-РФ IP: часть источников
+# ожидаемо «гео», это фиксируется в таблице probe, а не в провале джоба.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # понедельник 06:17 UTC
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: probe доступности с раннера (не-РФ IP)
+        run: python3 scripts/check_access.py --no-cache
+
+      - name: канарейки парсеров (падает при смене схемы ФНС)
+        env:
+          COUNTERPARTY_DEADLINE: "300"
+          COUNTERPARTY_IGNORE_ACCESS_CACHE: "1"
+        run: python3 scripts/check_access.py --канарейки --no-cache

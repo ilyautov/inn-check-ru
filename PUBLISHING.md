@@ -18,27 +18,73 @@ pending publisher на PyPI, первая публикация в реестр M
 5. `publish-pypi.yml` (по событию Release) собирает пакет и публикует на PyPI
    через OIDC Trusted Publishing — токен в секретах не нужен.
 
-## PyPI: пакет `inn-check-ru` (разовая настройка)
+## PyPI: пакет `inn-check-ru` (Trusted Publishing, разовая настройка)
 
-До первого релиза после подключения `publish-pypi.yml`:
+Состояние на 19.09.2026: `pypi.org/project/inn-check-ru` отдаёт 404 — пакет
+ещё ни разу не публиковался, хотя `server.json` уже объявляет его на PyPI.
+Пока PyPI не отдаст версию, `uvx --from inn-check-ru ...` и запись в реестре
+MCP не работают. Закрыть это — ручной шаг ниже, один раз.
 
-1. Войти на https://pypi.org (аккаунт с 2FA).
-2. Your account → **Publishing** → **Add a new pending publisher**:
-   - PyPI project name: `inn-check-ru`
+Как устроена публикация (`.github/workflows/publish-pypi.yml`):
+GitHub Release → job `pypi` с `permissions: id-token: write` (OIDC) →
+проверка «тег = версия pyproject» → «версия ещё не на PyPI» → `python -m build`
+→ гейт «колесо содержит canon и CLI работает из чистого venv» →
+`pypa/gh-action-pypi-publish` (Trusted Publishing, без токена в секретах).
+Проект `inn-check-ru` на PyPI создаётся сам при первой успешной публикации,
+но только если pending publisher заведён ДО неё.
+
+Последовательность (до первого релиза с этим workflow):
+
+1. Войти на https://pypi.org (аккаунт с 2FA; без 2FA Publishing недоступен).
+2. Your account → **Publishing** → **Add a new pending publisher** → GitHub.
+   Поля должны совпасть с workflow буквально, иначе OIDC-токен отклоняется
+   (`invalid-publisher`):
+   - PyPI project name: `inn-check-ru` (= `name` в `pyproject.toml`, он же
+     `identifier` в `server.json`)
    - Owner: `ilyautov`
    - Repository name: `inn-check-ru`
-   - Workflow name: `publish-pypi.yml`
-   - Environment name: пусто
-3. Сохранить. Проект появится на PyPI при первой успешной публикации.
+   - Workflow name: `publish-pypi.yml` (имя файла, не `name:` внутри)
+   - Environment name: пусто (job без `environment:`; если когда-нибудь
+     добавить `environment: pypi` в job — завести то же имя и здесь)
+3. Сохранить: publisher висит как pending, проект на PyPI ещё не существует —
+   это нормально.
+4. Локально убедиться, что колесо полное (то же, что гейт в workflow):
+   ```bash
+   uv build --out-dir /tmp/inn-dist
+   unzip -l /tmp/inn-dist/*.whl | grep inn_check_ru_data/canon_ru.json
+   uv venv /tmp/inn-venv && uv pip install --python /tmp/inn-venv/bin/python /tmp/inn-dist/*.whl
+   (cd /tmp && /tmp/inn-venv/bin/inn-check-ru 123 \
+     && /tmp/inn-venv/bin/python -c "import droblenie_check as d; assert d._load_canon(); print('canon ok')")
+   ```
+   Ожидается: строка с `canon_ru.json` в колесе, JSON «Некорректный ИНН» от
+   CLI, `canon ok`. Канон едет в колесо как package-data пакета
+   `inn_check_ru_data` (`pyproject.toml`: `package-dir` → `data/`,
+   `package-data = ["*.json"]`, маркер `data/__init__.py`);
+   `droblenie_check._load_canon` ищет его: путь репозитория →
+   `importlib.resources.files("inn_check_ru_data") / "canon_ru.json"`.
+5. Выпустить релиз по циклу выше (`git tag vX.Y.Z && git push origin vX.Y.Z`
+   → `release.yml` → Release → `publish-pypi.yml`). Версия тега обязана
+   совпасть с `pyproject.toml` (гейт в workflow), а `pyproject.toml` — со
+   всеми манифестами (`python3 eval/run_version_gate.py`).
+6. Если Release уже вышел до настройки publisher (как 1.6.0/1.6.1) —
+   Actions → **Publish to PyPI** → Run workflow → существующий тег, например
+   `v1.6.1`. Workflow сам выйдет без ошибки, если версия уже на PyPI.
+7. После первой успешной публикации на PyPI появится проект; pending
+   publisher автоматически станет обычным Trusted Publisher проекта
+   (Manage → Publishing). Больше ничего заводить не нужно.
 
-Проверка после релиза: `pip install inn-check-ru && inn-check-ru <ИНН>`,
-MCP-обёртка: `uvx --from "inn-check-ru[mcp]" inn-check-ru-mcp`.
-Если релиз вышел до настройки — Actions → Publish to PyPI → Run workflow → тег.
+Проверка после релиза:
+```bash
+curl -fsS https://pypi.org/pypi/inn-check-ru/json | python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])"
+uvx --from inn-check-ru inn-check-ru <ИНН>
+uvx --from "inn-check-ru[mcp]" inn-check-ru-mcp   # MCP-обёртка
+```
 
-Известное ограничение колеса: `data/canon_ru.json` в пакет не едет
-(py-modules без данных), поэтому `droblenie_check` из установленного пакета
-отвечает по выручке «не проверено — канон отсутствует». Из репозитория
-(`python3 scripts/...`, скилл, `uvx --from git+...`) канон на месте.
+Типовые отказы на шаге «Публикация»: `invalid-publisher` — не совпало одно из
+пяти полей pending publisher (чаще всего Workflow name или Environment);
+`403`/`project name already exists` — имя занято чужим проектом (тогда
+переименовывать пакет и `identifier` в `server.json`); `400 File already
+exists` — эта версия уже загружена, поднять версию, PyPI перезаливать не даёт.
 
 ## Реестр MCP: `io.github.ilyautov/inn-check-ru` (ручной шаг)
 

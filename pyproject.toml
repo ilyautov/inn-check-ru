@@ -5,11 +5,13 @@ build-backend = "setuptools.build_meta"
 # Пакет на PyPI: тот же движок, что едет со скиллом, без копии кода.
 # py-modules показывают на scripts/ (плоские модули — структура скилла не
 # ломается: `python3 scripts/...` и `npx skills add` работают как раньше),
-# MCP-обёртка едет пакетом inn_check_ru_mcp из mcp/.
+# MCP-обёртка едет пакетом inn_check_ru_mcp из mcp/, канон порогов
+# data/canon_ru.json — package-data пакета inn_check_ru_data из data/
+# (droblenie_check ищет канон: путь репозитория -> importlib.resources).
 # Версия одна на репозиторий: гейт eval/run_version_gate.py.
 [project]
 name = "inn-check-ru"
-version = "1.6.1"
+version = "1.7.0"
 description = "Проверка российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом. CLI и MCP-сервер."
 readme = "README.md"
 license = "Apache-2.0"
@@ -48,9 +50,20 @@ py-modules = [
   "droblenie_check",
   "diff_counterparty",
   "registries_refresh",
+  "check_access",
+  "install_ca",
+  "profiles",
+  "sources",
 ]
-packages = ["inn_check_ru_mcp"]
+packages = ["inn_check_ru_mcp", "inn_check_ru_data"]
 
 [tool.setuptools.package-dir]
 "" = "scripts"
 inn_check_ru_mcp = "mcp"
+inn_check_ru_data = "data"
+
+# канон порогов едет в колесо (без него droblenie_check из установленного
+# пакета отвечает по выручке «не проверено»); проверка — CI-шаг «колесо
+# содержит canon» и PUBLISHING.md
+[tool.setuptools.package-data]
+inn_check_ru_data = ["*.json"]

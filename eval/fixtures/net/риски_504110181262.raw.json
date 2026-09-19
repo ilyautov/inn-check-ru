@@ -1,0 +1,29 @@
+{
+ "ip": {
+  "data": [
+   {
+    "ogrn": "326508100214173",
+    "periodcode": "12",
+    "namec": "ИВАНОВ ДИМИТЪР ИВАНОВ",
+    "inn": "504110181262",
+    "okved2maintype": "заявительный",
+    "okved2name": "Деятельность автомобильного грузового транспорта",
+    "predo": "0",
+    "pr_sipst": "0",
+    "yearcode": "2025",
+    "okved2main": "49.41",
+    "okved2": "49.41",
+    "okved2mainname": "Деятельность автомобильного грузового транспорта",
+    "dtogrn": "07.04.2026",
+    "token": "<token>",
+    "egrulurl": "token=<token>&inn=504110181262&pdf=vyp",
+    "rsmppdf": "https://rmsp.nalog.ru/excerpt.pdf?token=<token>",
+    "gosregurl": "https://service.nalog.ru/gosreg/lk-excerpt.html"
+   }
+  ],
+  "hasMore": false,
+  "pageSize": 10.0,
+  "rowCount": 1.0,
+  "page": 1.0
+ }
+}
