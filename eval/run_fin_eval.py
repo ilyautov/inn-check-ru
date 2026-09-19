@@ -72,8 +72,58 @@ def run_case(name, expected_flags, forbidden_ids, expected_status):
     return errors
 
 
+def case_единицы_ук():
+    """Уставный капитал из ЕГРЮЛ — рубли, строки ГИР БО — тысячи рублей.
+
+    Без приведения к общим единицам чистые активы оказываются занижены в
+    тысячу раз, и флаг «ниже уставного капитала» встаёт почти каждому.
+    Здесь ЧА = 5 000 тыс. ₽ (5 млн), а УК меняется по обе стороны границы.
+    """
+    errors = []
+
+    def прогон(ук_рублей, ча_тыс):
+        вход = {
+            "инн": "7707083893",
+            "егрюл": {"уставный_капитал": "%d руб." % ук_рублей},
+            "финансы": {"отчётность_по_годам": [
+                {"год": "2025",
+                 "строки": {"1300": ча_тыс, "1600": 20000, "2110": 30000}}]},
+        }
+        proc = subprocess.run([sys.executable, str(SCORING), "--stdin"],
+                              input=json.dumps(вход, ensure_ascii=False),
+                              capture_output=True, text=True, check=False)
+        out = json.loads(proc.stdout)
+        return ({f["id"] for f in out.get("флаги") or []},
+                (out.get("финансовый_профиль") or {}).get("уставный_капитал_тыс_руб"))
+
+    # УК 10 млн ₽ = 10 000 тыс. — выше ЧА 5 000 тыс., флаг обязан встать
+    флаги, ук = прогон(10_000_000, 5000)
+    if "ча_ниже_уставного_капитала" not in флаги:
+        errors.append("УК 10 млн ₽ выше ЧА 5 млн ₽, а флага нет: %s" % sorted(флаги))
+    if ук != 10000:
+        errors.append("УК в выводе %r, ожидались 10000 тыс. руб." % ук)
+
+    # УК 10 тыс. ₽ (типовое ООО) = 10 тыс. — ниже ЧА, флага быть не должно.
+    # Без приведения единиц сравнение шло бы 5000 < 10000 и флаг встал бы.
+    флаги, ук = прогон(10_000, 5000)
+    if "ча_ниже_уставного_капитала" in флаги:
+        errors.append("УК 10 тыс. ₽ ниже ЧА 5 млн ₽, а флаг поднят — "
+                      "единицы не приведены")
+    if ук != 10:
+        errors.append("УК в выводе %r, ожидались 10 тыс. руб." % ук)
+    return errors
+
+
 def main():
     failed = 0
+    errors = case_единицы_ук()
+    if errors:
+        failed += 1
+        print("FAIL единицы уставного капитала")
+        for e in errors:
+            print("  - %s" % e)
+    else:
+        print("PASS единицы уставного капитала")
     for name, (expected, forbidden, status) in sorted(CASES.items()):
         errors = run_case(name, expected, forbidden, status)
         if errors:
@@ -84,9 +134,9 @@ def main():
         else:
             print("PASS %s" % name)
     if failed:
-        print("FAIL: %d/%d кейсов упало" % (failed, len(CASES)))
+        print("FAIL: %d/%d кейсов упало" % (failed, len(CASES) + 1))
         return 1
-    print("PASS: все %d кейсов зелёные" % len(CASES))
+    print("PASS: все %d кейсов зелёные" % (len(CASES) + 1))
     return 0
 
 
