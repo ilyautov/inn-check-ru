@@ -5,12 +5,23 @@ fetch_counterparty.py — проверка российского контраг
 
 Использование:
     python3 fetch_counterparty.py <ИНН> [--save] [--профиль <id>]
+                                        [--режим quick|полный|всё]
     python3 fetch_counterparty.py --канарейки        # парсеры против канареечных ИНН
 
 --save сохраняет снимок в ~/.cache/inn-check-ru/snapshots/<ИНН>/<дата>_<время>.json
 (мониторинг через diff_counterparty.py). --профиль <id> собирает только источники
 профиля (id — sources.PROFILE_IDS, по умолчанию «нейтрально»); остальные —
 «не проверено», причина «профиль: не требуется для <id>».
+
+Фазы и ранний выход (волна 2, §1): источники разнесены по фазам
+(sources.SOURCES[*]["фаза"]). quick-фаза — то, что дёшево даёт deal-killer
+(егрюл, риски, спецреестры, санкции + браузерные с их «не покрыто»); досье-фаза —
+финансы, мсп, нпд, еркнм, рнп. `--режим quick` останавливается после быстрой фазы,
+`--режим полный` (по умолчанию) после неё спрашивает profiles.resolve() и, если
+светофор 🔴, досье не собирает; `--режим всё` собирает всё без раннего выхода.
+Источники одной фазы собираются параллельно (максимум 4 потока, свой opener на
+поток, общий дедлайн); COUNTERPARTY_SEQUENTIAL=1 возвращает последовательный обход.
+Блок `_сбор` в выводе говорит, что именно произошло.
 
 Архитектура (спек docs/superpowers/specs/2026-09-19-wave1-sources-registry-design.md):
   * реестр источников — scripts/sources.py (SOURCES, порядок обхода = порядок ключей);
@@ -37,7 +48,7 @@ _итог_проверки (§1.3): сколько deal-killer-источник�
     {"инн", "тип", "профиль",
      "егрюл", "риски", "финансы", "мсп", "нпд", "спецреестры", "еркнм", "рнп",
      "санкции", "фссп", "суды", "банкротство",      # блоки в порядке SOURCES
-     "_доступность": {...}, "_итог_проверки": {...}}
+     "_доступность": {...}, "_итог_проверки": {...}, "_сбор": {...}}
 
 Что реально отдают источники (живой снимок 19.09.2026, не-РФ IP — см. спек §0):
   egrul.nalog.ru search-result: c,g,cnt,i,k,n,o,p,r,t,pg,tot,rn — адреса (a),
@@ -56,6 +67,7 @@ _итог_проверки (§1.3): сколько deal-killer-источник�
 Без eval/shell. TLS-верификация не отключается (см. _build_ssl_context).
 """
 
+import concurrent.futures
 import datetime as _dt
 import http.cookiejar
 import importlib.util
@@ -64,6 +76,7 @@ import os
 import socket
 import ssl
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -208,11 +221,22 @@ def _http_status_reason(status, step=""):
     return "сеть: HTTP %s%s" % (status, suffix)
 
 
+# Машинно-различимые префиксы причин «не проверено» (§1.1 волны 1 + §1.2 волны 2).
+# Двухсловные («не покрыто:», «ранний выход:») тоже полноценные префиксы, поэтому
+# проверка идёт по списку, а не по «первому слову с двоеточием».
+ПРЕФИКСЫ_ПРИЧИН = ("сеть:", "tls:", "гео:", "капча:", "дедлайн:", "схема:",
+                   "не покрыто:", "профиль:", "probe:", "режим:", "ранний выход:")
+
+
+def _есть_префикс(s):
+    return str(s).startswith(ПРЕФИКСЫ_ПРИЧИН)
+
+
 def _classify_exc(e):
     """Исключение сетевого слоя -> причина с машинно-различимым префиксом."""
     if isinstance(e, (SourceUnavailable, DeadlineExceeded)):
         s = str(e)
-        return s if ":" in s.split(" ")[0] else "дедлайн: " + s
+        return s if _есть_префикс(s) else "дедлайн: " + s
     if isinstance(e, ssl.SSLCertVerificationError):
         return ("tls: сертификат не проверен (%s) — корень УЦ Минцифры: "
                 "scripts/install_ca.py" % (e.verify_message or "verify failed"))
@@ -925,70 +949,284 @@ def fetch_npd(opener, inn):
 
 
 # ---------------------------------------------------------------------------
-# Спецреестры ФНС — service.nalog.ru (НЕ верифицированы)
+# Реестр дисквалифицированных лиц ФНС — service.nalog.ru/disqualified-proc.json
 # ---------------------------------------------------------------------------
+#
+# Живая разведка 19.09.2026 (волна 2, §1.4; дословные ответы — в sources.py,
+# дескриптор «спецреестры», ключ «разведка»):
+#   * disqualified.do  -> форма POST disqualified-proc.json, капчи нет;
+#     proc.json отдаёт JSON СРАЗУ (ни token, ни поллинга, в отличие от egrul);
+#   * zd.do            -> «сервис выведен из эксплуатации», данные в «Прозрачном
+#     бизнесе» -> покрывается блоком «риски»;
+#   * invalid-addresses.do / mri.do / mn.do -> редирект на /payment/ (сервиса нет);
+#     недостоверность сведений отдаёт pb (поле invalid) -> блок «риски»;
+#   * mru.do / addrfind.do -> редирект на pb.nalog.ru; baddr.do -> service-closed;
+#     svl.do -> выведен из эксплуатации с 09.06.2023.
+# Старая схема <path>/proc.json + search-result/<t> принадлежит egrul.nalog.ru и к
+# service.nalog.ru отношения не имеет — отсюда и HTML 200 вместо JSON.
+#
+# ГЛАВНОЕ ОГРАНИЧЕНИЕ: реестр НЕ ищется по ИНН (проверено на пяти организациях с
+# дисквалифицированным действующим руководителем — rowCount=0), хотя форма это
+# обещает. Рабочий ключ — ФИО. Поэтому источник зависит от блока «егрюл»
+# (sources.SOURCES["спецреестры"]["зависит_от"]) и сверяет ФИО руководителя.
 
-NOTE_UNVERIFIED = "эндпоинт не верифицирован (разведка с не-РФ IP 19.09.2026)"
+DISQ_PAGE = "https://service.nalog.ru/disqualified.do"
+DISQ_PROC = "https://service.nalog.ru/disqualified-proc.json"
+DISQ_NOTE_NAME = ("совпадение по ФИО без даты и места рождения — юридически это НЕ "
+                  "идентификация лица: сверьте ДатаРожд/МестоРожд записи с паспортными "
+                  "данными руководителя (правило однофамильцев, KNOWN_LIMITS)")
+DISQ_NO_HEAD = ("не покрыто: реестр дисквалифицированных ищется по ФИО, а не по ИНН "
+                "(проверено 19.09.2026 на пяти ИНН — rowCount=0). %s")
+# Подреестры, которых больше нет как отдельных сервисов (дословно — см. «разведка»).
+DISQ_MOVED = {
+    "налоговая_задолженность": {
+        "статус": "не покрыто",
+        "причина": "service.nalog.ru/zd.do выведен из эксплуатации (проверено "
+                   "19.09.2026); задолженность по налогам отдаёт «Прозрачный бизнес» "
+                   "— см. блок «риски», подблок «детали» (нужен РФ-IP)",
+    },
+    "недостоверность_сведений": {
+        "статус": "не покрыто",
+        "причина": "service.nalog.ru/invalid-addresses.do редиректит на /payment/ — "
+                   "отдельного сервиса нет (проверено 19.09.2026); признак отдаёт pb "
+                   "(поле invalid) — см. блок «риски», поле «недостоверность_сведений»",
+    },
+    "массовый_адрес_руководитель": {
+        "статус": "не покрыто",
+        "причина": "service.nalog.ru/mru.do и /addrfind.do редиректят на pb.nalog.ru, "
+                   "/baddr.do закрыт (проверено 19.09.2026); массовость — за token в "
+                   "company-proc.json, см. блок «риски», подблок «детали»",
+    },
+}
 
 
-def _service_nalog_query(opener, path, inn):
-    """Спецреестры service.nalog.ru — двухшаговый флоу proc.json +
-    search-result/{token} по образцу egrul.nalog.ru. НЕ ВЕРИФИЦИРОВАН: живьём
-    19.09.2026 proc.json отдаёт HTML (HTTP 200) вместо JSON с token."""
-    base = "https://service.nalog.ru/%s/" % path
+# Маркеры того, что «руководитель» из ЕГРЮЛ — организация, а не человек.
+# Реальный случай (5036045205 АО «ДИКСИ ЮГ»): «Управляющая организация:
+# АКЦИОНЕРНОЕ ОБЩЕСТВО "ДИКСИ ГРУПП"». Искать такое в реестре дисквалифицированных
+# ФИЗЛИЦ бессмысленно, а «пусто» было бы тихой ложью.
+_ORG_ПОДСТРОКИ = ("организац", "общество", "товарищество", "кооператив", "компани",
+                  "предприят", "фонд", "учреждени", "партнёрств", "партнерств",
+                  "филиал", "представительств", "банк", "корпорац")
+_ORG_СЛОВА = {"ооо", "оао", "зао", "пао", "ао", "нао", "нко", "гк", "ук", "нп", "ано"}
+
+
+def _похоже_на_фио(s):
+    """Строка выглядит как ФИО физлица (2–4 слова из букв), а не как организация."""
+    if not isinstance(s, str) or not s.strip():
+        return False
+    if any(ch in s for ch in '"«»()0123456789'):
+        return False
+    токены = s.split()
+    if not 2 <= len(токены) <= 4:
+        return False
+    if any(not t.replace("-", "").replace("'", "").isalpha() for t in токены):
+        return False
+    low = s.lower()
+    if any(m in low for m in _ORG_ПОДСТРОКИ):
+        return False
+    return not any(t.lower().strip(".") in _ORG_СЛОВА for t in токены)
+
+
+def _disq_head_name(контекст):
+    """(ФИО в верхнем регистре, откуда взято, причина отказа).
+
+    egrul отдаёт руководителя строкой «ДОЛЖНОСТЬ: Фамилия Имя Отчество»; у ИП
+    руководителя нет, но наименование карточки и есть ФИО. Регистр реестру
+    безразличен (проверено живьём), поэтому приводим к верхнему для сверки.
+    Если руководитель — управляющая организация, ФИО не возвращается: источник
+    честно скажет «не проверено» и подскажет, что делать дальше.
+    """
+    if not isinstance(контекст, dict) or not isinstance(контекст.get("егрюл"), dict):
+        return None, None, ("блок «егрюл» не собран, ФИО руководителя взять неоткуда "
+                            "(реестр ищет по ФИО, ИНН он не индексирует)")
+    егрюл = контекст["егрюл"]
+    g = егрюл.get("руководитель")
+    if isinstance(g, str) and g.strip():
+        g = " ".join(g.split())
+        фио = " ".join((g.split(":", 1)[1] if ":" in g else g).split())
+        if _похоже_на_фио(фио):
+            return фио.upper(), "ФИО руководителя из ЕГРЮЛ (%s)" % g, None
+        return None, None, (
+            "руководитель в ЕГРЮЛ — не физлицо, а «%s»: реестр дисквалифицированных "
+            "ведётся по ФИО должностных лиц. Проверьте руководителя управляющей "
+            "организации отдельным прогоном по её ИНН" % g)
+    if егрюл.get("вид") == "fl":
+        имя = егрюл.get("наименование_полное") or егрюл.get("наименование_краткое")
+        if _похоже_на_фио(" ".join(str(имя or "").split())):
+            return " ".join(str(имя).split()).upper(), "ФИО ИП из ЕГРИП", None
+    return None, None, ("блок «егрюл» не отдал ФИО руководителя (поле «руководитель» "
+                        "пустое), а по ИНН реестр не ищется")
+
+
+def _disq_post(opener, query):
+    """Один POST disqualified-proc.json. Возвращает разобранный JSON."""
     body = urllib.parse.urlencode({
-        "captcha": "", "captchaToken": "", "query": str(inn),
-        "page": "1", "pageSize": "10",
+        "query": query, "page": "1", "pageSize": "25",
+        "m": "", "fam": "", "nam": "", "otch": "", "bd": "", "bp": "",
     }).encode("utf-8")
     headers = {
         "User-Agent": UA,
         "Accept": "application/json, text/javascript, */*; q=0.01",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": base,
+        "Referer": DISQ_PAGE,
     }
-    post_json = _safe_json(_http_post(opener, base + "proc.json", body, headers))
-    if post_json is None:
-        raise SourceUnavailable("схема: service.nalog.ru/%s/proc.json отдаёт HTML вместо "
-                                "JSON — %s" % (path, NOTE_UNVERIFIED))
-    token = _g(post_json, "t")
-    if not token:
-        raise SourceUnavailable("схема: не найдено поле t (token) в ответе %s — %s"
-                                % (path, NOTE_UNVERIFIED))
-    for _ in range(POLL_TRIES):
-        if _time_left() <= POLL_DELAY:
-            raise SourceUnavailable("дедлайн: token %s получен, результат не успел" % path)
-        time.sleep(POLL_DELAY)
-        try:
-            status, text = _http_get(opener, base + "search-result/%s" % token, referer=base)
-        except Exception as e:
-            raise SourceUnavailable(_classify_exc(e))
-        j = _safe_json(text)
-        if j is not None:
-            return j
-    raise SourceUnavailable("дедлайн: token %s получен, результат не пришёл" % path)
+    j = _safe_json(_http_post(opener, DISQ_PROC, body, headers))
+    if j is None:
+        raise SourceUnavailable("схема: disqualified-proc.json вернул не-JSON "
+                                "(ожидался {data, rowCount})")
+    return j
 
 
-def fetch_special_registries(opener, inn):
-    """Дисквалификация руководителя (dismissal), налоговая задолженность >1000 ₽ (zd),
-    недостоверность сведений (invalid). Каждый подзапрос деградирует независимо;
-    блок «ok» только если все три отдали JSON — иначе «не проверено» с причиной
-    первого сбоя (сырые ответы не интерпретируются: схема не верифицирована)."""
-    checks = (("дисквалификация_руководителя", "dismissal"),
-              ("налоговая_задолженность", "zd"),
-              ("недостоверность_сведений", "invalid"))
-    out, failures = {}, []
-    for key, path in checks:
+def raw_special_registries(opener, inn, контекст=None):
+    """Запрос по ФИО руководителя + встроенная самопроверка реестра.
+
+    Возвращает {"запрос": {...}, "ответ": {...}, "самопроверка": {...}|None}.
+    Самопроверка делается ТОЛЬКО когда записей не нашлось: пустой query обязан
+    вернуть весь реестр (19.09.2026 — 8188 записей). Ноль там означает, что
+    сломался эндпоинт, а не что руководитель чист, — и парсер обязан сказать
+    «не проверено», а не «пусто». Это замена канарейки: канарейка по ИНН
+    невозможна (реестр ИНН не индексирует), по ФИО — протухает вместе со сроком.
+    """
+    фио, откуда, отказ = _disq_head_name(контекст)
+    if not фио:
+        raise SourceUnavailable(DISQ_NO_HEAD % отказ)
+    ответ = _disq_post(opener, фио)
+    raw = {"запрос": {"тип": "ФИО", "значение": фио, "откуда": откуда},
+           "ответ": ответ, "самопроверка": None}
+    rows = ответ.get("data") if isinstance(ответ, dict) else None
+    if isinstance(rows, list) and not rows:
+        проба = _disq_post(opener, "")
+        raw["самопроверка"] = {
+            "запрос": "пустой query — весь реестр",
+            "записей_в_реестре": _g(проба, "rowCount"),
+        }
+    return raw
+
+
+def _rec_special(raw, inn):
+    """Первая запись ответа реестра (по ней проверяется контракт §1.1)."""
+    rows = _g(raw, "ответ", "data")
+    if not isinstance(rows, list):
+        return None
+    dict_rows = [r for r in rows if isinstance(r, dict)]
+    return dict_rows[0] if dict_rows else None
+
+
+def _disq_дата(v):
+    """«25.08.2026 00:00:00» -> «25.08.2026»; иное значение — как есть."""
+    if isinstance(v, str) and len(v) >= 10 and v[2] == "." and v[5] == ".":
+        return v[:10]
+    return v
+
+
+def _дата_dmy(v):
+    """«25.08.2026» или «25.08.2026 00:00:00» -> datetime.date; иначе None."""
+    s = _disq_дата(v)
+    if not isinstance(s, str) or len(s) != 10:
+        return None
+    try:
+        return _dt.date(int(s[6:10]), int(s[3:5]), int(s[0:2]))
+    except ValueError:
+        return None
+
+
+def _disq_действует(запись, сегодня=None):
+    """Действует ли дисквалификация на сегодня. None — даты не разобрались.
+
+    Реестр хранит только действующие записи (19.09.2026: все 8188 с датой
+    окончания в будущем), но полагаться на это нельзя — считаем по датам.
+    """
+    d_кон = _дата_dmy(запись.get("ДатаКонДискв"))
+    if d_кон is None:
+        return None
+    сегодня = сегодня or _dt.datetime.now(tz=_dt.timezone.utc).date()
+    d_нач = _дата_dmy(запись.get("ДатаНачДискв"))
+    return d_кон >= сегодня and (d_нач is None or d_нач <= сегодня)
+
+
+def parse_special_registries(raw, inn):
+    """Ответ реестра дисквалифицированных -> блок «спецреестры». ЧИСТАЯ функция.
+
+    «ok»    — записи по ФИО руководителя найдены (это deal-killer-сигнал);
+    «пусто» — записей нет И самопроверка подтвердила, что реестр живой;
+    «не проверено» — всё остальное, включая пустой ответ при нулевой самопроверке.
+    """
+    if not isinstance(raw, dict):
+        return _not_checked("спецреестры", "схема: ответ не JSON-объект")
+    ответ = raw.get("ответ")
+    if not isinstance(ответ, dict):
+        return _not_checked("спецреестры", "схема: не найдено поле ответ")
+    rows = ответ.get("data")
+    if not isinstance(rows, list):
+        return _not_checked("спецреестры", "схема: не найдено поле data")
+    запрос = raw.get("запрос") if isinstance(raw.get("запрос"), dict) else {}
+    подписи = dict(DISQ_MOVED)
+
+    if not rows:
+        всего = _g(raw, "самопроверка", "записей_в_реестре")
         try:
-            out[key] = {"статус": "получен сырой ответ", "данные_сырые":
-                        _service_nalog_query(opener, path, inn)}
-        except (SourceUnavailable, DeadlineExceeded) as e:
-            failures.append((key, _classify_exc(e)))
-    if failures:
-        key, reason = failures[0]
-        return _not_checked("спецреестры", "%s (подзапрос %s%s)" % (
-            reason, key, "; ещё %d" % (len(failures) - 1) if len(failures) > 1 else ""))
-    return out, _av("спецреестры", "ok")
+            живой = int(всего) > 0
+        except (TypeError, ValueError):
+            живой = False
+        if not живой:
+            return _not_checked(
+                "спецреестры",
+                "схема: реестр дисквалифицированных вернул пусто И самопроверка "
+                "пустым запросом дала %r вместо всего реестра — «дисквалификации нет» "
+                "утверждать нельзя" % (всего,))
+        return None, _av("спецреестры", "пусто",
+                         "в реестре дисквалифицированных нет записей по ФИО «%s» "
+                         "(реестр живой: %s записей); задолженность и недостоверность "
+                         "этот сервис больше не отдаёт — см. блок «риски»"
+                         % (запрос.get("значение"), всего))
+
+    missing = _schema_missing("спецреестры", inn, _rec_special(raw, inn))
+    if missing:
+        return _not_checked("спецреестры", "схема: не найдено поле %s" % missing)
+
+    записи = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        записи.append({
+            "фио": r.get("ФИО"),
+            "дата_рождения": _disq_дата(r.get("ДатаРожд")),
+            "место_рождения": r.get("МестоРожд"),
+            "организация": r.get("НаимОрг"),
+            "должность": r.get("Должность"),
+            "статья_коап": r.get("КвалификацияТекст"),
+            "дисквалификация_с": _disq_дата(r.get("ДатаНачДискв")),
+            "дисквалификация_по": _disq_дата(r.get("ДатаКонДискв")),
+            "срок": r.get("ДисквСрок"),
+            "орган": r.get("НаимОргПрот"),
+            "номер_записи": r.get("НомЗап"),
+            "действует": _disq_действует(r),
+        })
+    точные = [z for z in записи
+              if str(z.get("фио") or "").strip().upper()
+              == str(запрос.get("значение") or "").strip().upper()]
+    действующие = [z for z in (точные or записи) if z.get("действует")]
+    # Форма подблока продиктована profiles.py (_истина): {"статус", "данные"} —
+    # «статус» не начинается с «не» -> сигнал берётся из «данные», а непустой
+    # список «записи» внутри и означает «сигнал найден».
+    подписи["дисквалификация_руководителя"] = {
+        "статус": "проверено",
+        "совпадение": "точное по ФИО" if точные else "нестрогое (подстрока ФИО)",
+        "запрос": запрос,
+        "примечание": DISQ_NOTE_NAME,
+        "данные": {
+            "записей": len(записи),
+            "точных_совпадений_фио": len(точные),
+            "действующих": len(действующие),
+            "записи": записи,
+        },
+    }
+    return подписи, _av("спецреестры", "ok")
+
+
+def fetch_special_registries(opener, inn, контекст=None):
+    return parse_special_registries(raw_special_registries(opener, inn, контекст), inn)
 
 
 # ---------------------------------------------------------------------------
@@ -1073,10 +1311,25 @@ PARSERS = {
     "финансы": parse_finance,
     "мсп": parse_msp,
     "нпд": parse_npd,
+    "спецреестры": parse_special_registries,
 }
 
+# Источники, чей fetcher принимает третьим аргументом контекст — данные уже
+# собранных источников (sources.SOURCES[id]["зависит_от"]). Остальные fetcher'ы
+# вызываются по-старому, двумя аргументами: check_access.py --канарейки и внешние
+# потребители FETCHERS ничего не замечают.
+CONTEXT_FETCHERS = {"спецреестры"}
+
+# Запись сырого ответа для источника «спецреестры» — как и для остальных,
+# из неё eval дрейфа схемы удаляет поля контракта по очереди.
+RAW_RECORD["спецреестры"] = _rec_special
+
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
+# Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка
+# одного источника обязана запуститься не больше одного раза за процесс.
 _CANARY_CACHE = {}
+_CANARY_LOCK = threading.Lock()
+_CANARY_KEY_LOCKS = {}
 
 
 def _browser_note(source_id, inn):
@@ -1127,41 +1380,79 @@ def _non_empty(v):
     return v not in (None, "", [], {})
 
 
+def _canary_key_lock(key):
+    """Замок на конкретную канарейку: разные источники не ждут друг друга."""
+    with _CANARY_LOCK:
+        return _CANARY_KEY_LOCKS.setdefault(key, threading.Lock())
+
+
+def _canary_cached(key):
+    with _CANARY_LOCK:
+        return _CANARY_CACHE.get(key)
+
+
+def _call_fetcher(source_id, opener, inn, контекст=None):
+    """Вызов FETCHERS[id] с учётом того, принимает ли он контекст (CONTEXT_FETCHERS).
+
+    Подменённые в eval fetcher'ы двух аргументов остаются рабочими: третий
+    аргумент передаётся только источникам из CONTEXT_FETCHERS.
+    """
+    if source_id in CONTEXT_FETCHERS:
+        return FETCHERS[source_id](opener, inn, контекст)
+    return FETCHERS[source_id](opener, inn)
+
+
 def _run_canary(source_id, canary, opener):
     """Один раз за процесс: fetcher на канареечном ИНН дескриптора canary. «ok» —
     состояние ok и все ожидаем_непустые непустые; «провал» — пусто/пустые поля;
-    сеть/капча/дедлайн — «не запускалась» (о парсере ничего не говорит)."""
+    сеть/капча/дедлайн — «не запускалась» (о парсере ничего не говорит).
+
+    Потокобезопасно: при параллельном сборе (§1.3) несколько потоков могут
+    одновременно упереться в «пусто» одного источника — сеть на канарейку обязана
+    уйти ровно один раз, поэтому проверка кэша и сам прогон идут под замком ключа.
+    """
     key = (source_id, str(canary["инн"]))
-    if key in _CANARY_CACHE:
-        return _CANARY_CACHE[key]
-    if _time_left() <= POLL_DELAY * 2:
-        result = ("не запускалась", "дедлайн: бюджет времени исчерпан")
-        _CANARY_CACHE[key] = result
-        return result
-    try:
-        data, av = FETCHERS[source_id](opener, canary["инн"])
-    except (SourceUnavailable, DeadlineExceeded) as e:
-        result = ("не запускалась", _classify_exc(e))
-    except Exception as e:
-        result = ("провал", "схема: исключение парсера на канарейке (%s)" % type(e).__name__)
-    else:
-        st = av.get("состояние")
-        if st == "ok":
-            empty = [f for f in canary.get("ожидаем_непустые", [])
-                     if not _non_empty((data or {}).get(f))]
-            result = ("ok", None) if not empty else (
-                "провал", "схема: канарейка без полей %s" % ", ".join(empty))
-        elif st == "пусто":
-            result = ("провал", "схема: канарейка пуста — парсер сломан")
+    cached = _canary_cached(key)
+    if cached is not None:
+        return cached
+    with _canary_key_lock(key):
+        cached = _canary_cached(key)          # пока ждали замок, сосед мог посчитать
+        if cached is not None:
+            return cached
+        if _time_left() <= POLL_DELAY * 2:
+            result = ("не запускалась", "дедлайн: бюджет времени исчерпан")
         else:
-            result = ("не запускалась", av.get("причина"))
-    _CANARY_CACHE[key] = result
-    return result
+            try:
+                data, av = _call_fetcher(source_id, opener, canary["инн"],
+                                         canary.get("контекст"))
+            except (SourceUnavailable, DeadlineExceeded) as e:
+                result = ("не запускалась", _classify_exc(e))
+            except Exception as e:
+                result = ("провал",
+                          "схема: исключение парсера на канарейке (%s)" % type(e).__name__)
+            else:
+                st = av.get("состояние")
+                if st == "ok":
+                    empty = [f for f in canary.get("ожидаем_непустые", [])
+                             if not _non_empty((data or {}).get(f))]
+                    result = ("ok", None) if not empty else (
+                        "провал", "схема: канарейка без полей %s" % ", ".join(empty))
+                elif st == "пусто":
+                    result = ("провал", "схема: канарейка пуста — парсер сломан")
+                else:
+                    result = ("не запускалась", av.get("причина"))
+        with _CANARY_LOCK:
+            _CANARY_CACHE[key] = result
+        return result
 
 
-def run_source(source_id, inn, opener=None, профиль=None):
+def run_source(source_id, inn, opener=None, профиль=None, контекст=None):
     """Один источник по реестру: профиль -> браузер -> probe-кэш -> fetcher ->
-    канарейка. Всегда (данные|None, _доступность); исключения — в «не проверено»."""
+    канарейка. Всегда (данные|None, _доступность); исключения — в «не проверено».
+
+    `контекст` — уже собранные блоки (id источника -> данные) для источников с
+    `зависит_от` в дескрипторе; остальным он не передаётся.
+    """
     d = SOURCES[source_id]
     if профиль and source_id not in sources.sources_for_profile(профиль):
         return _not_checked(source_id, "профиль: не требуется для %s" % профиль)
@@ -1174,7 +1465,7 @@ def run_source(source_id, inn, opener=None, профиль=None):
         if opener is None:
             opener = _make_opener()
     try:
-        data, av = FETCHERS[source_id](opener, inn)
+        data, av = _call_fetcher(source_id, opener, inn, контекст)
     except (SourceUnavailable, DeadlineExceeded) as e:
         return _not_checked(source_id, _classify_exc(e))
     except Exception as e:
@@ -1221,16 +1512,179 @@ def build_summary(av_map):
     }
 
 
-def collect(inn, профиль=None, opener=None):
-    """Обход SOURCES по порядку -> полный результат (без записи снимка)."""
-    if opener is None:
+# ---------------------------------------------------------------------------
+# Фазы сбора, параллелизм, ранний выход (волна 2, §1)
+# ---------------------------------------------------------------------------
+
+РЕЖИМЫ = ("quick", "полный", "всё")
+MAX_WORKERS = 4                 # уважение к ФНС: не больше четырёх запросов разом
+_THREAD_LOCAL = threading.local()
+
+
+def _sequential():
+    """COUNTERPARTY_SEQUENTIAL=1 — последовательный обход (отладка, воспроизводимость)."""
+    return os.environ.get("COUNTERPARTY_SEQUENTIAL") == "1"
+
+
+def reset_deadline():
+    """Перезапустить общий бюджет времени.
+
+    DEADLINE отсчитывается от загрузки модуля, а collect() могут звать несколько раз
+    подряд (батч, MCP-сервер) — тогда второй вызов стартовал бы с уже потраченным
+    бюджетом. Сбрасывается один раз на collect(), поэтому внутри сбора дедлайн
+    остаётся ОБЩИМ на обе фазы и на все потоки, как требует §1.3.
+    """
+    global _START
+    _START = time.monotonic()
+
+
+def _thread_opener():
+    """Свой opener на поток: http.cookiejar.CookieJar не потокобезопасен (§1.3)."""
+    op = getattr(_THREAD_LOCAL, "opener", None)
+    if op is None:
+        op = _THREAD_LOCAL.opener = _make_opener()
+    return op
+
+
+def _run_wave(ids, inn, профиль, контекст, opener):
+    """Одна волна источников -> [(id, (данные, _доступность))] в порядке ids.
+
+    Параллельно (ThreadPoolExecutor, максимум MAX_WORKERS потоков) — источники
+    независимы; при COUNTERPARTY_SEQUENTIAL=1 или одном источнике — в лоб.
+    Ни один поток не переживает исчерпание бюджета: все сетевые вызовы внутри
+    ходят через _http_get/_http_post, которые сверяются с общим _time_left()
+    перед каждым запросом и ограничивают им socket timeout.
+    """
+    if not ids:
+        return []
+    if len(ids) == 1 or _sequential():
+        return [(sid, run_source(sid, inn, opener=opener or _make_opener(),
+                                 профиль=профиль, контекст=контекст))
+                for sid in ids]
+
+    def задача(sid):
+        # opener берётся ленивым per-thread: источникам «кэш»/«браузер» он не нужен.
+        return run_source(sid, inn, opener=_thread_opener(), профиль=профиль,
+                          контекст=контекст)
+
+    with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(MAX_WORKERS, len(ids)),
+            thread_name_prefix="источник") as pool:
+        futures = {sid: pool.submit(задача, sid) for sid in ids}
+        out = []
+        for sid in ids:
+            try:
+                out.append((sid, futures[sid].result()))
+            except Exception as e:          # run_source сам не бросает; страховка
+                out.append((sid, _not_checked(
+                    sid, "схема: сбой параллельного сбора %s: %s" % (type(e).__name__, e))))
+    return out
+
+
+def _collect_phase(фаза, inn, профиль, result, av_map, opener=None):
+    """Собирает источники одной фазы в result/av_map. -> список собранных id.
+
+    Внутри фазы два захода: сначала независимые источники, затем те, у кого в
+    дескрипторе есть «зависит_от» (им нужен контекст уже собранных блоков —
+    так «спецреестры» получают ФИО руководителя из «егрюл»).
+    """
+    ids = [sid for sid in SOURCES if SOURCES[sid].get("фаза") == фаза]
+    волны = ([sid for sid in ids if not sources.depends_on(sid)],
+             [sid for sid in ids if sources.depends_on(sid)])
+    собрано = []
+    for волна in волны:
+        контекст = {sid: result.get(sid) for sid in собрано}
+        for sid, (data, av) in _run_wave(волна, inn, профиль, контекст, opener):
+            result[sid] = data
+            av_map[sid] = av
+            собрано.append(sid)
+    return собрано
+
+
+def _skip_phase(фаза, причина, result, av_map):
+    """Источники несобранной фазы -> «не проверено» с общей причиной."""
+    for sid in SOURCES:
+        if SOURCES[sid].get("фаза") == фаза:
+            result[sid], av_map[sid] = _not_checked(sid, причина)
+
+
+def _светофор_после_quick(result, av_map, профиль):
+    """profiles.resolve() на собранной quick-фазе. -> (светофор, сигналы, причина сбоя).
+
+    fin_json не считается: финансы живут в досье-фазе, а резолвер принимает None
+    (финансовые сигналы просто станут «не проверен»). Резолвер импортируется
+    мягко: нет модуля или он упал — раннего выхода просто не происходит.
+    """
+    try:
+        profiles = _load_sibling("profiles")
+    except Exception as e:
+        return None, [], "резолвер профилей не импортируется (%s)" % type(e).__name__
+    частичный = dict(result)
+    частичный["_доступность"] = dict(av_map)
+    частичный["_итог_проверки"] = build_summary(av_map)
+    try:
+        вердикт = profiles.resolve(частичный, None, профиль or "нейтрально")
+    except Exception as e:
+        return None, [], "резолвер профилей упал (%s: %s)" % (type(e).__name__, e)
+    if not isinstance(вердикт, dict):
+        return None, [], "резолвер профилей вернул не-словарь"
+    сигналы = [s.get("сигнал") for s in (вердикт.get("поднят_сигналами") or [])
+               if isinstance(s, dict)]
+    return вердикт.get("светофор"), [x for x in сигналы if x], None
+
+
+def collect(inn, профиль=None, режим="полный", opener=None):
+    """Сбор по фазам -> полный результат (без записи снимка).
+
+    режим (§1.2):
+      quick  — только quick-фаза, затем стоп;
+      полный — quick-фаза, проверка на deal-killer, затем досье-фаза;
+      всё    — обе фазы без раннего выхода (снимки мониторинга: диффу нужны все поля).
+
+    Профиль «нейтрально» светофора не выдаёт (формулировка «факты»), поэтому
+    ранний выход в нём не срабатывает никогда — это осознанно: нейтральный режим
+    показывает факты, а не отсеивает.
+    """
+    if режим is None:
+        режим = "полный"
+    if режим not in РЕЖИМЫ:
+        режим = "полный"
+    reset_deadline()
+    начало = time.monotonic()
+    if opener is None and _sequential():
         opener = _make_opener()
     result = {"инн": inn, "тип": _тип_контрагента(inn), "профиль": профиль or "нейтрально"}
-    av_map = {}
+    # Ключи блоков заводятся заранее, в порядке SOURCES: фазы наполняют их вразнобой,
+    # а формат вывода (и его порядок) остаётся тем же, что до волны 2.
     for sid in SOURCES:
-        data, av = run_source(sid, inn, opener=opener, профиль=профиль)
-        result[sid] = data
-        av_map[sid] = av
+        result[sid] = None
+    av_map = {}
+
+    собрано = _collect_phase("quick", inn, профиль, result, av_map, opener)
+    фаза_остановки, ранний_выход, причина = "quick", False, None
+
+    if режим == "quick":
+        причина = "режим quick: досье-фаза не запрашивалась"
+        _skip_phase("досье", "режим: quick — досье-фаза не собиралась", result, av_map)
+    else:
+        светофор, сигналы, сбой = (None, [], None)
+        if режим == "полный":
+            светофор, сигналы, сбой = _светофор_после_quick(result, av_map, профиль)
+        if режим == "полный" and светофор == "🔴":
+            ранний_выход = True
+            причина = "ранний выход: deal-killer найден на quick-фазе"
+            if сигналы:
+                причина += " (%s)" % ", ".join(сигналы)
+            _skip_phase("досье", "ранний выход: deal-killer найден на quick-фазе",
+                        result, av_map)
+        else:
+            собрано += _collect_phase("досье", inn, профиль, result, av_map, opener)
+            фаза_остановки = "досье"
+            причина = ("обе фазы собраны" if режим != "всё"
+                       else "режим всё: ранний выход отключён, обе фазы собраны")
+            if сбой:
+                причина += " (проверка на deal-killer не делалась: %s)" % сбой
+
     # egrul не отдаёт статус (k — вид субъекта): текстовый статус — из pb.
     egrul, risks = result.get("егрюл"), result.get("риски")
     if isinstance(egrul, dict) and isinstance(risks, dict) and risks.get("статус"):
@@ -1238,6 +1692,15 @@ def collect(inn, профиль=None, opener=None):
         egrul["статус_источник"] = "pb.nalog.ru (sulst_name_ex)"
     result["_доступность"] = av_map
     result["_итог_проверки"] = build_summary(av_map)
+    result["_сбор"] = {
+        "режим": режим,
+        "фаза_остановки": фаза_остановки,
+        "секунд": round(time.monotonic() - начало, 2),
+        "источников_собрано": len(собрано),
+        "ранний_выход": ранний_выход,
+        "причина_остановки": причина,
+        "параллельно": not _sequential(),
+    }
     return result
 
 
@@ -1279,13 +1742,30 @@ def validate_inn(inn):
     return inn
 
 
-def save_snapshot(inn, result):
+def save_snapshot(inn, result, полный=False):
     """Снимок проверки для мониторинга (diff_counterparty.py).
 
+    По умолчанию сохраняется нормализованный ОТПЕЧАТОК (scripts/snapshot.py):
+    поля, по которым идёт дифф, плюс состояния источников и SHA-256 остального.
+    Он на порядок меньше и не тащит в хранилище чужие персданные, которые для
+    мониторинга не нужны. `--снимок полный` возвращает старое поведение (весь
+    JSON) — на случай, когда нужен исходник целиком.
+
     ~/.cache/inn-check-ru/snapshots/<ИНН>/<дата>_<время>.json — по снимку на
-    запуск; сравниваются два последних. Не падает: сбой записи — предупреждение
-    в stderr, JSON в stdout всё равно уходит.
+    запуск; сравниваются два последних (diff читает оба формата). Не падает:
+    сбой записи — предупреждение в stderr, JSON в stdout всё равно уходит.
     """
+    if not полный:
+        try:
+            snapshot = _load_sibling("snapshot")
+            путь = snapshot.save(inn, result)
+            if путь:
+                sys.stderr.write("отпечаток сохранён: %s\n" % путь)
+            return путь
+        except Exception as e:
+            sys.stderr.write(
+                "ВНИМАНИЕ: отпечаток не сделан (%s) — сохраняю полный снимок\n"
+                % type(e).__name__)
     try:
         snap_dir = os.path.join(CACHE_DIR, "snapshots", inn)
         os.makedirs(snap_dir, exist_ok=True)
@@ -1300,30 +1780,51 @@ def save_snapshot(inn, result):
         return None
 
 
-USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--save] [--профиль <id>]\n"
+USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--save [--снимок полный]]\n"
+         "                                            [--профиль <id>]\n"
+         "                                            [--режим quick|полный|всё]\n"
          "               python3 fetch_counterparty.py --канарейки\n"
-         "Профили: %s\n" % ", ".join(sources.PROFILE_IDS))
+         "Профили: %s\n"
+         "Режимы: quick — только быстрая фаза (егрюл, риски, спецреестры, санкции);\n"
+         "        полный — quick, и если deal-killer не найден, досье-фаза "
+         "(по умолчанию);\n"
+         "        всё — обе фазы без раннего выхода (снимки мониторинга).\n"
+         "        --quick — синоним --режим quick.\n"
+         "--save: отпечаток для мониторинга (--режим всё подставляется сам);\n"
+         "        --снимок полный — сохранить весь JSON, как раньше.\n"
+         % ", ".join(sources.PROFILE_IDS))
 
 
 def _parse_args(argv):
-    args, do_save, профиль, canaries = [], False, None, False
+    args, do_save, профиль, canaries, режим = [], False, None, False, None
+    снимок = None
     it = iter(argv[1:])
     for a in it:
         if a == "--save":
             do_save = True
+        elif a in ("--снимок", "--snapshot"):
+            снимок = next(it, None)
+        elif a.startswith(("--снимок=", "--snapshot=")):
+            снимок = a.split("=", 1)[1]
         elif a == "--канарейки":
             canaries = True
         elif a in ("--профиль", "--profile"):
             профиль = next(it, None)
-        elif a.startswith("--профиль="):
+        elif a.startswith(("--профиль=", "--profile=")):
             профиль = a.split("=", 1)[1]
+        elif a == "--quick":
+            режим = "quick"
+        elif a in ("--режим", "--mode"):
+            режим = next(it, None)
+        elif a.startswith(("--режим=", "--mode=")):
+            режим = a.split("=", 1)[1]
         else:
             args.append(a)
-    return args, do_save, профиль, canaries
+    return args, do_save, профиль, canaries, режим, снимок
 
 
 def main(argv):
-    args, do_save, профиль, canaries = _parse_args(argv)
+    args, do_save, профиль, canaries, режим, снимок = _parse_args(argv)
     if canaries:
         out, failed = run_canaries()
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
@@ -1337,6 +1838,12 @@ def main(argv):
                        % (профиль, ", ".join(sources.PROFILE_IDS))},
             ensure_ascii=False, indent=2) + "\n")
         return 2
+    if режим is not None and режим not in РЕЖИМЫ:
+        sys.stdout.write(json.dumps(
+            {"ошибка": "неизвестный режим %r; допустимые: %s"
+                       % (режим, ", ".join(РЕЖИМЫ))},
+            ensure_ascii=False, indent=2) + "\n")
+        return 2
     inn = validate_inn(args[0])
     if inn is None:
         out = {"ошибка": "Некорректный ИНН: ожидается 10 или 12 цифр с верным "
@@ -1345,9 +1852,24 @@ def main(argv):
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
         return 1
 
-    result = collect(inn, профиль=профиль)
+    if снимок is not None and снимок not in ("отпечаток", "полный"):
+        sys.stdout.write(json.dumps(
+            {"ошибка": "неизвестный вид снимка %r; допустимые: отпечаток, полный"
+                       % снимок}, ensure_ascii=False, indent=2) + "\n")
+        return 2
+    # Снимок мониторинга должен быть полным: дифф сравнивает поля, а ранний
+    # выход оставил бы половину блоков «не проверено» — следующий прогон
+    # показал бы не изменения контрагента, а разницу режимов сбора.
+    if do_save and режим is None:
+        режим = "всё"
+    elif do_save and режим != "всё":
+        sys.stderr.write(
+            "ВНИМАНИЕ: снимок в режиме %r неполный — для мониторинга "
+            "используйте --режим всё\n" % режим)
+
+    result = collect(inn, профиль=профиль, режим=режим or "полный")
     if do_save:
-        save_snapshot(inn, result)
+        save_snapshot(inn, result, полный=(снимок == "полный"))
     sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return 0
 

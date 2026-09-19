@@ -13,6 +13,7 @@ tools_impl.py — логика MCP-инструментов inn-check-ru пов�
 import functools
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -34,7 +35,14 @@ EXPECTED_TOOLS = (
     "affiliates_graph",
     "droblenie_check",
     "counterparty_diff",
+    "counterparty_verdict",
+    "counterparty_batch",
+    "access_check",
 )
+
+# Батч: 3 ИНН собираются одновременно (batch_check.py), волна ~15 с в quick-режиме.
+BATCH_LIMIT = 50
+BATCH_WAVE_SECONDS = 20.0
 
 
 def _не_проверено(причина, инструмент=None):
@@ -161,3 +169,64 @@ def counterparty_diff(inn):
     if inn is None:
         return _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
     return run_script("diff_counterparty.py", [inn])
+
+
+def _batch_timeout(n):
+    """Батч идёт волнами по 3 ИНН (batch_check.py --потоков 3): даём волне
+    BATCH_WAVE_SECONDS, но не меньше общего TIMEOUT."""
+    return max(TIMEOUT, BATCH_WAVE_SECONDS * ((n + 2) // 3))
+
+
+def _строки(out):
+    """Список результатов батча или None, если пришла деградация обёртки."""
+    рез = out.get("результаты") if isinstance(out, dict) else None
+    return рез if isinstance(рез, list) else None
+
+
+@_guarded
+def counterparty_verdict(inn, profile="нейтрально"):
+    """Главный инструмент: сбор + финансы + резолвер профиля одной командой.
+    Возвращает светофор, поднявшие его сигналы, рекомендацию и что осталось
+    «не проверено» — модели не нужно сводить вердикт из сырого JSON."""
+    inn = _valid_inn(inn)
+    if inn is None:
+        return _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
+    out = run_script("batch_check.py",
+                     ["--json", "--тихо", "--профиль", str(profile or "нейтрально"),
+                      "--режим", "полный", inn])
+    строки = _строки(out)
+    if строки is None:
+        return out
+    if not строки:
+        return _не_проверено("батч вернул пустой результат", "counterparty_verdict")
+    строка = dict(строки[0])
+    строка["профиль"] = out.get("профиль")
+    строка["быстрый_режим"] = out.get("быстрый_режим")
+    return строка
+
+
+@_guarded
+def counterparty_batch(inns, profile="нейтрально"):
+    """Батч по списку ИНН (лимит BATCH_LIMIT за вызов): по каждому — быстрая
+    проверка и светофор профиля, сортировка 🔴 → не проверено → 🟡 → 🟢."""
+    if isinstance(inns, str):
+        inns = [x for x in re.split(r"[\s,;]+", inns) if x]
+    if not isinstance(inns, (list, tuple)):
+        return _не_проверено("inns: ожидается список ИНН (или строка через запятую)")
+    inns = [str(i).strip() for i in inns if str(i).strip()]
+    if not inns:
+        return _не_проверено("пустой список ИНН")
+    if len(inns) > BATCH_LIMIT:
+        return _не_проверено("лимит %d ИНН за вызов, передано %d — разбейте батч"
+                             % (BATCH_LIMIT, len(inns)))
+    return run_script("batch_check.py",
+                      ["--json", "--тихо", "--профиль", str(profile or "нейтрально"),
+                       *inns],
+                      timeout=_batch_timeout(len(inns)))
+
+
+@_guarded
+def access_check():
+    """Таблица доступности источников с текущей сети (probe, кэш на сутки):
+    что реально отвечает, где нужен РФ-IP, где корень УЦ Минцифры."""
+    return run_script("check_access.py", ["--json"])

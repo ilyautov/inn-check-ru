@@ -5,6 +5,8 @@ test_server.py — дымовой тест MCP-сервера без живог�
 1. tools_impl: каждый EXPECTED инструмент существует и вызывается;
    counterparty_fetch на фикстурном выводе (monkeypatch run_script) отдаёт
    JSON с обязательными полями; ошибочный путь -> «не проверено», не traceback.
+   Волна 2: counterparty_verdict / counterparty_batch (лимит 50) / access_check
+   гоняются тем же офлайн-путём — движок не запускается, сети нет.
 2. SDK-транспорт (если пакет mcp установлен): сервер импортируется, список
    инструментов == EXPECTED_TOOLS.
 """
@@ -53,6 +55,27 @@ FIXTURE_FETCH = {
 }
 
 
+FIXTURE_BATCH = {
+    "статус": "ок", "профиль": "отсрочка", "режим": "quick",
+    "быстрый_режим": "доступен", "всего": 2, "проверено": 1,
+    "не_проверено": 0, "некорректных_инн": 1, "дублей_схлопнуто": 0,
+    "результаты": [
+        {"инн": "7707083893", "название": "ПАО «Тест»", "светофор": "🔴",
+         "статус": "проверено", "сигналы": ["недостоверность_сведений"],
+         "проверка_состоялась": True, "не_проверено": [],
+         "рекомендация": "не отгружать в долг", "вердикт": {"факты": []}},
+        {"инн": "1234567890", "светофор": None, "статус": "некорректный ИНН",
+         "сигналы": [], "причина": "неверное контрольное число"},
+    ],
+}
+
+FIXTURE_ACCESS = {
+    "дата": "2026-09-19T14:00:00", "ip_класс": "не-РФ",
+    "источники": {"егрюл": {"состояние": "доступен", "http": 307, "мс": 350,
+                            "причина": None}},
+}
+
+
 def case_tools_impl(ti):
     errors = []
 
@@ -77,6 +100,10 @@ def case_tools_impl(ti):
             return {"статус": "проверено", "совпадений": 0}
         if script == "diff_counterparty.py":
             return {"статус": "изменений нет"}
+        if script == "batch_check.py":
+            return dict(FIXTURE_BATCH)
+        if script == "check_access.py":
+            return dict(FIXTURE_ACCESS)
         return {"статус": "не проверено", "причина": "фикстура"}
 
     ti.run_script = fake
@@ -100,6 +127,34 @@ def case_tools_impl(ti):
         out6 = ti.counterparty_diff("7707083893")
         check(out6.get("статус") == "изменений нет", "diff: %s" % out6)
 
+        # --- волна 2: вердикт / батч / доступность ---
+        v = ti.counterparty_verdict("7707083893", profile="отсрочка")
+        check(v.get("светофор") == "🔴", "verdict: светофор %s" % v.get("светофор"))
+        check(v.get("сигналы") == ["недостоверность_сведений"],
+              "verdict: сигналы %s" % v.get("сигналы"))
+        check(v.get("профиль") == "отсрочка", "verdict: профиль %s" % v.get("профиль"))
+        check(any(c[0] == "batch_check.py" and "--режим" in c[1] and "полный" in c[1]
+                  for c in calls),
+              "verdict должен звать батч полным режимом: %s" % [c[1] for c in calls])
+        check(ti.counterparty_verdict("не-инн").get("статус") == "не проверено",
+              "verdict: невалидный ИНН должен дать «не проверено»")
+
+        b = ti.counterparty_batch(["7707083893", "1234567890"], profile="отсрочка")
+        check(len(b.get("результаты") or []) == 2, "batch: результаты %s" % b)
+        check((b["результаты"][0] or {}).get("светофор") == "🔴",
+              "batch: сверху должен быть 🔴")
+        b2 = ti.counterparty_batch("7707083893, 1234567890")
+        check(len(b2.get("результаты") or []) == 2, "batch: строка через запятую %s" % b2)
+        check(ti.counterparty_batch(["1"] * 51).get("статус") == "не проверено",
+              "batch: лимит 50 не сработал")
+        check(ti.counterparty_batch([]).get("статус") == "не проверено",
+              "batch: пустой список должен дать «не проверено»")
+        check(ti.counterparty_batch(42).get("статус") == "не проверено",
+              "batch: не-список должен дать «не проверено», не traceback")
+
+        a = ti.access_check()
+        check(a.get("ip_класс") == "не-РФ", "access_check: %s" % a)
+
         # ошибочный путь: runner падает таймаутом -> «не проверено», не traceback
         def boom(script, args, stdin_text=None, timeout=None):
             raise subprocess.TimeoutExpired(cmd=script, timeout=1)
@@ -107,6 +162,12 @@ def case_tools_impl(ti):
         out7 = ti.counterparty_fetch("7707083893")
         check(out7.get("статус") == "не проверено",
               "таймаут должен дать «не проверено»: %s" % out7)
+        for имя in ("counterparty_verdict", "counterparty_batch", "access_check"):
+            fn = getattr(ti, имя)
+            res = fn(["7707083893"]) if имя == "counterparty_batch" else (
+                fn() if имя == "access_check" else fn("7707083893"))
+            check(isinstance(res, dict) and res.get("статус") == "не проверено",
+                  "%s при сбое движка должен дать «не проверено»: %s" % (имя, res))
     finally:
         ti.run_script = orig
     return errors

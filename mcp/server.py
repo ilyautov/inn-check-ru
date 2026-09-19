@@ -112,6 +112,47 @@ def counterparty_diff(inn: str) -> dict:
     return tools_impl.counterparty_diff(inn)
 
 
+@mcp_server.tool()
+def counterparty_verdict(inn: str, profile: str = "нейтрально") -> dict:
+    """Вердикт по контрагенту одной командой: сбор + финансы + резолвер профиля
+    цели. Возвращает светофор 🟢/🟡/🔴 (или null, если проверка НЕ состоялась),
+    сигналы, поднявшие его, рекомендацию и перечень «не проверено». Профили:
+    нейтрально (факты без вердикта), отсрочка, предоплата, подрядчик, доля,
+    клиент_115фз, самопроверка — одни и те же факты весят по-разному.
+
+    One-call verdict for a counterparty: collect + financials + target-profile
+    resolver. Returns a traffic light (null when the check did not actually
+    happen), the signals behind it, a recommendation and what stayed unchecked.
+    """
+    return tools_impl.counterparty_verdict(inn, profile=profile)
+
+
+@mcp_server.tool()
+def counterparty_batch(inns: list[str], profile: str = "нейтрально") -> dict:
+    """Батч-проверка списка ИНН (до 50 за вызов): по каждому быстрая проверка
+    и светофор профиля. Сортировка 🔴 → «проверка не состоялась» → 🟡 → 🟢 —
+    опасное и непроверенное сверху. Сбой по одному ИНН не роняет батч.
+
+    Batch screening of up to 50 INNs per call: quick check plus a per-profile
+    traffic light, sorted danger-first. A failure on one INN never kills the
+    batch — that row comes back as 'not checked' with a reason.
+    """
+    return tools_impl.counterparty_batch(inns, profile=profile)
+
+
+@mcp_server.tool()
+def access_check() -> dict:
+    """Что реально доступно с текущей сети: probe по всем источникам (кэш на
+    сутки) — доступен / гео (нужен РФ-IP) / tls (нужен корень УЦ Минцифры) /
+    капча / dns. Диагностика перед тем, как верить «не проверено» в выводах.
+
+    Source availability probe from the current network (cached 24h): reachable,
+    geo-blocked (needs a Russian IP), TLS (needs the Russian CA root), captcha
+    or DNS. Run it before trusting any 'not checked' verdicts.
+    """
+    return tools_impl.access_check()
+
+
 def entry():
     """console_script `inn-check-ru-mcp` (pyproject.toml)."""
     mcp_server.run()

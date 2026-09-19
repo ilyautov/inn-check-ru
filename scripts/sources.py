@@ -9,6 +9,12 @@ callable: реестр импортируется и probe-скриптом (che
     tier          — 🟢 бесплатно скриптом | 🟡 кэш/ключ | 🔴 браузер | ⚪ не покрыто
     требует       — сеть | кэш | браузер | ключ
     deal_killer   — участвует в _итог_проверки (проверка «состоялась» / «не состоялась»)
+    фаза          — quick | досье (волна 2, §1.1): quick — источники, способные дать
+                    deal-killer дёшево; досье — всё остальное. Браузерные источники
+                    стоят в quick: они не ходят в сеть, а их «не покрыто» обязано
+                    попасть в _итог_проверки уже после быстрой фазы
+    зависит_от    — (необязательно) id источников, чьи данные нужны сборщику как
+                    контекст; внутри фазы такие источники собираются вторым заходом
     профили       — "*" или список id из data/profiles_ru.json
     probe         — лёгкий запрос для check_access.py: url, method, ok_http, ожидаем
     контракт      — поля сырой записи, без которых блок НЕ может быть «ok» (схема изменилась)
@@ -28,6 +34,7 @@ SOURCES = {
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://egrul.nalog.ru/", "method": "GET",
                   "ok_http": [200, 307], "ожидаем": "html"},
@@ -43,6 +50,7 @@ SOURCES = {
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://pb.nalog.ru/search-proc.json?mode=search-ul&queryUl=7707083893",
                   "method": "GET", "ok_http": [200], "ожидаем": "json"},
@@ -64,6 +72,7 @@ SOURCES = {
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": False,
+        "фаза": "досье",
         "профили": ["нейтрально", "отсрочка", "предоплата", "подрядчик", "доля",
                     "самопроверка"],
         "probe": {"url": "https://bo.nalog.gov.ru/advanced-search/organizations/search"
@@ -81,6 +90,7 @@ SOURCES = {
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": False,
+        "фаза": "досье",
         "профили": "*",
         "probe": {"url": "https://rmsp.nalog.ru/search-proc.json?query=7707083893",
                   "method": "GET", "ok_http": [200], "ожидаем": "json"},
@@ -95,6 +105,7 @@ SOURCES = {
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": False,
+        "фаза": "досье",
         "профили": "*",
         "probe": {"url": "https://npd.nalog.ru/check-status/", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -104,24 +115,82 @@ SOURCES = {
         "документация": "https://npd.nalog.ru/check-status/",
     },
     "спецреестры": {
-        "название": "Спецреестры ФНС: дисквалификация, задолженность, недостоверность "
-                    "(service.nalog.ru)",
+        "название": "Реестр дисквалифицированных лиц ФНС (service.nalog.ru/disqualified.do)",
         "tier": "🟢",
         "требует": "сеть",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
+        # Реестр ищется ПО ФИО/наименованию, а не по ИНН (см. «разведка» ниже), поэтому
+        # сборщику нужен руководитель из блока «егрюл»: внутри quick-фазы источник
+        # собирается вторым заходом, после того как егрюл отдал карточку.
+        "зависит_от": ["егрюл"],
         "probe": {"url": "https://service.nalog.ru/disqualified.do", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
-        "контракт": ["t"],
-        "канарейка": None,  # эндпоинт не верифицирован (POST не возвращает token)
+        # Поля записи ответа disqualified-proc.json (снято живьём 19.09.2026).
+        "контракт": ["ФИО", "ДатаРожд", "НаимОрг", "Должность", "КвалификацияТекст",
+                     "ДатаНачДискв", "ДатаКонДискв"],
+        # Канарейка по ИНН невозможна (реестр ИНН не индексирует), а канарейка по ФИО
+        # протухает вместе со сроком дисквалификации. Вместо неё — ВСТРОЕННАЯ
+        # самопроверка в сетевом слое: на пустом результате делается запрос с пустым
+        # query, который обязан вернуть весь реестр (rowCount > 0, 19.09.2026 — 8188).
+        # Ноль там означает «эндпоинт/схема сломались», а не «дисквалификации нет».
+        "канарейка": None,
         "при_отказе": "не проверено",
-        "документация": "https://service.nalog.ru/",
+        "документация": "https://service.nalog.ru/disqualified.do",
+        # Живая разведка 19.09.2026 со шведского IP (волна 2, §1.4). Дословно: что
+        # запрашивали и что ответило. Ничего не додумано.
+        "разведка": {
+            "https://service.nalog.ru/disqualified.do":
+                "HTTP 200, HTML; форма frmList method=post action=disqualified-proc.json, "
+                "поля query/page/pageSize/m/fam/nam/otch/bd/bp, CAPTCHA_REQUIRED=false — РАБОТАЕТ",
+            "https://service.nalog.ru/disqualified-proc.json":
+                "HTTP 200 application/json сразу, без token и поллинга: "
+                "{data:[…], rowCount, pageCount, pageSize, validPageSizes, rowLimit, "
+                "queryHash, queryTime, dtQueryBegin, dtQueryEnd}; запись — "
+                "ROW_NUM, ДатаФорм, КолЗап, НомЗап, ФИО, ДатаРожд, МестоРожд, НаимОрг, "
+                "Должность, КвалификацияТекст, НаимОргПрот, ФИОСуд, ДолжностьСуд, "
+                "ДисквСрок, ДатаНачДискв, ДатаКонДискв, row_cnt",
+            "поиск по ИНН ЮЛ":
+                "НЕ РАБОТАЕТ, хотя placeholder формы обещает «ИНН ЮЛ»: проверено на пяти "
+                "организациях, чей действующий руководитель есть в реестре "
+                "(5836898322 ООО «ТЕКСПРОМ» — Иванов А. Б.; 2511110744; 6317140840; "
+                "2616010031; 1655217944) — во всех случаях rowCount=0. "
+                "Поиск по ФИО и по наименованию организации при этом находит те же записи. "
+                "Значит, ИНН в индексе реестра не заполнен — сверка идёт по ФИО",
+            "https://service.nalog.ru/zd.do":
+                "HTTP 200, HTML: «Сервис \u00abСведения о юридических лицах, имеющих "
+                "задолженность по уплате налогов и/или не представляющих налоговую "
+                "отчётность более года\u00bb выведен из эксплуатации. Информация доступна "
+                "в сервисе \u00abПрозрачный бизнес\u00bb» — покрывается блоком «риски»",
+            "https://service.nalog.ru/invalid-addresses.do":
+                "HTTP 200 после редиректа на https://service.nalog.ru/payment/ — "
+                "такого сервиса нет; признак недостоверности сведений отдаёт pb "
+                "(поле invalid) и он уже разбирается в блоке «риски»",
+            "https://service.nalog.ru/mri.do": "редирект на /payment/ — сервиса нет",
+            "https://service.nalog.ru/mru.do":
+                "редирект на https://pb.nalog.ru/ — массовые руководители/учредители "
+                "переехали в «Прозрачный бизнес» (за token в company-proc.json)",
+            "https://service.nalog.ru/addrfind.do": "редирект на https://pb.nalog.ru/",
+            "https://service.nalog.ru/baddr.do":
+                "редирект на /service-closed.html?svc=baddr — сервис закрыт",
+            "https://service.nalog.ru/svl.do":
+                "HTTP 200, HTML: «Сервис выведен из эксплуатации с 09.06.2023»",
+            "https://service.nalog.ru/uwsfind.do":
+                "HTTP 200, форма action=uwsfind-proc.json (документы, поданные на "
+                "госрегистрацию, в т. ч. Р15016 «ликвидация»), но поля captcha/captchaToken "
+                "обязательны — скриптом не берётся",
+            "старая схема <path>/proc.json + search-result/<t>":
+                "неверна: она у egrul.nalog.ru, а не у service.nalog.ru; "
+                "service.nalog.ru/dismissal|zd|invalid/proc.json отдавали HTML 200",
+        },
     },
     "еркнм": {
         "название": "ЕРКНМ — плановые проверки (proverki.gov.ru, кэш дампов)",
         "tier": "🟡",
         "требует": "кэш",
         "deal_killer": False,
+        "фаза": "досье",
         "профили": ["нейтрально", "предоплата", "подрядчик", "самопроверка"],
         "probe": {"url": "https://proverki.gov.ru/portal/public-open-data", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -135,6 +204,7 @@ SOURCES = {
         "tier": "🟡",
         "требует": "кэш",
         "deal_killer": False,
+        "фаза": "досье",
         "профили": ["нейтрально", "предоплата", "подрядчик", "самопроверка"],
         "probe": {"url": "https://zakupki.gov.ru/epz/opendata", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -148,6 +218,7 @@ SOURCES = {
         "tier": "🟡",
         "требует": "кэш",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://www.fedsfm.ru/documents/terrorists-catalog-portal-act",
                   "method": "GET", "ok_http": [200], "ожидаем": "html"},
@@ -161,6 +232,7 @@ SOURCES = {
         "tier": "🔴",
         "требует": "браузер",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://fssp.gov.ru/", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -174,6 +246,7 @@ SOURCES = {
         "tier": "🔴",
         "требует": "браузер",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://kad.arbitr.ru/", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -187,6 +260,7 @@ SOURCES = {
         "tier": "🔴",
         "требует": "браузер",
         "deal_killer": True,
+        "фаза": "quick",
         "профили": "*",
         "probe": {"url": "https://bankrot.fedresurs.ru/", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
@@ -208,6 +282,10 @@ TLS_MINCIFRY_PROBES = {
 PROFILE_IDS = ("нейтрально", "отсрочка", "предоплата", "подрядчик", "доля",
                "клиент_115фз", "самопроверка")
 
+# Фазы сбора (волна 2, §1.1). Порядок значим: quick собирается первой, и только если
+# после неё нет deal-killer'а, движок идёт в досье-фазу.
+PHASES = ("quick", "досье")
+
 
 def deal_killer_ids():
     return [k for k, v in SOURCES.items() if v.get("deal_killer")]
@@ -223,10 +301,20 @@ def sources_for_profile(profile_id):
     return out
 
 
+def sources_for_phase(фаза):
+    """id источников указанной фазы, в порядке SOURCES."""
+    return [k for k, v in SOURCES.items() if v.get("фаза") == фаза]
+
+
+def depends_on(source_id):
+    """id источников, чьи данные нужны сборщику как контекст (пустой список — нет)."""
+    return list(SOURCES.get(source_id, {}).get("зависит_от") or [])
+
+
 def validate():
     """Самопроверка реестра: обязательные ключи и допустимые значения."""
     errors = []
-    req = ("название", "tier", "требует", "deal_killer", "профили", "probe",
+    req = ("название", "tier", "требует", "deal_killer", "фаза", "профили", "probe",
            "контракт", "канарейка", "при_отказе", "документация")
     for sid, d in SOURCES.items():
         for k in req:
@@ -241,6 +329,25 @@ def validate():
             errors.append("%s: профили %r" % (sid, p))
         if d.get("при_отказе") not in ("не проверено", "пропустить"):
             errors.append("%s: при_отказе %r" % (sid, d.get("при_отказе")))
+        if d.get("фаза") not in PHASES:
+            errors.append("%s: фаза %r (допустимы: %s)"
+                          % (sid, d.get("фаза"), ", ".join(PHASES)))
+        for dep in d.get("зависит_от") or []:
+            if dep not in SOURCES:
+                errors.append("%s: зависит_от %r — нет такого источника" % (sid, dep))
+            elif SOURCES[dep].get("фаза") != d.get("фаза"):
+                errors.append("%s: зависит_от %r из другой фазы (%r vs %r) — "
+                              "контекст не успеет собраться"
+                              % (sid, dep, SOURCES[dep].get("фаза"), d.get("фаза")))
+            elif dep == sid:
+                errors.append("%s: зависит_от самого себя" % sid)
+    # Цикл зависимостей внутри фазы: сбор идёт двумя заходами, длиннее цепочки нет.
+    for sid, d in SOURCES.items():
+        for dep in d.get("зависит_от") or []:
+            if dep in SOURCES and (SOURCES[dep].get("зависит_от") or []):
+                errors.append("%s: зависит от %s, который сам зависим — "
+                              "цепочки длиннее одного шага сбор не поддерживает"
+                              % (sid, dep))
     return errors
 
 
@@ -253,4 +360,6 @@ if __name__ == "__main__":
         sys.exit(1)
     sys.stdout.write(json.dumps(
         {"источников": len(SOURCES), "deal_killer": deal_killer_ids(),
-         "профили": list(PROFILE_IDS)}, ensure_ascii=False, indent=2) + "\n")
+         "профили": list(PROFILE_IDS),
+         "фазы": {ф: sources_for_phase(ф) for ф in PHASES}},
+        ensure_ascii=False, indent=2) + "\n")

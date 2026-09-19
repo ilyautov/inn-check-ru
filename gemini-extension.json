@@ -1,6 +1,6 @@
 {
   "name": "inn-check-ru",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам, финансовая патология и признаки дробления кодом. Counterparty due-diligence by Russian INN.",
   "mcpServers": {
     "inn-check-ru": {

@@ -79,6 +79,15 @@ jobs:
       - name: профили цели проверки (офлайн)
         run: python3 eval/run_profiles_eval.py
 
+      - name: батч-проверка (офлайн)
+        run: python3 eval/run_batch_eval.py
+
+      - name: мониторинг: отпечатки и список наблюдения (офлайн)
+        run: python3 eval/run_watchlist_eval.py
+
+      - name: санкционные перечни: парсер и сверка (офлайн)
+        run: python3 eval/run_sanctions_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |
