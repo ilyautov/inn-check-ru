@@ -9,11 +9,18 @@ test_server.py — дымовой тест MCP-сервера без живог�
    гоняются тем же офлайн-путём — движок не запускается, сети нет.
 2. SDK-транспорт (если пакет mcp установлен): сервер импортируется, список
    инструментов == EXPECTED_TOOLS.
+3. Живой stdio-хендшейк отдельным процессом: initialize (имя и версия из
+   SKILL.md, не версия SDK), tools/list по транспорту, tools/call с битым
+   ИНН — движок должен быть достижим из процесса сервера. Импорт модуля
+   этого не проверяет: команда запуска может не стартовать вовсе.
 """
 
 import importlib.util
+import json
+import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 MCP_DIR = Path(__file__).resolve().parent
@@ -196,10 +203,114 @@ def case_sdk():
     return errors
 
 
+def _версия_скилла():
+    """Версия из frontmatter SKILL.md — источник истины релиза."""
+    head = (MCP_DIR.parent / "SKILL.md").read_text(encoding="utf-8")[:2048]
+    m = re.search(r'^\s*version:\s*"([^"]+)"', head, re.MULTILINE)
+    return m.group(1) if m else None
+
+
+def case_stdio():
+    """Живой stdio-хендшейк: сервер поднимается ОТДЕЛЬНЫМ ПРОЦЕССОМ.
+
+    Проверки в одном процессе (case_sdk) не ловят поломку запуска: импорт
+    модуля работает и тогда, когда команда из .mcp.json не стартует вовсе.
+    Именно так «Connection closed» жил незамеченным.
+    """
+    try:
+        import mcp  # noqa: F401
+    except ImportError:
+        return ["SKIP: пакет mcp не установлен (проверяется в CI)"]
+
+    запрос = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize",
+         "params": {"protocolVersion": "2024-11-05", "capabilities": {},
+                    "clientInfo": {"name": "smoke", "version": "0"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+         "params": {"name": "counterparty_fetch", "arguments": {"inn": "123"}}},
+    ]
+    # stdin держим открытым, пока не получены все ответы: закрытие сразу
+    # после записи гасит сервер посреди обработки вызова инструмента
+    proc = subprocess.Popen(
+        [sys.executable, str(MCP_DIR / "server.py")],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, bufsize=1)
+    ответы = {}
+    таймер = threading.Timer(120, proc.kill)
+    таймер.start()
+    try:
+        for m in запрос:
+            proc.stdin.write(json.dumps(m) + "\n")
+            proc.stdin.flush()
+        for строка in proc.stdout:
+            строка = строка.strip()
+            if not строка:
+                continue
+            try:
+                ответ = json.loads(строка)
+            except ValueError:
+                continue
+            if ответ.get("id") is not None:
+                ответы[ответ["id"]] = ответ
+            if 3 in ответы:
+                break
+    except (BrokenPipeError, OSError):
+        pass
+    finally:
+        таймер.cancel()
+        try:
+            proc.stdin.close()
+        except OSError:
+            pass
+        proc.terminate()
+        try:
+            _, stderr = proc.communicate(timeout=20)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            _, stderr = proc.communicate()
+
+    errors = []
+    if 1 not in ответы:
+        return ["сервер не прошёл initialize (код %s): %s"
+                % (proc.returncode, (stderr or "")[-400:])]
+
+    info = ответы[1].get("result", {}).get("serverInfo", {})
+    if info.get("name") != "inn-check-ru":
+        errors.append("serverInfo.name = %r" % info.get("name"))
+    ожидаемая = _версия_скилла()
+    # версия SDK вместо нашей — клиент увидит чужой номер релиза
+    if ожидаемая and info.get("version") != ожидаемая:
+        errors.append("serverInfo.version = %r, ожидалась %r"
+                      % (info.get("version"), ожидаемая))
+
+    if 2 not in ответы:
+        errors.append("нет ответа на tools/list")
+    else:
+        ti = load("tools_impl", MCP_DIR / "tools_impl.py")
+        names = sorted(t["name"] for t in ответы[2]["result"]["tools"])
+        if names != sorted(ti.EXPECTED_TOOLS):
+            errors.append("инструменты по транспорту %s != %s"
+                          % (names, sorted(ti.EXPECTED_TOOLS)))
+
+    if 3 not in ответы:
+        errors.append("нет ответа на tools/call")
+    else:
+        res = ответы[3].get("result", {})
+        текст = "".join(c.get("text", "") for c in res.get("content", []))
+        # движок должен быть достижим из процесса сервера, а не только
+        # из теста: битый ИНН — единственный ответ без сети
+        if "не проверено" not in текст:
+            errors.append("движок недостижим из сервера: %r" % текст[:200])
+    return errors
+
+
 def main():
     ti = load("tools_impl", MCP_DIR / "tools_impl.py")
     cases = {"tools_impl-логика": case_tools_impl(ti),
-             "sdk-транспорт": case_sdk()}
+             "sdk-транспорт": case_sdk(),
+             "живой stdio-хендшейк": case_stdio()}
     failed = 0
     for name, errors in cases.items():
         if errors and errors[0].startswith("SKIP"):

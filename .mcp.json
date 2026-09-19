@@ -1,8 +1,12 @@
 {
   "mcpServers": {
     "inn-check-ru": {
-      "command": "python3",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.py"],
+      "command": "uv",
+      "args": [
+        "run", "--quiet", "--no-project",
+        "--with", "mcp>=1.2,<2",
+        "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"
+      ],
       "env": {}
     }
   }

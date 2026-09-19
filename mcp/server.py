@@ -3,8 +3,10 @@
 server.py — MCP-сервер inn-check-ru (stdio, FastMCP). Тонкая обёртка:
 логика в tools_impl.py, движок — в scripts/ корня репозитория.
 
-Запуск:
-    pip install mcp
+Запуск (как его делает .mcp.json плагина):
+    uvx --from <корень> --with "mcp>=1.2,<2" inn-check-ru-mcp
+
+Голым скриптом — только если SDK уже стоит в этом интерпретаторе:
     python3 mcp/server.py          # НЕ python3 -m mcp.server (см. README)
 
 Все инструменты read-only: сервер ничего не пишет во внешние сервисы.
@@ -12,6 +14,7 @@ server.py — MCP-сервер inn-check-ru (stdio, FastMCP). Тонкая об�
 """
 
 import os
+import re
 import sys
 
 # tools_impl лежит рядом; корень репо в sys.path не добавляем — каталог mcp/
@@ -31,7 +34,41 @@ try:
 except ImportError:
     import tools_impl  # запуск скриптом из mcp/
 
+def _версия():
+    """Версия пакета для serverInfo. Без неё FastMCP отдаёт клиенту свою
+    собственную версию SDK — клиент видит не тот номер, что в релизе."""
+    # запуск из исходников: источник истины — frontmatter SKILL.md. Он идёт
+    # первым намеренно: в venv разработчика может лежать старая установка
+    # пакета, и её метаданные соврали бы про версию работающего кода.
+    try:
+        skill = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "SKILL.md")
+        with open(skill, encoding="utf-8") as f:
+            head = f.read(2048)
+        m = re.search(r'^\s*version:\s*"([^"]+)"', head, re.MULTILINE)
+        if m:
+            return m.group(1)
+    except OSError:
+        pass
+    # установка колесом: SKILL.md рядом нет, версия — из метаданных пакета
+    try:
+        from importlib.metadata import version
+        return version("inn-check-ru")
+    except Exception:
+        return None
+
+
 mcp_server = FastMCP("inn-check-ru")
+
+# FastMCP v1 не принимает version в конструкторе, а serverInfo его берёт с
+# низкоуровневого Server — без этого клиент видит версию SDK вместо нашей.
+# Приватный атрибут: если SDK его переименует, версия просто не проставится,
+# сервер продолжит работать (проверяется дымовым тестом mcp/test_server.py).
+_v = _версия()
+if _v:
+    _low = getattr(mcp_server, "_mcp_server", None)
+    if _low is not None and hasattr(_low, "version"):
+        _low.version = _v
 
 
 @mcp_server.tool()

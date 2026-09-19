@@ -30,22 +30,42 @@ MCPServer с ломающими изменениями), а из конвенц�
 
 ## Установка
 
+Рекомендуемый способ — `uv`: он сам приносит SDK в разовое окружение, и
+ставить ничего глобально не нужно.
+
+```bash
+uv run --no-project --with "mcp>=1.2,<2" mcp/server.py
+```
+
+Вариант с заранее установленным SDK:
+
 ```bash
 pip install -r mcp/requirements.txt   # или: pip install "mcp>=1.2,<2"
 python3 mcp/doctor.py                 # отчёт «взлетит ли установка»
+python3 mcp/server.py
 ```
 
 `scripts/` движка остаются чистым stdlib; зависимость `mcp` нужна только
-серверу. Запуск — **только скриптом** (`python3 mcp/server.py`), не
-`python3 -m mcp.server`: каталог `mcp/` при запуске модулем теневал бы
-одноимённый пакет SDK.
+серверу.
+
+Два подвода, на которых легко потерять сервер молча:
+
+- Запуск — **только скриптом** (`python3 mcp/server.py`), не
+  `python3 -m mcp.server`: каталог `mcp/` при запуске модулем теневал бы
+  одноимённый пакет SDK. По той же причине `import mcp` из корня
+  репозитория берёт наш каталог, а не SDK — в колесе он едет под именем
+  `inn_check_ru_mcp`, и там коллизии нет.
+- `uvx --from <локальный путь>` кэширует сборку и после правки исходников
+  может поднять устаревший сервер (проверено 19.09.2026: `--refresh` и
+  `--refresh-package` кэш не сбрасывают). Поэтому в `.mcp.json` стоит
+  `uv run`, который запускает текущий файл.
 
 ## Конфигурация клиентов
 
 Claude Code (из корня репозитория):
 
 ```bash
-claude mcp add inn-check-ru -- python3 "$PWD/mcp/server.py"
+claude mcp add inn-check-ru -- uv run --no-project --with "mcp>=1.2,<2" "$PWD/mcp/server.py"
 ```
 
 Cursor / generic stdio (`~/.cursor/mcp.json` или аналог):
@@ -54,8 +74,9 @@ Cursor / generic stdio (`~/.cursor/mcp.json` или аналог):
 {
   "mcpServers": {
     "inn-check-ru": {
-      "command": "python3",
-      "args": ["/полный/путь/inn-check-ru/mcp/server.py"],
+      "command": "uv",
+      "args": ["run", "--no-project", "--with", "mcp>=1.2,<2",
+               "/полный/путь/inn-check-ru/mcp/server.py"],
       "env": {"CHECKO_API_KEY": ""}
     }
   }
