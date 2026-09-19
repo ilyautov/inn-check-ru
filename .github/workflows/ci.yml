@@ -18,7 +18,7 @@ jobs:
       - name: ruff
         run: |
           pip install ruff
-          ruff check scripts/ eval/
+          ruff check scripts/ eval/ mcp/
 
       - name: fin_scoring eval (офлайн, фикстуры)
         run: python3 eval/run_fin_eval.py
@@ -31,6 +31,11 @@ jobs:
 
       - name: registries eval (офлайн, фикстуры)
         run: python3 eval/run_registries_eval.py
+
+      - name: mcp server smoke test
+        run: |
+          pip install -r mcp/requirements.txt
+          python3 mcp/test_server.py
 
       - name: skill frontmatter is valid YAML
         run: |

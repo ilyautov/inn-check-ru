@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "inn-check-ru": {
+      "command": "python3",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/server.py"],
+      "env": {}
+    }
+  }
+}

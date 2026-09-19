@@ -2,6 +2,19 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — semver.
 
+## [1.5.0] — 2026-09-19
+
+«MCP-обёртка»: один движок, два интерфейса в одном репозитории.
+
+### Added
+- `mcp/` — MCP-сервер (stdio) поверх скриптов движка: `server.py` на официальном MCP SDK (FastMCP, пин `mcp<2` — в 2.x ломающий rename в MCPServer), 6 read-only инструментов с описаниями RU+EN: `counterparty_fetch`, `counterparty_fin_scoring`, `sanctions_check`, `affiliates_graph`, `droblenie_check`, `counterparty_diff`. Вызов движка через subprocess (`tools_impl.py`, чистый stdlib) — логика не дублируется, tier/оговорки/«не проверено» возвращаются как есть; инструмент никогда не падает traceback'ом в MCP-ответ.
+- `mcp/doctor.py` — отчёт «взлетит ли установка» в стилистике семьи schema-mcp-core; `mcp/test_server.py` — дымовой тест (логика маппинга офлайн + список инструментов SDK), шаг в CI; `mcp/requirements.txt`; `mcp/README.md` с конфигами для Claude Code/Cursor/generic stdio и фиксацией выбора SDK (schema-mcp-core заточен под удалённые HTTP-API — здесь движок локальный).
+- `.mcp.json` в корне — заявка MCP-сервера для Claude Code плагина (конвенция plugin-.mcp.json).
+- README — раздел «Два интерфейса»; KNOWN_LIMITS — статусы верификации MCP-слоя.
+
+### Notes
+- `scripts/` остаются чистым stdlib — зависимость `mcp` живёт только в `mcp/requirements.txt`.
+
 ## [1.4.0] — 2026-09-19
 
 «ИП-пакет + бесплатные источники»: исправлены устаревшие факты, светофор ИП.
