@@ -6,7 +6,14 @@ fetch_counterparty.py — проверка российского контраг
 Использование:
     python3 fetch_counterparty.py <ИНН> [--save] [--профиль <id>]
                                         [--режим quick|полный|всё]
+                                        [--прокси http://host:3128]
     python3 fetch_counterparty.py --канарейки        # парсеры против канареечных ИНН
+
+Прокси (scripts/proxy.py, спек v2 §18.2): --прокси > INN_CHECK_PROXY > HTTPS_PROXY.
+Свой узел в РФ открывает источники, закрытые для не-РФ IP. Узел при этом видит,
+какие ИНН вы проверяете, поэтому — только своя нода: общего пула у проекта нет и
+не будет. Битый URL — отказ, а не тихий переход на прямое соединение. Блок «_сеть»
+в выводе говорит, через что шли; probe-кэш, снятый из другой сети, не берётся.
 
 --save сохраняет снимок в ~/.cache/inn-check-ru/snapshots/<ИНН>/<дата>_<время>.json
 (мониторинг через diff_counterparty.py). --профиль <id> собирает только источники
@@ -111,6 +118,20 @@ def _load_sibling(name):
 
 sources = _load_sibling("sources")
 SOURCES = sources.SOURCES
+proxy = _load_sibling("proxy")
+
+# Пользовательский прокси (scripts/proxy.py): --прокси > INN_CHECK_PROXY > HTTPS_PROXY.
+# Разбирается один раз при импорте; --прокси доставляется через установить_прокси().
+_ПРОКСИ = proxy.настройка()
+# Почему probe-кэш не пригодился: пусто — пригодился или его просто нет.
+_КЭШ_ДОСТУПА_ОТКЛОНЁН = None
+
+
+def установить_прокси(явный=None):
+    """Пересобрать настройку прокси с учётом флага. Возвращает текст ошибки или None."""
+    global _ПРОКСИ
+    _ПРОКСИ = proxy.настройка(явный)
+    return _ПРОКСИ["ошибка"]
 
 
 class DeadlineExceeded(Exception):
@@ -162,8 +183,17 @@ _SSL = _build_ssl_context()
 
 
 def _make_opener():
+    # Битый URL прокси — отказ, а не прямое соединение: пользователь прячет свой
+    # IP намеренно, и «тихо пойдём напрямую» раскрыло бы его именно тогда, когда
+    # этого не ждут. main() ловит то же самое раньше и печатает JSON с ошибкой;
+    # здесь — страховка для всех остальных входов в модуль.
+    if _ПРОКСИ["ошибка"]:
+        raise ValueError("прокси: " + _ПРОКСИ["ошибка"])
     cj = http.cookiejar.CookieJar()
     return urllib.request.build_opener(
+        # ProxyHandler задаётся явно всегда: пустой отключает подхват переменных
+        # окружения, и прямое соединение остаётся прямым, а не «как повезёт».
+        proxy.handler(_ПРОКСИ["url"]),
         urllib.request.HTTPSHandler(context=_SSL),
         urllib.request.HTTPCookieProcessor(cj),
     )
@@ -1429,6 +1459,19 @@ def _load_access_cache():
         age_h = (_dt.datetime.now(_dt.timezone.utc) - stamp).total_seconds() / 3600.0
         if age_h < 0 or age_h > ACCESS_CACHE_TTL_H:
             return None
+        # Probe, снятый из другой сети, к этой не относится: прогон через РФ-ноду
+        # и прогон напрямую видят разные источники. Подставить один вместо
+        # другого — это ровно «гео: недоступно» под видом «доступно» (или
+        # наоборот). Кэш без отметки о сети — от версии до 1.11.0, чем он снят,
+        # неизвестно, поэтому тоже не годится.
+        чем_снят = _g(cache, "сеть", "отпечаток")
+        if чем_снят != _ПРОКСИ["отпечаток"]:
+            global _КЭШ_ДОСТУПА_ОТКЛОНЁН
+            _КЭШ_ДОСТУПА_ОТКЛОНЁН = (
+                "снят из другой сети (%s), сейчас %s — источники пробуются живьём"
+                % (чем_снят or "сеть не отмечена, версия до 1.11.0",
+                   _ПРОКСИ["отпечаток"]))
+            return None
         return cache if isinstance(cache.get("источники"), dict) else None
     except (OSError, ValueError, TypeError, AttributeError):
         return None
@@ -1765,6 +1808,10 @@ def collect(inn, профиль=None, режим="полный", opener=None):
         "причина_остановки": причина,
         "параллельно": not _sequential(),
     }
+    result["_сеть"] = proxy.описание(
+        _ПРОКСИ, insecure=os.environ.get("COUNTERPARTY_INSECURE") == "1")
+    if _КЭШ_ДОСТУПА_ОТКЛОНЁН:
+        result["_сеть"]["кэш_доступа"] = "отклонён: " + _КЭШ_ДОСТУПА_ОТКЛОНЁН
     return result
 
 
@@ -1847,6 +1894,7 @@ def save_snapshot(inn, result, полный=False):
 USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--save [--снимок полный]]\n"
          "                                            [--профиль <id>]\n"
          "                                            [--режим quick|полный|всё]\n"
+         "                                            [--прокси http://host:3128]\n"
          "               python3 fetch_counterparty.py --канарейки\n"
          "Профили: %s\n"
          "Режимы: quick — только быстрая фаза (егрюл, риски, спецреестры, санкции);\n"
@@ -1856,15 +1904,22 @@ USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--
          "        --quick — синоним --режим quick.\n"
          "--save: отпечаток для мониторинга (--режим всё подставляется сам);\n"
          "        --снимок полный — сохранить весь JSON, как раньше.\n"
+         "--прокси: свой http/https-прокси (или INN_CHECK_PROXY / HTTPS_PROXY).\n"
+         "        Узел видит, какие ИНН вы проверяете, — только своя нода.\n"
          % ", ".join(sources.PROFILE_IDS))
 
 
 def _parse_args(argv):
     args, do_save, профиль, canaries, режим = [], False, None, False, None
     снимок = None
+    прокси = None
     it = iter(argv[1:])
     for a in it:
-        if a == "--save":
+        if a in ("--прокси", "--proxy"):
+            прокси = next(it, None)
+        elif a.startswith(("--прокси=", "--proxy=")):
+            прокси = a.split("=", 1)[1]
+        elif a == "--save":
             do_save = True
         elif a in ("--снимок", "--snapshot"):
             снимок = next(it, None)
@@ -1884,11 +1939,19 @@ def _parse_args(argv):
             режим = a.split("=", 1)[1]
         else:
             args.append(a)
-    return args, do_save, профиль, canaries, режим, снимок
+    return args, do_save, профиль, canaries, режим, снимок, прокси
 
 
 def main(argv):
-    args, do_save, профиль, canaries, режим, снимок = _parse_args(argv)
+    args, do_save, профиль, canaries, режим, снимок, прокси = _parse_args(argv)
+    ошибка_прокси = установить_прокси(прокси)
+    if ошибка_прокси:
+        sys.stdout.write(json.dumps(
+            {"ошибка": "прокси: " + ошибка_прокси}, ensure_ascii=False, indent=2) + "\n")
+        return 2
+    if _ПРОКСИ["url"]:
+        sys.stderr.write("сеть: через прокси %s (%s)\n"
+                         % (_ПРОКСИ["маска"], _ПРОКСИ["источник"]))
     if canaries:
         out, failed = run_canaries()
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")

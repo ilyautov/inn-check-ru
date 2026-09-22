@@ -5,12 +5,15 @@ run_access_eval.py — офлайн-eval probe-скрипта check_access.py (�
 Сеть не используется: вместо реального HTTP-запроса подставляется фейковый
 «requester», который отдаёт заданный код/тело или бросает заданное исключение.
 Проверяется таблица классификации из спека §4, формат кэша ~/.cache/inn-check-ru/
-access.json (ровно {"дата", "ip_класс", "источники"}), TTL и режим --канарейки на
+access.json (ровно {"дата", "ip_класс", "сеть", "источники"}), TTL, пользовательский
+прокси (§18.2: отметка сети, отказ вместо тихого прямого соединения) и --канарейки на
 фейковом модуле fetch_counterparty (с FETCHERS и без). PASS/FAIL, чистый stdlib.
 """
 
+import contextlib
 import datetime as dt
 import importlib.util
+import io
 import json
 import socket
 import ssl
@@ -166,8 +169,10 @@ def case_cache_format(ca):
 
     results = ca.run_probes(targets, requester=requester, timeout=1)
     report = ca.build_report(results, ip_class="неизвестно")
-    check(errors, set(report.keys()) == {"дата", "ip_класс", "источники"},
+    check(errors, set(report.keys()) == {"дата", "ip_класс", "сеть", "источники"},
           "ключи отчёта: %s" % sorted(report.keys()))
+    check(errors, (report.get("сеть") or {}).get("отпечаток") == "прямое",
+          "без прокси отчёт должен быть помечен «прямое»: %r" % report.get("сеть"))
     check(errors, report["ip_класс"] in ("РФ", "не-РФ", "неизвестно"),
           "ip_класс %r" % report["ip_класс"])
     try:
@@ -298,6 +303,113 @@ def case_nonempty(ca):
     return errors
 
 
+def _сеть(report):
+    """report["сеть"] как словарь: отсутствие блока — тоже ответ, не падение."""
+    return (report.get("сеть") or {}) if isinstance(report, dict) else {}
+
+
+def case_proxy_marks_report(ca):
+    """Отчёт помнит, через что снят: прямой и прокси-прогон не путаются."""
+    errors = []
+    targets = [_target("а")]
+    results = ca.run_probes(targets, requester=_responder(200, "ok"), timeout=1)
+
+    прямой = ca.build_report(results, ip_class="не-РФ")
+    через = ca.build_report(results, ip_class="РФ",
+                            конф=ca.proxy.настройка("http://u:p@rf.example:3128"))
+    check(errors, _сеть(прямой).get("отпечаток") == "прямое",
+          "прямой прогон: %r" % _сеть(прямой))
+    check(errors, str(_сеть(через).get("отпечаток")).startswith("прокси:"),
+          "прогон через прокси: %r" % _сеть(через))
+    check(errors, _сеть(прямой).get("отпечаток") != _сеть(через).get("отпечаток"),
+          "отпечатки прямого и прокси-прогона обязаны различаться")
+    # Пароль в кэш не попадает: файл лежит в ~/.cache и читается чем угодно.
+    сырое = json.dumps(через, ensure_ascii=False)
+    check(errors, "p@rf" not in сырое and ":p@" not in сырое,
+          "пароль прокси не должен попадать в отчёт: %r" % _сеть(через))
+    check(errors, "rf.example" in сырое, "хост прокси стоит показать: %r" % _сеть(через))
+    return errors
+
+
+def case_proxy_hard_refusal(ca):
+    """Негодный прокси — отказ, а не тихий уход напрямую."""
+    errors = []
+    for url, что in (("socks5://host:1080", "socks"),
+                     ("ftp://host", "чужая схема"),
+                     ("http://", "нет хоста")):
+        конф = ca.proxy.настройка(url, env={})
+        check(errors, конф["ошибка"], "%s (%s) должен быть отвергнут" % (url, что))
+        check(errors, конф["url"] is None,
+              "%s: при ошибке url обязан быть None, иначе пойдём через мусор" % url)
+        check(errors, конф["отпечаток"] == "прямое",
+              "%s: отпечаток при ошибке" % url)
+    конф = ca.proxy.настройка("socks5://host:1080", env={})
+    текст = конф["ошибка"] or ""
+    check(errors, "socks" in текст and "http" in текст,
+          "про socks надо сказать прямо и подсказать замену: %r" % конф["ошибка"])
+    # Главное: код возврата, а не «ну ладно, сходим напрямую».
+    буфер = io.StringIO()
+    with contextlib.redirect_stdout(буфер):
+        код = ca.main(["check_access.py", "--json", "--прокси", "socks5://host:1080"])
+    check(errors, "ошибка" in буфер.getvalue(),
+          "отказ должен быть виден в stdout: %r" % буфер.getvalue()[:120])
+    check(errors, код == 2, "main с негодным прокси должен вернуть 2, вернул %r" % код)
+    return errors
+
+
+def case_proxy_cache_for_network(ca):
+    """Кэш probe принадлежит той сети, из которой снят, — и только ей."""
+    errors = []
+    прямо = ca.proxy.настройка(None, env={})
+    нода = ca.proxy.настройка("http://rf.example:3128", env={})
+    прямой_кэш = {"дата": "2026-09-22T10:00:00", "ip_класс": "не-РФ",
+                  "сеть": {"отпечаток": "прямое"}, "источники": {}}
+    кэш_ноды = dict(прямой_кэш, ip_класс="РФ",
+                    сеть={"отпечаток": нода["отпечаток"]})
+    старый = {"дата": "2026-09-22T10:00:00", "ip_класс": "РФ", "источники": {}}
+
+    отчёт, причина = ca.кэш_для_этой_сети(прямой_кэш, прямо)
+    check(errors, отчёт is прямой_кэш and причина is None,
+          "свой же кэш обязан читаться: %r" % причина)
+    отчёт, причина = ca.кэш_для_этой_сети(прямой_кэш, нода)
+    check(errors, отчёт is None and причина,
+          "кэш прямого прогона не про прокси-прогон: %r" % отчёт)
+    отчёт, причина = ca.кэш_для_этой_сети(кэш_ноды, прямо)
+    check(errors, отчёт is None and причина,
+          "кэш прокси-прогона не про прямой: %r" % отчёт)
+    отчёт, причина = ca.кэш_для_этой_сети(кэш_ноды, нода)
+    check(errors, отчёт is кэш_ноды, "кэш той же ноды обязан читаться")
+    отчёт, причина = ca.кэш_для_этой_сети(старый, прямо)
+    check(errors, отчёт is None and "не отмечена" in (причина or ""),
+          "кэш без отметки сети: %r / %r" % (отчёт, причина))
+    отчёт, причина = ca.кэш_для_этой_сети(None, прямо)
+    check(errors, отчёт is None and причина is None,
+          "отсутствие кэша — не повод для причины: %r" % причина)
+    return errors
+
+
+def case_proxy_precedence(ca):
+    """--прокси > INN_CHECK_PROXY > HTTPS_PROXY, и видно, откуда взято."""
+    errors = []
+    env = {"INN_CHECK_PROXY": "http://свой:3128", "HTTPS_PROXY": "http://общий:8080"}
+    конф = ca.proxy.настройка("http://флаг:1080", env=env)
+    check(errors, конф["источник"] == "--прокси" and "флаг" in конф["url"],
+          "флаг должен побеждать: %r" % конф)
+    конф = ca.proxy.настройка(None, env=env)
+    check(errors, конф["источник"] == "INN_CHECK_PROXY" and "свой" in конф["url"],
+          "переменная проекта должна побеждать HTTPS_PROXY: %r" % конф)
+    конф = ca.proxy.настройка(None, env={"HTTPS_PROXY": "http://общий:8080"})
+    check(errors, конф["источник"] == "HTTPS_PROXY", "HTTPS_PROXY как запасной: %r" % конф)
+    конф = ca.proxy.настройка(None, env={})
+    check(errors, конф["url"] is None and конф["отпечаток"] == "прямое" and not конф["ошибка"],
+          "без настройки — прямое соединение без ошибки: %r" % конф)
+    # Пустая строка в окружении — это «не задано», а не «прокси ''».
+    конф = ca.proxy.настройка(None, env={"INN_CHECK_PROXY": "  ", "HTTPS_PROXY": "http://о:1"})
+    check(errors, конф["источник"] == "HTTPS_PROXY",
+          "пустая переменная не должна перекрывать следующую: %r" % конф)
+    return errors
+
+
 def main():
     src = load_module("sources", ROOT / "scripts" / "sources.py")
     ca = load_module("check_access", ROOT / "scripts" / "check_access.py")
@@ -309,6 +421,10 @@ def main():
         "ttl": case_ttl(ca),
         "канарейки-офлайн": case_canaries(ca, src),
         "непустые-поля": case_nonempty(ca),
+        "прокси-отмечен-в-отчёте": case_proxy_marks_report(ca),
+        "прокси-негодный-это-отказ": case_proxy_hard_refusal(ca),
+        "прокси-приоритет-источников": case_proxy_precedence(ca),
+        "прокси-кэш-принадлежит-сети": case_proxy_cache_for_network(ca),
     }
     failed = 0
     for name, errs in cases.items():

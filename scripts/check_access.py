@@ -14,7 +14,8 @@ docs/superpowers/specs/2026-09-19-wave1-sources-registry-design.md, §4:
     ошибка    — всё остальное
 
 Использование:
-    python3 scripts/check_access.py [--json] [--no-cache] [--ttl <часы>] [--канарейки]
+    python3 scripts/check_access.py [--json] [--no-cache] [--ttl <часы>]
+                                    [--канарейки] [--прокси http://host:3128]
 
     --json       только JSON в stdout (таблица в stderr не печатается)
     --no-cache   не читать и не писать ~/.cache/inn-check-ru/access.json
@@ -22,11 +23,15 @@ docs/superpowers/specs/2026-09-19-wave1-sources-registry-design.md, §4:
                  моложе — вывести его без сетевого прогона; --ttl 0 — всегда бить сеть
     --канарейки  дополнительно прогнать fetch_counterparty.FETCHERS на канареечных
                  ИНН из SOURCES[*].канарейка и сверить ожидаем_непустые (еженедельный CI)
+    --прокси U   свой http/https-прокси (или INN_CHECK_PROXY / HTTPS_PROXY): probe
+                 покажет, что видно с ТОЙ ноды. Отчёт помечается отпечатком сети,
+                 и кэш, снятый из другой сети, не переиспользуется
 
 Вывод: таблица в stderr (источник, состояние, http, мс, подсказка), JSON в stdout,
 кэш ~/.cache/inn-check-ru/access.json ровно в формате §4:
 
     {"дата": "2026-09-19T14:00:00", "ip_класс": "не-РФ|РФ|неизвестно",
+     "сеть": {"отпечаток": "прямое|прокси:<hash>", "через": ..., "источник_настройки": ...},
      "источники": {"егрюл": {"состояние": "доступен", "http": 307, "мс": 350,
                              "причина": null}}}
 
@@ -35,7 +40,8 @@ fetch_counterparty.py читает этот кэш (TTL 24 ч) и не дёрг�
 
 TLS-контекст берётся из fetch_counterparty._build_ssl_context(), чтобы корень УЦ
 Минцифры подхватывался одинаково; если импорт не удался — ssl.create_default_context()
-с предупреждением в stderr. Прокси: urllib уважает HTTPS_PROXY из окружения.
+с предупреждением в stderr. Прокси — через scripts/proxy.py (--прокси >
+INN_CHECK_PROXY > HTTPS_PROXY); без него соединение строго прямое.
 Только стандартная библиотека.
 """
 
@@ -51,6 +57,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import proxy  # настройка пользовательского прокси (§18.2)
 import sources  # реестр: plain dict, без сетевых модулей
 
 TIMEOUT = 10          # секунд на один probe-запрос
@@ -75,8 +82,8 @@ CAPTCHA_MARKERS_HTML = (
 
 HINTS = {
     "tls": "нужен корень УЦ Минцифры: python3 scripts/install_ca.py",
-    "гео": "нужен РФ-IP или HTTPS_PROXY (urllib уважает переменную окружения)",
-    "dns": "хост не резолвится — проверьте DNS/сеть (или HTTPS_PROXY с удалённым DNS)",
+    "гео": "нужен РФ-IP: своя нода через --прокси / INN_CHECK_PROXY / HTTPS_PROXY",
+    "dns": "хост не резолвится — проверьте DNS/сеть (у прокси DNS свой, удалённый)",
     "капча": "источник отдаёт капчу — сбор только через браузер",
 }
 
@@ -101,6 +108,29 @@ def build_ssl_context():
         return ssl.create_default_context()
 
 
+def _отпечаток_сети(report):
+    """report["сеть"]["отпечаток"] у отчёта любой формы; None — отметки нет."""
+    сеть = report.get("сеть") if isinstance(report, dict) else None
+    return сеть.get("отпечаток") if isinstance(сеть, dict) else None
+
+
+def кэш_для_этой_сети(report, конф):
+    """(отчёт | None, причина отказа | None).
+
+    Probe, снятый через другую сеть, к этой не относится: РФ-нода и прямой выход
+    видят разные источники. Кэш без отметки (версия до 1.11.0) — тоже мимо: чем
+    он снят, неизвестно, а гадать здесь значит показать «доступно» там, где «гео».
+    """
+    if report is None:
+        return None, None
+    снят = _отпечаток_сети(report)
+    if снят == конф["отпечаток"]:
+        return report, None
+    return None, ("кэш снят из другой сети (%s), сейчас %s"
+                  % (снят or "сеть не отмечена, версия до 1.11.0",
+                     конф["отпечаток"]))
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Редиректы не следуем: 307 от egrul — самостоятельный сигнал (ok_http его знает)."""
 
@@ -108,10 +138,15 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def make_requester(ctx=None):
+def make_requester(ctx=None, прокси_url=None):
     """requester(url, method, timeout) -> (status, body_text); транспортные ошибки — наружу."""
     ctx = ctx or build_ssl_context()
-    opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ctx), _NoRedirect())
+    opener = urllib.request.build_opener(
+        # Явный ProxyHandler в обоих случаях: пустой отключает подхват переменных
+        # окружения, иначе «прямой» прогон мог бы незаметно уйти через HTTPS_PROXY
+        # и отчёт сказал бы «доступно с вашей сети» про чужую.
+        proxy.handler(прокси_url),
+        urllib.request.HTTPSHandler(context=ctx), _NoRedirect())
 
     def requester(url, method, timeout):
         req = urllib.request.Request(url, method=method, headers={
@@ -279,12 +314,21 @@ def _to_naive_local(d):
     return d.astimezone().replace(tzinfo=None) if d.tzinfo is not None else d
 
 
-def build_report(results, ip_class, now=None):
-    """Ровно формат §4: {"дата", "ip_класс", "источники"}."""
+def build_report(results, ip_class, now=None, конф=None):
+    """Формат §4 + «сеть»: {"дата", "ip_класс", "сеть", "источники"}.
+
+    «сеть» — отпечаток того, через что снят probe. Без него отчёт, снятый через
+    РФ-ноду, неотличим от снятого напрямую, и fetch_counterparty подставил бы
+    один вместо другого: «гео: недоступно» превратилось бы в «доступно» (или
+    наоборот) без единого слова в выводе.
+    """
     now = _to_naive_local(now or _now_local())
+    конф = конф or proxy.настройка(env={})
     return {
         "дата": now.isoformat(timespec="seconds"),
         "ip_класс": ip_class,
+        "сеть": {"отпечаток": конф["отпечаток"], "через": конф["маска"],
+                 "источник_настройки": конф["источник"]},
         "источники": {t["id"]: row for t, row in results},
     }
 
@@ -328,8 +372,10 @@ def print_table(report, out=sys.stderr):
                       str(row.get("мс") if row.get("мс") is not None else "—"),
                       hint_for(row, sources.SOURCES.get(sid))))
     widths = [max(len(str(line[i])) for line in lines) for i in range(4)]
-    out.write("ip_класс: %s · дата: %s · целей: %d\n"
-              % (report.get("ip_класс"), report.get("дата"), len(src)))
+    сеть = report.get("сеть") or {}
+    out.write("ip_класс: %s · дата: %s · целей: %d · сеть: %s\n"
+              % (report.get("ip_класс"), report.get("дата"), len(src),
+                 сеть.get("через") or сеть.get("отпечаток") or "не отмечена"))
     for n, line in enumerate(lines):
         out.write("  ".join(str(line[i]).ljust(widths[i]) for i in range(4))
                   + "  " + line[4] + "\n")
@@ -418,10 +464,15 @@ def print_canaries(report, out=sys.stderr):
 # ---------------------------------------------------------------- CLI
 
 def _parse_args(argv):
-    opts = {"json": False, "no_cache": False, "ttl": DEFAULT_TTL_HOURS, "canaries": False}
+    opts = {"json": False, "no_cache": False, "ttl": DEFAULT_TTL_HOURS,
+            "canaries": False, "прокси": None}
     it = iter(argv[1:])
     for a in it:
-        if a == "--json":
+        if a in ("--прокси", "--proxy"):
+            opts["прокси"] = next(it, None)
+        elif a.startswith(("--прокси=", "--proxy=")):
+            opts["прокси"] = a.split("=", 1)[1]
+        elif a == "--json":
             opts["json"] = True
         elif a == "--no-cache":
             opts["no_cache"] = True
@@ -454,20 +505,32 @@ def main(argv):
         return 0
     quiet = opts["json"]
 
+    конф = proxy.настройка(opts["прокси"])
+    if конф["ошибка"]:
+        sys.stdout.write(json.dumps({"ошибка": "прокси: " + конф["ошибка"]},
+                                    ensure_ascii=False, indent=2) + "\n")
+        return 2
+    if конф["url"] and not quiet:
+        sys.stderr.write("сеть: probe пойдёт через прокси %s (%s)\n"
+                         % (конф["маска"], конф["источник"]))
+
     report = None if opts["no_cache"] else load_cache(CACHE_PATH, opts["ttl"])
+    report, мимо_сети = кэш_для_этой_сети(report, конф)
+    if мимо_сети and not quiet:
+        sys.stderr.write("%s: %s — прогон живой\n" % (CACHE_PATH, мимо_сети))
     if report is not None:
         if not quiet:
             sys.stderr.write("кэш %s свежий (TTL %g ч) — сетевой прогон пропущен; "
                              "--ttl 0 или --no-cache для живого прогона\n"
                              % (CACHE_PATH, opts["ttl"]))
     else:
-        requester = make_requester()
+        requester = make_requester(прокси_url=конф["url"])
         targets = probe_targets()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             ip_future = pool.submit(detect_ip_class, requester)
             results = run_probes(targets, requester)
             ip_class = ip_future.result()
-        report = build_report(results, ip_class)
+        report = build_report(results, ip_class, конф=конф)
         if not opts["no_cache"]:
             try:
                 write_cache(report, CACHE_PATH)

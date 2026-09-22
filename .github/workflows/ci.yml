@@ -124,6 +124,13 @@ jobs:
           import dossier, extract_inn, opendata_index, opendata_refresh, paper_vat  # noqa: F401
           import retro_verdict  # noqa: F401
           print("модули волны 3 импортируются из колеса")
+          # check_access делает `import proxy`: забудь модуль в py-modules —
+          # и установленный пакет падает на probe, хотя из репозитория работает.
+          import check_access, proxy
+          конф = proxy.настройка(None, env={"HTTPS_PROXY": "http://узел:3128"})
+          assert конф["источник"] == "HTTPS_PROXY", конф
+          assert "сеть" in check_access.build_report([], "неизвестно"), "нет отметки сети"
+          print("прокси из колеса ok:", конф["отпечаток"])
           PY
 
       - name: "отраслевые нормы: агрегация и порог публикации (офлайн)"

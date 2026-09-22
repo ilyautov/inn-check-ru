@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 # Версия одна на репозиторий: гейт eval/run_version_gate.py.
 [project]
 name = "inn-check-ru"
-version = "1.10.0"
+version = "1.11.0"
 description = "Проверка российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом. CLI и MCP-сервер."
 readme = "README.md"
 license = "Apache-2.0"
@@ -51,6 +51,7 @@ py-modules = [
   "diff_counterparty",
   "registries_refresh",
   "check_access",
+  "proxy",
   "install_ca",
   "profiles",
   "sources",

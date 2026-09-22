@@ -22,11 +22,14 @@ run_fetch_eval.py — офлайн-eval движка fetch_counterparty.py (во
 """
 
 import copy
+import datetime as _dt
 import importlib.util
 import json
 import os
 import sys
+import tempfile
 import time
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -767,6 +770,132 @@ def case_special_registries(fc):
     return errors
 
 
+def case_proxy(fc):
+    """§18.2: свой прокси — и probe-кэш, снятый из другой сети, не переиспользуется."""
+    errors = []
+    сохранено = (fc._ПРОКСИ, fc.ACCESS_CACHE, fc._КЭШ_ДОСТУПА_ОТКЛОНЁН)
+    # main() глушит probe-кэш на весь прогон; этому кейсу он как раз нужен живым.
+    игнор = os.environ.pop("COUNTERPARTY_IGNORE_ACCESS_CACHE", None)
+    all_proxy = os.environ.pop("ALL_PROXY", None)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            путь = os.path.join(tmp, "access.json")
+            fc.ACCESS_CACHE = путь
+            # check_access пишет локальное время БЕЗ зоны — воспроизводим как есть.
+            свежая_дата = (_dt.datetime.now(_dt.timezone.utc).astimezone()
+                           .replace(tzinfo=None).isoformat(timespec="seconds"))
+
+            def записать(сеть):
+                кэш = {"дата": свежая_дата, "ip_класс": "РФ",
+                       "источники": {"егрюл": {"состояние": "доступен"}}}
+                if сеть is not None:
+                    кэш["сеть"] = сеть
+                with open(путь, "w", encoding="utf-8") as fh:
+                    json.dump(кэш, fh, ensure_ascii=False)
+
+            # 1. Прямой кэш при прямом прогоне — берётся.
+            записать({"отпечаток": "прямое"})
+            fc.установить_прокси(None)
+            fc._КЭШ_ДОСТУПА_ОТКЛОНЁН = None
+            check(errors, fc._load_access_cache() is not None,
+                  "свой же прямой кэш обязан читаться")
+
+            # 2. Тот же кэш, но идём через прокси — сеть другая, кэш не про неё.
+            fc.установить_прокси("http://rf.example:3128")
+            fc._КЭШ_ДОСТУПА_ОТКЛОНЁН = None
+            check(errors, fc._load_access_cache() is None,
+                  "кэш прямого прогона не должен подставляться прокси-прогону: "
+                  "иначе «гео: недоступно» читалось бы как «доступно»")
+            check(errors, fc._КЭШ_ДОСТУПА_ОТКЛОНЁН,
+                  "отклонение кэша обязано быть названо, а не произойти молча")
+
+            # 3. Обратное направление: кэш снят через ноду, идём напрямую.
+            записать({"отпечаток": fc.proxy.отпечаток("http://rf.example:3128")})
+            fc.установить_прокси(None)
+            fc._КЭШ_ДОСТУПА_ОТКЛОНЁН = None
+            check(errors, fc._load_access_cache() is None,
+                  "кэш прокси-прогона не должен подставляться прямому")
+
+            # 4. Кэш старого формата: чем снят — неизвестно, значит не годится.
+            записать(None)
+            fc.установить_прокси(None)
+            fc._КЭШ_ДОСТУПА_ОТКЛОНЁН = None
+            check(errors, fc._load_access_cache() is None,
+                  "кэш без отметки сети (версия до 1.11.0) не годится ни для чего")
+
+        # 5. Прокси реально попадает в opener, а не только в вывод.
+        fc.установить_прокси("http://rf.example:3128")
+        прокси_хендлеры = [h for h in fc._make_opener().handlers
+                           if isinstance(h, urllib.request.ProxyHandler)]
+        check(errors, len(прокси_хендлеры) == 1,
+              "ProxyHandler должен быть ровно один: %r" % прокси_хендлеры)
+        check(errors, прокси_хендлеры and прокси_хендлеры[0].proxies.get("https")
+              == "http://rf.example:3128",
+              "opener не ходит через заданный прокси: %r"
+              % (прокси_хендлеры[0].proxies if прокси_хендлеры else None))
+
+        # 6. Прямое соединение — ЯВНО прямое. urllib по умолчанию подхватывает
+        #    ЛЮБУЮ переменную вида *_proxy (ALL_PROXY, ftp_proxy…), а проект
+        #    честно знает только про три. Без явного пустого ProxyHandler трафик
+        #    ушёл бы через ALL_PROXY, а «_сеть» говорила бы «прямое соединение» —
+        #    ровно та тихая деградация, от которой вся эта возня.
+        os.environ["ALL_PROXY"] = "http://мимо.example:9999"
+        try:
+            fc.установить_прокси(None)
+            check(errors, fc._ПРОКСИ["url"] is None,
+                  "ALL_PROXY не входит в поддерживаемые переменные: %r" % fc._ПРОКСИ)
+            живые = [h.proxies for h in fc._make_opener().handlers
+                     if isinstance(h, urllib.request.ProxyHandler) and h.proxies]
+            check(errors, not живые,
+                  "при «прямом соединении» opener не должен знать ни одного "
+                  "прокси, а знает: %r" % живые)
+        finally:
+            os.environ.pop("ALL_PROXY", None)
+
+        # 7. Негодный URL — отказ на уровне opener'а, а не тихий прямой выход.
+        ошибка = fc.установить_прокси("socks5://host:1080")
+        check(errors, ошибка, "socks5 обязан быть отвергнут")
+        try:
+            fc._make_opener()
+        except ValueError as e:
+            check(errors, "прокси" in str(e), "текст отказа: %r" % str(e))
+        else:
+            errors.append("_make_opener с негодным прокси обязан упасть, "
+                          "а не пойти напрямую в обход настройки")
+
+        # 8. Блок «_сеть» в выводе: через что шли, видно без чтения окружения.
+        fc.установить_прокси("http://логин:секрет@rf.example:3128")
+        restore = _fake_env(fc, {sid: ("пусто", None) for sid in fc.SOURCES})
+        try:
+            r = fc.collect("7707083893", режим="quick")
+        finally:
+            restore()
+        сеть = r.get("_сеть") or {}
+        check(errors, сеть.get("отпечаток", "").startswith("прокси:"),
+              "_сеть при прокси: %r" % сеть)
+        сырое = json.dumps(r, ensure_ascii=False)
+        check(errors, "секрет" not in сырое,
+              "пароль прокси не должен утекать в вывод (его сохраняют в снимки)")
+        check(errors, "rf.example" in сырое, "хост прокси в выводе: %r" % сеть)
+        check(errors, "ИНН" in (сеть.get("оговорка") or ""),
+              "оговорка обязана сказать, что узел видит проверяемые ИНН: %r" % сеть)
+
+        # 9. Флаг разбирается в обеих формах.
+        for argv, ждём in ((["x", "7707083893", "--прокси", "http://a:1"], "http://a:1"),
+                           (["x", "7707083893", "--прокси=http://b:2"], "http://b:2"),
+                           (["x", "7707083893"], None)):
+            check(errors, fc._parse_args(argv)[-1] == ждём,
+                  "разбор %r -> %r" % (argv, fc._parse_args(argv)[-1]))
+    finally:
+        fc._ПРОКСИ, fc.ACCESS_CACHE, fc._КЭШ_ДОСТУПА_ОТКЛОНЁН = сохранено
+        for имя, значение in (("COUNTERPARTY_IGNORE_ACCESS_CACHE", игнор),
+                              ("ALL_PROXY", all_proxy)):
+            os.environ.pop(имя, None)
+            if значение is not None:
+                os.environ[имя] = значение
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
     fc._http_get = _no_network
@@ -783,6 +912,7 @@ def main():
         "параллельный-сбор": case_parallel(fc),
         "канарейка-потокобезопасна": case_canary_threadsafe(fc),
         "спецреестры-дисквалификация": case_special_registries(fc),
+        "прокси-и-кэш-доступа": case_proxy(fc),
     }
     failed = 0
     for name, errors in cases.items():
