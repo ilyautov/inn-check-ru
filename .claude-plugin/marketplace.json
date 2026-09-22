@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Проверка контрагента по ИНН перед сделкой: светофор риска по открытым реестрам (ЕГРЮЛ, ФССП, суды, банкротства), круговая сверка агрегаторов. | Counterparty due-diligence by Russian tax ID (INN) over open registries.",
-    "version": "1.8.0"
+    "version": "1.9.0"
   },
   "plugins": [
     {
