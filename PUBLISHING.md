@@ -92,6 +92,11 @@ uvx --from inn-check-ru inn-check-ru <ИНН>
 uvx --from "inn-check-ru[mcp]" inn-check-ru-mcp   # MCP-обёртка
 ```
 
+Типовые отказы ДО шага «Публикация»: `Unable to resolve action ...@<sha>,
+unable to find version` — пин указывает на коммит, которого нет в репозитории
+действия; job падает на «Set up job», не дойдя до первого шага. Проверить все
+пины разом: job `action-pins` в `supply-chain.yml` (бежит на каждом пуше).
+
 Типовые отказы на шаге «Публикация»: `invalid-publisher` — не совпало одно из
 пяти полей pending publisher (чаще всего Workflow name или Environment);
 `403`/`project name already exists` — имя занято чужим проектом (тогда

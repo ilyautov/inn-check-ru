@@ -125,4 +125,4 @@ jobs:
 
       - name: Публикация
         if: steps.check.outputs.skip == '0'
-        uses: pypa/gh-action-pypi-publish@ed0c695935afd0fd88331604a3c3fbd4d3fa0ea1 # v1.13.0
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0

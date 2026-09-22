@@ -22,6 +22,40 @@ jobs:
         --recursive
         ./
 
+  # Пин на несуществующий SHA виден только тогда, когда workflow запускается:
+  # job падает на «Set up job», до первого шага. publish-pypi.yml был пришпилен
+  # к SHA, которого нет в pypa/gh-action-pypi-publish, три релиза подряд — и
+  # никто не узнал, потому что он не запускался (см. CHANGELOG 1.11.0).
+  # Здесь пины проверяются на КАЖДОМ пуше, независимо от того, кто когда бежит.
+  action-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Каждый пин действия резолвится в реальный коммит
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          # Переиспользуемый workflow пишется как owner/repo/путь/файл.yml@SHA —
+          # поэтому owner/repo берём первыми двумя сегментами, а не всем куском.
+          pins=$(grep -rhoE "uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}" \
+                   .github/workflows/ | sed 's/uses: //' | sort -u)
+          [ -n "$pins" ] || { echo "ни одного пина не найдено: либо их правда нет, либо сломан grep" >&2; exit 1; }
+          rc=0
+          while IFS= read -r pin; do
+            [ -n "$pin" ] || continue
+            sha=${pin##*@}
+            repo=$(cut -d/ -f1,2 <<< "${pin%@*}")
+            if gh api "repos/$repo/commits/$sha" --jq '.sha' >/dev/null 2>&1; then
+              echo "ok    $repo@${sha:0:8}"
+            else
+              echo "::error::пин не резолвится: $repo@$sha"
+              rc=1
+            fi
+          done <<< "$pins"
+          exit $rc
+
   python-deps:
     runs-on: ubuntu-latest
     steps:
