@@ -384,7 +384,7 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
         применимо = s.get("применимо_к")
         if применимо and тип not in применимо:
             rec["статус"] = "не применимо"
-            rec["причина"] = "к %s не применимо (см. SKILL.md «Проверка ИП»)" % (
+            rec["причина"] = "к %s не применимо (см. references/scenarii.md «Проверка ИП»)" % (
                 "ИП" if тип == "ип" else тип)
             out.append(rec)
             continue

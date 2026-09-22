@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Сборка релизного ZIP скилла для claude.ai (паттерн humanizer-ru).
 
-В архиве: SKILL.md в корне + scripts/ + data/ + LICENSE — ровно то, что нужно
-скиллу; eval/, mcp/, .github и прочая инфраструктура репозитория не едут.
+В архиве: SKILL.md в корне + references/ (вынесенные разделы скилла, без них
+скачанный скилл теряет куски молча) + scripts/ + data/ + LICENSE — ровно то,
+что нужно скиллу; eval/, mcp/, .github и прочая инфраструктура репозитория не едут.
 """
 
 import argparse
@@ -10,7 +11,7 @@ import zipfile
 from pathlib import Path
 
 INCLUDE_FILES = ("SKILL.md", "LICENSE")
-INCLUDE_DIRS = ("scripts", "data")
+INCLUDE_DIRS = ("scripts", "data", "references")
 BAD_NAMES = {".DS_Store", "__pycache__"}
 BAD_SUFFIXES = {".pyc"}
 # инфраструктура репозитория (релизная машина, генератор картинки, секьюрити-хуки)

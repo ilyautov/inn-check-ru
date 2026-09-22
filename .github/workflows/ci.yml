@@ -45,6 +45,9 @@ jobs:
           pip install pillow
           python3 scripts/make_social_preview.py --check
 
+      - name: "гейт скилла: вынесенные разделы, ссылки и релизный архив"
+        run: python3 eval/run_skill_gate.py
+
       - name: release zip собирается (SKILL.md в корне)
         run: |
           python3 scripts/build_release_zip.py
