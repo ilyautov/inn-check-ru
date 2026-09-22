@@ -34,13 +34,13 @@ MCPServer с ломающими изменениями), а из конвенц�
 ставить ничего глобально не нужно.
 
 ```bash
-uv run --no-project --with "mcp>=1.2,<2" mcp/server.py
+uv run --no-project --with "mcp>=1.30,<2" mcp/server.py
 ```
 
 Вариант с заранее установленным SDK:
 
 ```bash
-pip install -r mcp/requirements.txt   # или: pip install "mcp>=1.2,<2"
+pip install -r mcp/requirements.txt   # или: pip install "mcp>=1.30,<2"
 python3 mcp/doctor.py                 # отчёт «взлетит ли установка»
 python3 mcp/server.py
 ```
@@ -65,7 +65,7 @@ python3 mcp/server.py
 Claude Code (из корня репозитория):
 
 ```bash
-claude mcp add inn-check-ru -- uv run --no-project --with "mcp>=1.2,<2" "$PWD/mcp/server.py"
+claude mcp add inn-check-ru -- uv run --no-project --with "mcp>=1.30,<2" "$PWD/mcp/server.py"
 ```
 
 Cursor / generic stdio (`~/.cursor/mcp.json` или аналог):
@@ -75,7 +75,7 @@ Cursor / generic stdio (`~/.cursor/mcp.json` или аналог):
   "mcpServers": {
     "inn-check-ru": {
       "command": "uv",
-      "args": ["run", "--no-project", "--with", "mcp>=1.2,<2",
+      "args": ["run", "--no-project", "--with", "mcp>=1.30,<2",
                "/полный/путь/inn-check-ru/mcp/server.py"],
       "env": {"CHECKO_API_KEY": ""}
     }

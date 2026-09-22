@@ -4,7 +4,7 @@
       "command": "uv",
       "args": [
         "run", "--quiet", "--no-project",
-        "--with", "mcp>=1.2,<2",
+        "--with", "mcp>=1.30,<2",
         "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"
       ],
       "env": {}

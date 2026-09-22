@@ -260,11 +260,13 @@ def case_stdio():
         pass
     finally:
         таймер.cancel()
-        try:
-            proc.stdin.close()
-        except OSError:
-            pass
         proc.terminate()
+        # stdin руками НЕ закрываем: его закроет communicate(). Закрытый
+        # заранее stdin ломает сам communicate() — он безусловно делает
+        # flush(), и на Python < 3.14 это ValueError («I/O operation on
+        # closed file»), который внутри communicate() не ловится. На 3.14
+        # ValueError там проглатывается, поэтому тест был зелёным на машине
+        # и красным в CI: разница интерпретаторов, а не кода сервера.
         try:
             _, stderr = proc.communicate(timeout=20)
         except subprocess.TimeoutExpired:
