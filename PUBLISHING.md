@@ -15,13 +15,25 @@ pending publisher на PyPI, первая публикация в реестр M
 4. `release.yml` собирает `dist/inn-check-ru.zip` (SKILL.md в корне архива)
    и создаёт GitHub Release с `--generate-notes`. По ссылке
    `releases/latest/download/inn-check-ru.zip` всегда последний ZIP.
-5. `publish-pypi.yml` (по событию Release) собирает пакет и публикует на PyPI
+5. `publish-pypi.yml` (по тому же пушу тега) собирает пакет и публикует на PyPI
    через OIDC Trusted Publishing — токен в секретах не нужен.
+
+   **Почему по тегу, а не по событию Release.** До 23.09.2026 здесь стояло
+   `on: release: published`, и цепочка «тег → Release → публикация» выглядела
+   рабочей. Она не отработала ни разу: Release создаёт `release.yml` через
+   `GITHUB_TOKEN`, а события от `GITHUB_TOKEN` новых прогонов не запускают —
+   это защита GitHub от петель. Три релиза, ноль прогонов `publish-pypi.yml`,
+   PyPI отдаёт 404. Если когда-нибудь понадобится убедиться, что звено живо:
+   `gh run list --workflow publish-pypi.yml` — пустой список после релиза
+   означает, что оно молчит, а не что публиковать было нечего.
 
 ## PyPI: пакет `inn-check-ru` (Trusted Publishing, разовая настройка)
 
-Состояние на 19.09.2026: `pypi.org/project/inn-check-ru` отдаёт 404 — пакет
+Состояние на 23.09.2026: `pypi.org/project/inn-check-ru` отдаёт 404 — пакет
 ещё ни разу не публиковался, хотя `server.json` уже объявляет его на PyPI.
+Причин было ДВЕ, и вторая нашлась только сейчас: (1) pending publisher на PyPI
+не заведён — ручной шаг ниже; (2) `publish-pypi.yml` не запускался вовсе из-за
+триггера по событию Release (см. пункт 5 выше, исправлено).
 Пока PyPI не отдаст версию, `uvx --from inn-check-ru ...` и запись в реестре
 MCP не работают. Закрыть это — ручной шаг ниже, один раз.
 

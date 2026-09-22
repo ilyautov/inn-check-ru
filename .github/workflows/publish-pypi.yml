@@ -13,8 +13,17 @@ name: Publish to PyPI
 #     Workflow name:     publish-pypi.yml   <-- ровно имя этого файла
 #     Environment name:  (пусто)
 #
+# Триггер — ПУШ ТЕГА, а не «release: published». Релиз создаёт release.yml
+# через GITHUB_TOKEN, а события от GITHUB_TOKEN новых прогонов не запускают
+# (защита GitHub от петель). Поэтому цепочка «тег -> Release -> публикация»
+# выглядела рабочей и не отработала НИ РАЗУ: три релиза, ноль прогонов этого
+# файла, PyPI отдавал 404. Проверено 23.09.2026. Подписка на release оставлена
+# на случай релиза, созданного человеком; на такой случай — concurrency, чтобы
+# два прогона одного тега не лезли на PyPI одновременно.
 # workflow_dispatch нужен, чтобы до-опубликовать уже выпущенный тег.
 on:
+  push:
+    tags: ["v*"]
   release:
     types: [published]
   workflow_dispatch:
@@ -22,6 +31,10 @@ on:
       tag:
         description: "Существующий тег релиза, например v1.6.0"
         required: true
+
+concurrency:
+  group: publish-pypi-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -38,7 +51,7 @@ jobs:
         id: tag
         shell: bash
         env:
-          REF: ${{ github.event.inputs.tag || github.event.release.tag_name }}
+          REF: ${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
         run: |
           [[ "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "тег не похож на vX.Y.Z: $REF" >&2; exit 1; }
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
@@ -102,6 +115,12 @@ jobs:
           canon = d._load_canon()
           assert isinstance(canon, dict) and "ндс_усн_освобождение" in canon, canon
           print("canon из колеса ok:", sorted(canon))
+          # Последний рубеж перед PyPI: забытый py-module ломает установленный
+          # пакет, работая из репозитория. check_access делает `import proxy`.
+          import check_access, proxy
+          assert proxy.настройка(None, env={"HTTPS_PROXY": "http://у:3128"})["источник"]
+          assert "сеть" in check_access.build_report([], "неизвестно")
+          print("прокси из колеса ok")
           PY
 
       - name: Публикация
