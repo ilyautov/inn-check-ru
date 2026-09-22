@@ -118,7 +118,7 @@ jobs:
           assert таблица, "нормы из колеса не читаются: %s" % причина
           print("нормы из колеса ok:", таблица["групп"], "групп")
           assert "ндс_вычет" in sources.PROFILE_IDS, sources.PROFILE_IDS
-          import dossier, extract_inn, opendata_refresh, paper_vat  # noqa: F401
+          import dossier, extract_inn, opendata_index, opendata_refresh, paper_vat  # noqa: F401
           print("модули волны 3 импортируются из колеса")
           PY
 
@@ -133,6 +133,9 @@ jobs:
 
       - name: извлечение ИНН из документов (офлайн)
         run: python3 eval/run_extract_eval.py
+
+      - name: "поиск по ИНН в дампах ФНС: индекс и три состояния (офлайн)"
+        run: python3 eval/run_opendata_index_eval.py
 
       - name: mcp server smoke test
         run: |
