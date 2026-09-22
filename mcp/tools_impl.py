@@ -38,6 +38,10 @@ EXPECTED_TOOLS = (
     "counterparty_verdict",
     "counterparty_batch",
     "access_check",
+    "industry_benchmarks",
+    "paper_vat_signs",
+    "due_diligence_dossier",
+    "extract_inns",
 )
 
 # Батч: 3 ИНН собираются одновременно (batch_check.py), волна ~15 с в quick-режиме.
@@ -65,11 +69,15 @@ def _guarded(fn):
     return wrapper
 
 
-def run_script(script, args, stdin_text=None, timeout=None):
+def run_script(script, args, stdin_text=None, timeout=None, сырой=False):
     """Запуск scripts/<script> и разбор его JSON-stdout.
 
     Возвращает dict скрипта как есть; любая деградация (таймаут, не-JSON,
     отсутствующий файл) -> {"статус": "не проверено", "причина": ...}.
+
+    `сырой=True` — вернуть stdout строкой без разбора (досье отдаёт Markdown,
+    а не JSON). Деградация и там остаётся словарём, чтобы вызывающий отличал
+    документ от отказа по типу значения.
     """
     path = os.path.join(SCRIPTS, script)
     if not os.path.exists(path):
@@ -86,6 +94,12 @@ def run_script(script, args, stdin_text=None, timeout=None):
             % (timeout or TIMEOUT), script)
     except Exception as e:
         return _не_проверено("сбой запуска движка (%s)" % type(e).__name__, script)
+    if сырой:
+        if proc.returncode != 0 or not (proc.stdout or "").strip():
+            return _не_проверено(
+                "движок не отдал документ (exit %s): %s"
+                % (proc.returncode, (proc.stderr or "")[:300]), script)
+        return proc.stdout
     try:
         return json.loads(proc.stdout)
     except ValueError:
@@ -230,3 +244,110 @@ def access_check():
     """Таблица доступности источников с текущей сети (probe, кэш на сутки):
     что реально отвечает, где нужен РФ-IP, где корень УЦ Минцифры."""
     return run_script("check_access.py", ["--json"])
+
+
+def _сбор(inn, режим="всё"):
+    """Общий шаг инструментов волны 3: полный сбор движком.
+
+    Отдельной функцией, потому что все трое ниже начинают одинаково, и
+    ошибочный JSON движка должен доходить до модели как есть, а не
+    прятаться за собственным «не проверено» обёртки.
+    """
+    return run_script("fetch_counterparty.py", [inn, "--режим", str(режим)])
+
+
+def _сбор_или_ошибка(inn, режим="всё"):
+    inn = _valid_inn(inn)
+    if inn is None:
+        return None, _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
+    fetch = _сбор(inn, режим)
+    if "инн" not in fetch:
+        return None, fetch
+    return fetch, None
+
+
+@_guarded
+def industry_benchmarks(inn):
+    """Положение компании относительно отраслевой нормы из дампов ФНС.
+
+    Норма — перцентили выручки, налоговой нагрузки, ССЧ и доли УСН по группе
+    (ОКВЭД2, регион, размер). Группы меньше порога наблюдений не публикуются,
+    у каждого показателя свой счётчик, а для «среднего» и «крупного» ответ
+    несёт предупреждение о смещённой выборке.
+    """
+    fetch, ошибка = _сбор_или_ошибка(inn)
+    if ошибка is not None:
+        return ошибка
+    return run_script("benchmarks.py", ["--stdin"],
+                      stdin_text=json.dumps(fetch, ensure_ascii=False))
+
+
+@_guarded
+def paper_vat_signs(inn, subject=None, amount=None):
+    """Признаки «технической» компании, из-за которой снимают вычет по НДС.
+
+    Язык фактов, не налоговый вывод: что видно в открытых данных, чего не
+    видно и что осталось непроверенным. Вердикта о вычете не выносит.
+    `subject` — предмет сделки (сверяется с ОКВЭД), `amount` — сумма в рублях.
+    """
+    fetch, ошибка = _сбор_или_ошибка(inn)
+    if ошибка is not None:
+        return ошибка
+    args = ["--stdin"]
+    if subject:
+        args += ["--предмет", str(subject)]
+    if amount not in (None, ""):
+        args += ["--сумма", str(amount)]
+    return run_script("paper_vat.py", args,
+                      stdin_text=json.dumps(fetch, ensure_ascii=False))
+
+
+@_guarded
+def due_diligence_dossier(inn, profile="нейтрально", subject=None, amount=None):
+    """Досье должной осмотрительности в Markdown — документ на дату проверки.
+
+    Фиксирует, что было видно в открытых источниках, что осталось
+    непроверенным и почему. Заключением не является и ценен только тогда,
+    когда составлен ДО сделки — это написано в самом документе. DOCX здесь
+    не отдаётся: инструмент возвращает текст, файл собирает dossier.py.
+    """
+    fetch, ошибка = _сбор_или_ошибка(inn)
+    if ошибка is not None:
+        return ошибка
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8",
+                                     delete=False) as fh:
+        json.dump(fetch, fh, ensure_ascii=False)
+        путь = fh.name
+    try:
+        args = ["--fetch", путь, "--профиль", str(profile or "нейтрально"),
+                "--markdown"]
+        if subject:
+            args += ["--предмет", str(subject)]
+        if amount not in (None, ""):
+            args += ["--сумма", str(amount)]
+        текст = run_script("dossier.py", args, сырой=True)
+    finally:
+        try:
+            os.unlink(путь)
+        except OSError:
+            pass
+    if isinstance(текст, dict):
+        return текст
+    return {"статус": "ок", "инн": fetch.get("инн"), "формат": "markdown",
+            "документ": текст}
+
+
+@_guarded
+def extract_inns(text, only_new=False):
+    """Вынуть ИНН из текста документа: счёта, договора, письма, выгрузки.
+
+    Мусор режется контрольным числом ФНС: номера счетов, телефоны,
+    расчётные счета и КПП отсеиваются с причиной. Каждый найденный ИНН —
+    с контекстом и пометкой «новый» либо «уже проверялся» по кэшу снимков.
+    Сеть не трогается: это разбор текста, а не проверка.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return _не_проверено("text: ожидается непустой текст документа")
+    args = ["--stdin", "--json"] + (["--только-новые"] if only_new else [])
+    return run_script("extract_inn.py", args, stdin_text=text)

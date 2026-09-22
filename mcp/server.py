@@ -191,6 +191,70 @@ def access_check() -> dict:
     return tools_impl.access_check()
 
 
+@mcp_server.tool()
+def industry_benchmarks(inn: str) -> dict:
+    """Где компания относительно отраслевой нормы: перцентиль выручки,
+    налоговая нагрузка, численность и доля УСН по группе (ОКВЭД2, регион,
+    размер). Нормы собраны из открытых дампов ФНС. Группы меньше порога
+    наблюдений не публикуются, у каждого показателя свой счётчик, а для
+    среднего и крупного бизнеса ответ несёт предупреждение: ОКВЭД в открытых
+    данных есть только у субъектов МСП, поэтому настоящего крупного бизнеса
+    в этих группах нет.
+
+    Where a company sits against its industry: revenue percentile, tax burden,
+    headcount and simplified-regime share for its (activity, region, size)
+    group, built from Russian tax service open data dumps.
+    """
+    return tools_impl.industry_benchmarks(inn)
+
+
+@mcp_server.tool()
+def paper_vat_signs(inn: str, subject: str = "", amount: str = "") -> dict:
+    """Признаки «технической» компании, из-за которой покупателю снимают вычет
+    по НДС: возраст, ресурсы, массовость адреса и руководителя, спецрежим,
+    несоразмерность выручки штату. Язык фактов, а не налоговый вывод — что
+    видно в открытых данных, чего не видно и что осталось непроверенным.
+    subject — предмет сделки (сверяется с ОКВЭД), amount — сумма в рублях.
+
+    Signs of a shell counterparty that can cost the buyer its VAT deduction.
+    States what open data shows, never a tax conclusion.
+    """
+    return tools_impl.paper_vat_signs(inn, subject=subject or None,
+                                      amount=amount or None)
+
+
+@mcp_server.tool()
+def due_diligence_dossier(inn: str, profile: str = "нейтрально",
+                          subject: str = "", amount: str = "") -> dict:
+    """Досье должной осмотрительности в Markdown: что было видно в открытых
+    источниках на дату проверки, что осталось непроверенным и почему.
+    Документ заключением не является и ценен только тогда, когда составлен ДО
+    сделки — это написано в нём самом. Файл DOCX собирает dossier.py.
+
+    Due-diligence dossier as Markdown: what open sources showed on the date of
+    the check, and what stayed unchecked. Not an opinion, and only meaningful
+    when produced BEFORE the deal.
+    """
+    return tools_impl.due_diligence_dossier(inn, profile=profile,
+                                            subject=subject or None,
+                                            amount=amount or None)
+
+
+@mcp_server.tool()
+def extract_inns(text: str, only_new: bool = False) -> dict:
+    """Вынуть ИНН из текста документа: счёта, договора, письма, выгрузки.
+    Мусор режется контрольным числом ФНС — номера счетов, телефоны, расчётные
+    счета и КПП отсеиваются с причиной. Каждый найденный ИНН с контекстом и
+    пометкой «новый» либо «уже проверялся» по кэшу снимков. Сеть не трогает:
+    это разбор текста, а не проверка. Дальше новые ИНН идут в
+    counterparty_batch.
+
+    Pull Russian tax IDs out of an invoice, contract, email or export. Garbage
+    is rejected by the official checksum, with a reason. No network access.
+    """
+    return tools_impl.extract_inns(text, only_new=only_new)
+
+
 def entry():
     """console_script `inn-check-ru-mcp` (pyproject.toml)."""
     mcp_server.run()
