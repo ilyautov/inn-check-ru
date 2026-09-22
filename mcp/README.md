@@ -94,7 +94,7 @@ Cursor / generic stdio (`~/.cursor/mcp.json` или аналог):
 | `counterparty_fetch(inn, save=False)` | полный сбор: ЕГРЮЛ/ЕГРИП, риск-флаги, финансы, МСП ✅, НПД, ЕРКНМ/РНП по кэшу. Базовый контур, без браузерных слоёв (суды/банкротства/ФССП) | — |
 | `counterparty_fin_scoring(inn)` | fetch + финансовый профиль кодом (ЧА/ст. 30 ФЗ-14, автономия, ликвидность…) | — |
 | `sanctions_check(inn, name)` | офлайн-сверка РФМ + OFAC SDN + EU по кэшу пользователя | — |
-| `affiliates_graph(inn)` | граф связей глубины 2 (checko API), рёбра с tier ⚠️ | CHECKO_API_KEY |
+| `affiliates_graph(inn)` | граф связей глубины 2 (checko API), ленивый обход с бюджетом и остановкой на значимом сигнале, рёбра с tier ⚠️ | CHECKO_API_KEY |
 | `droblenie_check(inn)` | граф + признаки дробления кодом, с предупреждением об одном источнике | CHECKO_API_KEY |
 | `counterparty_diff(inn)` | мониторинг: diff двух последних снимков (`save=True`) | — |
 | `counterparty_verdict(inn, profile)` | **главный инструмент**: сбор + финансы + резолвер профиля одной командой → светофор, сигналы, рекомендация, что не проверено | — |
