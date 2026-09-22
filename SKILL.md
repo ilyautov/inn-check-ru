@@ -19,7 +19,7 @@ compatibility: >
   непроверенные.
 metadata:
   author: Илья Утов (AI Frontier)
-  version: "1.11.0"
+  version: "1.11.1"
 ---
 
 # inn-check-ru — проверка контрагента по ИНН

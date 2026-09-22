@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+# Пакет-обёртка для реестра MCP. Кода в нём нет — только имя и точка входа.
+#
+# Зачем отдельный пакет. Клиенты реестра собирают команду по server.json как
+# `uvx <identifier> <packageArguments>`, и packageArguments уходят ИСПОЛНЯЕМОМУ
+# ФАЙЛУ пакета. У inn-check-ru исполняемый файл с именем пакета — это CLI
+# проверки ИНН, поэтому любая попытка «достучаться» до MCP-сервера через
+# аргументы отдавала клиенту справку CLI и мёртвый процесс (проверено на живом
+# PyPI 23.09.2026). Здесь имя пакета совпадает с именем сервера: `uvx
+# inn-check-ru-mcp` работает в любом клиенте, с версией и без.
+#
+# Почему не сделать mcp обязательной зависимостью inn-check-ru: тогда каждый,
+# кто ставит CLI ради одной проверки, тянул бы ~30 пакетов MCP SDK. Движок —
+# чистый stdlib, и пусть так и остаётся.
+#
+# Версия — ровно та же, что у inn-check-ru, и зависимость пришпилена `==`:
+# обёртка 1.11.1 поверх движка 1.11.0 — это сервер, отвечающий не тем кодом,
+# который написан в его версии. Сверяет eval/run_version_gate.py.
+[project]
+name = "inn-check-ru-mcp"
+version = "1.11.1"
+description = "MCP-сервер проверки контрагента РФ по ИНН: светофор риска по открытым реестрам. Запуск: uvx inn-check-ru-mcp"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [{ name = "Ilya Utov" }]
+keywords = ["mcp", "mcp-server", "inn", "egrul", "counterparty", "due-diligence", "russia"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Natural Language :: Russian",
+  "Programming Language :: Python :: 3",
+  "Topic :: Utilities",
+]
+dependencies = ["inn-check-ru[mcp]==1.11.1"]
+
+[project.urls]
+Repository = "https://github.com/ilyautov/inn-check-ru"
+Changelog = "https://github.com/ilyautov/inn-check-ru/blob/main/CHANGELOG.md"
+
+# Та же точка входа, что у inn-check-ru: модуль приезжает зависимостью.
+[project.scripts]
+inn-check-ru-mcp = "inn_check_ru_mcp.server:entry"
+
+[tool.setuptools]
+py-modules = []
+packages = []

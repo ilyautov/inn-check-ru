@@ -71,9 +71,12 @@ jobs:
         env:
           V: ${{ steps.tag.outputs.version }}
         run: |
-          PKG=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
-          echo "тег=$V pyproject=$PKG"
-          [ "$V" = "$PKG" ] || { echo "версия тега не совпала с pyproject.toml" >&2; exit 1; }
+          # Два пакета, одна версия: обёртка inn-check-ru-mcp пришпилена к движку `==`.
+          for f in pyproject.toml packaging/inn-check-ru-mcp/pyproject.toml; do
+            PKG=$(python -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1],"rb"))["project"]["version"])' "$f")
+            echo "тег=$V $f=$PKG"
+            [ "$V" = "$PKG" ] || { echo "версия тега не совпала с $f" >&2; exit 1; }
+          done
 
       - name: Эта версия уже на PyPI? Тогда выходим без ошибки
         id: check
@@ -81,9 +84,20 @@ jobs:
         env:
           V: ${{ steps.tag.outputs.version }}
         run: |
-          if curl -fsS "https://pypi.org/pypi/inn-check-ru/$V/json" >/dev/null 2>&1; then
+          # Выходим, только если на PyPI уже ОБА пакета этой версии. Один из двух —
+          # это недопубликованный релиз (например, у обёртки не было publisher),
+          # его надо доделать; уже залитый файл пропустит skip-existing ниже.
+          # имена переменных в bash — только ASCII: `есть=0` bash счёл бы командой
+          have=0
+          for pkg in inn-check-ru inn-check-ru-mcp; do
+            if curl -fsS "https://pypi.org/pypi/$pkg/$V/json" >/dev/null 2>&1; then
+              echo "PyPI уже отдаёт $pkg $V"; have=$((have + 1))
+            else
+              echo "на PyPI нет $pkg $V"
+            fi
+          done
+          if [ "$have" = 2 ]; then
             echo "skip=1" >> "$GITHUB_OUTPUT"
-            echo "PyPI уже отдаёт $V, публиковать нечего"
           else
             echo "skip=0" >> "$GITHUB_OUTPUT"
           fi
@@ -93,6 +107,8 @@ jobs:
         run: |
           python -m pip install --quiet build
           python -m build
+          python -m build packaging/inn-check-ru-mcp --outdir dist
+          ls -1 dist
 
       # Колесо без канона порогов публиковать нельзя: droblenie_check из
       # установленного пакета отвечал бы «не проверено». Ставим колесо в
@@ -102,10 +118,11 @@ jobs:
         shell: bash
         run: |
           # без grep -q: под pipefail ранний выход grep роняет unzip по SIGPIPE
-          unzip -Z1 dist/*.whl | grep -Fx 'inn_check_ru_data/canon_ru.json' \
+          # dist/inn_check_ru-*.whl — только движок: у обёртки после имени `_mcp`
+          unzip -Z1 dist/inn_check_ru-*.whl | grep -Fx 'inn_check_ru_data/canon_ru.json' \
             || { echo "в колесе нет inn_check_ru_data/canon_ru.json" >&2; exit 1; }
           python -m venv "$RUNNER_TEMP/whl-venv"
-          "$RUNNER_TEMP/whl-venv/bin/pip" install --quiet dist/*.whl
+          "$RUNNER_TEMP/whl-venv/bin/pip" install --quiet dist/inn_check_ru-*.whl
           cd "$RUNNER_TEMP"
           # некорректный ИНН -> JSON с ошибкой и exit 1: это и есть ожидаемый ответ
           out=$("$RUNNER_TEMP/whl-venv/bin/inn-check-ru" 123 || true)
@@ -123,6 +140,24 @@ jobs:
           print("прокси из колеса ok")
           PY
 
+      # Та самая команда, которую соберёт клиент реестра MCP по server.json.
+      # До 1.11.1 она запускала CLI проверки ИНН вместо сервера, и узнать это
+      # можно было только запуском. Колёса берутся из dist, mcp SDK — с PyPI.
+      - name: "`uvx inn-check-ru-mcp` поднимает сервер (путь реестра MCP)"
+        if: steps.check.outputs.skip == '0'
+        shell: bash
+        env:
+          V: ${{ steps.tag.outputs.version }}
+        run: |
+          python -m pip install --quiet uv
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/eval/mcp_handshake.py" \
+            uvx --no-cache --find-links "$GITHUB_WORKSPACE/dist" "inn-check-ru-mcp==$V"
+
       - name: Публикация
         if: steps.check.outputs.skip == '0'
         uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+        with:
+          # Перезапуск после частичной публикации: уже залитый файл той же
+          # версии пропускается, недостающий доливается.
+          skip-existing: true

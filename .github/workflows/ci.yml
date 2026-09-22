@@ -133,6 +133,20 @@ jobs:
           print("прокси из колеса ok:", конф["отпечаток"])
           PY
 
+      # Команда, которую клиент реестра MCP соберёт по server.json. Сервер может
+      # быть исправен, а команда — запускать не его (до 1.11.1 так и было: CLI
+      # проверки ИНН). Колесо движка — из прошлого шага, обёртка — здесь.
+      - name: "`uvx inn-check-ru-mcp` поднимает сервер (путь реестра MCP)"
+        shell: bash
+        run: |
+          python -m pip install --quiet uv
+          python -m build --wheel packaging/inn-check-ru-mcp --outdir "$RUNNER_TEMP/whl-mcp"
+          V=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/eval/mcp_handshake.py" \
+            uvx --no-cache --find-links "$RUNNER_TEMP/whl" --find-links "$RUNNER_TEMP/whl-mcp" \
+            "inn-check-ru-mcp==$V"
+
       - name: "отраслевые нормы: агрегация и порог публикации (офлайн)"
         run: python3 eval/run_benchmarks_eval.py
 

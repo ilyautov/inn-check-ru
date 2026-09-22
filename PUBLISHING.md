@@ -44,6 +44,19 @@ pending publisher на PyPI, первая публикация в реестр M
 
 Дальше публикация идёт сама по пушу тега. Разовые шаги ниже оставлены для
 истории и на случай переезда проекта.
+
+**С 1.11.1 пакетов два**, и публикуются они одним прогоном:
+- `inn-check-ru` — движок и CLI, без зависимостей;
+- `inn-check-ru-mcp` (`packaging/inn-check-ru-mcp/`) — обёртка для реестра MCP:
+  кода нет, только исполняемый файл с именем пакета и зависимость
+  `inn-check-ru[mcp]==<та же версия>`.
+
+У каждого проекта на PyPI свой Trusted Publisher. Для `inn-check-ru-mcp`
+заводится второй pending publisher с теми же полями, кроме имени проекта:
+`inn-check-ru-mcp` / `ilyautov` / `inn-check-ru` / `publish-pypi.yml` /
+Environment пусто. Без него публикация обёртки падает с `invalid-publisher`.
+Движок при этом может уже уйти на PyPI; перезапуск workflow доливает
+недостающее (`skip-existing`).
 Пока PyPI не отдаст версию, `uvx --from inn-check-ru ...` и запись в реестре
 MCP не работают. Закрыть это — ручной шаг ниже, один раз.
 
@@ -97,9 +110,11 @@ GitHub Release → job `pypi` с `permissions: id-token: write` (OIDC) →
 
 Проверка после релиза:
 ```bash
-curl -fsS https://pypi.org/pypi/inn-check-ru/json | python3 -c "import json,sys; print(json.load(sys.stdin)['info']['version'])"
-uvx --from inn-check-ru inn-check-ru <ИНН>
-uvx --from "inn-check-ru[mcp]" inn-check-ru-mcp   # MCP-обёртка
+for p in inn-check-ru inn-check-ru-mcp; do
+  curl -fsS https://pypi.org/pypi/$p/json | python3 -c "import json,sys; print('$p', json.load(sys.stdin)['info']['version'])"
+done
+uvx inn-check-ru <ИНН>                                  # CLI
+python3 eval/mcp_handshake.py uvx inn-check-ru-mcp      # сервер: initialize + tools/list
 ```
 
 Типовые отказы ДО шага «Публикация»: `Unable to resolve action ...@<sha>,
@@ -117,7 +132,11 @@ exists` — эта версия уже загружена, поднять вер
 
 Манифест `server.json` в корне готов (description ≤ 100 символов, схема
 camelCase — оба подводных камня учтены и проверяются версионным гейтом).
-Публикация пока РУКАМИ, после того как PyPI отдаст версию:
+Публикация пока РУКАМИ, после того как PyPI отдаст ОБА пакета версии.
+Реестр проверяет две вещи, и обе сверяет `eval/run_version_gate.py`: у пакета
+из `server.json` есть исполняемый файл с тем же именем, и в его README стоит
+`mcp-name: io.github.ilyautov/inn-check-ru`. README этого пакета —
+`packaging/inn-check-ru-mcp/README.md`, а не корневой.
 
 ```bash
 brew install mcp-publisher   # или с релизов modelcontextprotocol/registry
@@ -140,8 +159,8 @@ GitHub не даёт API для загрузки Social preview (провере�
 ```bash
 # MCP-сервер из репозитория
 claude mcp add inn-check-ru -- python3 "$PWD/mcp/server.py"
-# или из PyPI (после публикации)
-claude mcp add inn-check-ru -- uvx --from "inn-check-ru[mcp]" inn-check-ru-mcp
+# или с PyPI
+claude mcp add inn-check-ru -- uvx inn-check-ru-mcp
 ```
 
 ## Homepage

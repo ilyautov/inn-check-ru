@@ -7,27 +7,29 @@
     "url": "https://github.com/ilyautov/inn-check-ru",
     "source": "github"
   },
-  "version": "1.11.0",
+  "version": "1.11.1",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
-      "identifier": "inn-check-ru",
-      "version": "1.11.0",
+      "identifier": "inn-check-ru-mcp",
+      "version": "1.11.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
       },
-      "packageArguments": [
+      "environmentVariables": [
         {
-          "type": "named",
-          "name": "--from",
-          "value": "inn-check-ru"
+          "name": "CHECKO_API_KEY",
+          "description": "Ключ checko.ru (бесплатный), нужен только графу связей; без него эти инструменты отвечают «не проверено»",
+          "isRequired": false,
+          "isSecret": true
         },
         {
-          "type": "positional",
-          "value": "inn-check-ru-mcp",
-          "valueHint": "inn-check-ru-mcp"
+          "name": "INN_CHECK_PROXY",
+          "description": "Свой http(s)-прокси с РФ-IP, например http://host:3128. Узел видит проверяемые ИНН — только своя нода",
+          "isRequired": false,
+          "isSecret": true
         }
       ]
     }

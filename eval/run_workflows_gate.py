@@ -14,7 +14,12 @@ run_workflows_gate.py — гейт рабочих процессов GitHub Acti
 2. каждый `python3 eval/...py` и `python3 scripts/...py` из шагов указывает
    на существующий файл — шаг, ссылающийся на переименованный скрипт,
    красит CI уже после пуша;
-3. у каждого шага есть либо `uses`, либо `run`.
+3. у каждого шага есть либо `uses`, либо `run`;
+4. в shell-коде шагов имена переменных — только ASCII. `есть=0` bash читает
+   не как присваивание, а как команду «есть=0», которой нет: шаг падает на
+   раннере, а локально этот код никто не гоняет. Дважды за 1.11.x я написал
+   так сам. Python внутри heredoc (`<<'PY'` … `PY`) не проверяется: там
+   русские имена законны.
 """
 
 import re
@@ -26,7 +31,40 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 
 RE_NAME = re.compile(r'^(\s*)- name:\s*(.*?)\s*$')
 RE_STEP = re.compile(r'^(\s*)- (name|uses|run):')
-RE_SCRIPT = re.compile(r'python3?\s+((?:eval|scripts|mcp)/[\w./-]+\.py)')
+# `python3 eval/x.py`, а также `python "$GITHUB_WORKSPACE/eval/x.py"` — шаги,
+# которые делают cd из checkout, зовут скрипт по абсолютному пути.
+RE_SCRIPT = re.compile(
+    r'python3?\s+"?(?:\$GITHUB_WORKSPACE/|\$\{\{\s*github\.workspace\s*\}\}/)?'
+    r'((?:eval|scripts|mcp)/[\w./-]+\.py)')
+# Начало heredoc: <<'PY', <<"EOF", <<-EOF, <<EOF (но не here-string <<<).
+RE_HEREDOC = re.compile(r"(?<!<)<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+# Присваивание, `for X in`, `read [-r] X` — места, где bash ждёт имя переменной.
+RE_ИМЯ_ПЕРЕМЕННОЙ = (
+    re.compile(r"^\s*(?:export\s+|local\s+|readonly\s+)?([^\W\d]\w*)=(?!=)"),
+    re.compile(r"\bfor\s+([^\W\d]\w*)\s+in\b"),
+    re.compile(r"\bread\s+(?:-\w+\s+)*([^\W\d]\w*)"),
+)
+
+
+def _не_ascii_переменные(text, имя_файла):
+    """Строки shell-кода, где имя переменной не ASCII. Heredoc пропускается."""
+    errors, конец_heredoc = [], None
+    for n, line in enumerate(text.splitlines(), 1):
+        if конец_heredoc is not None:
+            if line.strip() == конец_heredoc:
+                конец_heredoc = None
+            continue
+        for rx in RE_ИМЯ_ПЕРЕМЕННОЙ:
+            for имя in rx.findall(line):
+                if not имя.isascii():
+                    errors.append(
+                        "%s:%d — имя переменной не ASCII: %r\n"
+                        "      bash прочтёт `%s=…` как команду, шаг упадёт на раннере"
+                        % (имя_файла, n, имя, имя))
+        m = RE_HEREDOC.search(line)
+        if m:
+            конец_heredoc = m.group(1)
+    return errors
 
 
 def проверить(path):
@@ -74,6 +112,7 @@ def проверить(path):
             if not (ROOT / скрипт).exists():
                 errors.append("%s:%d — шаг зовёт %s, а такого файла нет"
                               % (имя_файла, n, скрипт))
+    errors += _не_ascii_переменные(text, имя_файла)
     return errors
 
 

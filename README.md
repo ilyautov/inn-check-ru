@@ -5,7 +5,7 @@
 > **Не отгружай в долг вслепую.** Открытый AI-скилл, который по одному ИНН собирает открытые реестры (ЕГРЮЛ, ФССП, суды, банкротства, финансы) и выдаёт **светофор риска 🟢/🟡/🔴** с рекомендацией: отсрочка, только предоплата или избегать. Для Claude Code, Cursor, Codex, ChatGPT и Gemini. Бесплатно, Apache-2.0, данные — из настоящих реестров, а не из головы модели.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.11.0-blueviolet)](CHANGELOG.md)
+[![Версия](https://img.shields.io/badge/версия-1.11.1-blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/inn-check-ru?style=social)](https://github.com/ilyautov/inn-check-ru/stargazers)
 [![skills.sh](https://skills.sh/b/ilyautov/inn-check-ru)](https://skills.sh/ilyautov/inn-check-ru/inn-check-ru)
 
@@ -147,7 +147,7 @@ cd inn-check-ru && python3 scripts/build_release_zip.py
 Один движок (`scripts/`, чистый stdlib), две обёртки:
 
 - **Скилл (`SKILL.md` + `references/`)** — методология для агента: двухскоростной флоу, каскад источников, светофор, мониторинг. Основной файл читается целиком при каждом запуске, справочное лежит рядом и открывается по поводу. Когда проверка — часть живого разговора («проверь этого поставщика перед предоплатой»).
-- **MCP-сервер (`mcp/`)** — те же скрипты как 14 read-only инструментов MCP-сессии. Когда проверка — шаг в цепочке инструментов: счёт из diadoc-mcp-ru → `counterparty_fetch` до подписи. Tier-маркеры и «не проверено» проезжают в ответах как есть. Установка и конфиги: [mcp/README.md](mcp/README.md).
+- **MCP-сервер (`mcp/`)** — те же скрипты как 14 read-only инструментов MCP-сессии. Когда проверка — шаг в цепочке инструментов: счёт из diadoc-mcp-ru → `counterparty_fetch` до подписи. Tier-маркеры и «не проверено» проезжают в ответах как есть. Одной командой с PyPI: `claude mcp add inn-check-ru -- uvx inn-check-ru-mcp`; остальные конфиги — [mcp/README.md](mcp/README.md).
 
 ## Чем отличается от Контур.Фокуса, Checko и других сервисов
 
