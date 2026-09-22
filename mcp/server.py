@@ -150,6 +150,20 @@ def counterparty_diff(inn: str) -> dict:
 
 
 @mcp_server.tool()
+def retro_verdict(inn: str, date: str, profile: str = "") -> dict:
+    """Вердикт на дату в ПРОШЛОМ по снимку, сохранённому тогда: чем доказывают
+    должную осмотрительность — тем, что было видно ДО сделки, а не сегодняшней
+    карточкой. Снимок новее запрошенной даты не берётся, недостающее из сети не
+    добирается, «источник не сохранён» не превращается в «признака не было».
+    Без снимков на дату — честный отказ, а не сегодняшние данные задним числом.
+
+    Retrospective verdict as of a past date, computed from the snapshot stored
+    back then: never uses data newer than the requested date, never refetches.
+    """
+    return tools_impl.retro_verdict(inn, date, profile)
+
+
+@mcp_server.tool()
 def counterparty_verdict(inn: str, profile: str = "нейтрально") -> dict:
     """Вердикт по контрагенту одной командой: сбор + финансы + резолвер профиля
     цели. Возвращает светофор 🟢/🟡/🔴 (или null, если проверка НЕ состоялась),

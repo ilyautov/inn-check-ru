@@ -59,6 +59,7 @@ py-modules = [
   "watchlist",
   "opendata_refresh",
   "opendata_index",
+  "retro_verdict",
   "benchmarks",
   "paper_vat",
   "dossier",

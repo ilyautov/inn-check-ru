@@ -42,6 +42,7 @@ EXPECTED_TOOLS = (
     "paper_vat_signs",
     "due_diligence_dossier",
     "extract_inns",
+    "retro_verdict",
 )
 
 # Батч: 3 ИНН собираются одновременно (batch_check.py), волна ~15 с в quick-режиме.
@@ -183,6 +184,18 @@ def counterparty_diff(inn):
     if inn is None:
         return _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
     return run_script("diff_counterparty.py", [inn])
+
+
+@_guarded
+def retro_verdict(inn, date, profile=""):
+    """Вердикт на дату в прошлом по сохранённому тогда снимку."""
+    inn = _valid_inn(inn)
+    if inn is None:
+        return _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
+    args = [inn, "--дата", str(date or "")]
+    if profile:
+        args += ["--профиль", profile]
+    return run_script("retro_verdict.py", args)
 
 
 def _batch_timeout(n):
