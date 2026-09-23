@@ -29,9 +29,11 @@ pending publisher на PyPI, первая публикация в реестр M
 
 ## PyPI: пакет `inn-check-ru` (Trusted Publishing, разовая настройка)
 
-Состояние на 23.09.2026: **опубликовано, `inn-check-ru` 1.11.0 на PyPI**
-(колесо + sdist, Trusted Publishing, токена в секретах нет). Проверено
-установкой из чистого venv: CLI отвечает, канон и модуль `proxy` на месте.
+Состояние на 23.09.2026: **опубликованы оба пакета 1.11.1** — `inn-check-ru`
+и `inn-check-ru-mcp` (колесо + sdist, Trusted Publishing, токена в секретах нет).
+Проверено: CLI из чистого venv отвечает, канон и `proxy` на месте;
+`python3 eval/mcp_handshake.py uvx inn-check-ru-mcp==1.11.1` с живого PyPI —
+initialize + 14 инструментов.
 
 До этого пакет не публиковался ни разу, и причин было ТРИ — каждая следующая
 пряталась за предыдущей:
@@ -54,14 +56,20 @@ pending publisher на PyPI, первая публикация в реестр M
 У каждого проекта на PyPI свой Trusted Publisher. Для `inn-check-ru-mcp`
 заводится второй pending publisher с теми же полями, кроме имени проекта:
 `inn-check-ru-mcp` / `ilyautov` / `inn-check-ru` / `publish-pypi.yml` /
-Environment пусто. Без него публикация обёртки падает с `invalid-publisher`.
+Environment пусто. Без него публикация обёртки падает с
+`400 Non-user identities cannot create new projects`.
+
+**Где заводить.** Pending publisher для ЕЩЁ НЕ СУЩЕСТВУЮЩЕГО проекта — только на
+странице аккаунта: https://pypi.org/manage/account/publishing/ (форма
+«Add a new pending publisher», первое поле — PyPI Project Name). Страница
+проекта (`/manage/project/inn-check-ru/settings/publishing/`) выглядит почти
+так же, но поля с именем проекта в ней нет: всё, что там добавлено, привязано
+к `inn-check-ru`. На 23.09.2026 на этом потеряно три прогона.
 Движок при этом может уже уйти на PyPI; перезапуск workflow доливает
 недостающее (`skip-existing`).
-Пока PyPI не отдаст версию, `uvx --from inn-check-ru ...` и запись в реестре
-MCP не работают. Закрыть это — ручной шаг ниже, один раз.
 
 Как устроена публикация (`.github/workflows/publish-pypi.yml`):
-GitHub Release → job `pypi` с `permissions: id-token: write` (OIDC) →
+Пуш тега `v*` → job `pypi` с `permissions: id-token: write` (OIDC) →
 проверка «тег = версия pyproject» → «версия ещё не на PyPI» → `python -m build`
 → гейт «колесо содержит canon и CLI работает из чистого venv» →
 `pypa/gh-action-pypi-publish` (Trusted Publishing, без токена в секретах).
@@ -132,7 +140,13 @@ exists` — эта версия уже загружена, поднять вер
 
 Манифест `server.json` в корне готов (description ≤ 100 символов, схема
 camelCase — оба подводных камня учтены и проверяются версионным гейтом).
-Публикация пока РУКАМИ, после того как PyPI отдаст ОБА пакета версии.
+Состояние на 23.09.2026: **опубликовано**, `io.github.ilyautov/inn-check-ru`
+1.11.1, пакет `inn-check-ru-mcp`.
+
+Публикация пока РУКАМИ, после того как PyPI отдаст ОБА пакета версии
+(первые минуты после загрузки CDN PyPI может ещё отвечать 404 — подождать).
+JWT реестра живёт недолго: `401 token is expired` лечится повторным
+`mcp-publisher login github`.
 Реестр проверяет две вещи, и обе сверяет `eval/run_version_gate.py`: у пакета
 из `server.json` есть исполняемый файл с тем же именем, и в его README стоит
 `mcp-name: io.github.ilyautov/inn-check-ru`. README этого пакета —
