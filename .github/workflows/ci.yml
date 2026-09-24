@@ -147,6 +147,13 @@ jobs:
             uvx --no-cache --find-links "$RUNNER_TEMP/whl" --find-links "$RUNNER_TEMP/whl-mcp" \
             "inn-check-ru-mcp==$V"
 
+      # Docker MCP Registry собирает образ из Dockerfile и проверяет tools/list —
+      # тот же путь здесь: сломанный образ всплыл бы только в их CI.
+      - name: "Docker-образ поднимает MCP-сервер (путь Docker MCP Registry)"
+        run: |
+          docker build -t inn-check-ru-mcp:ci .
+          python3 eval/mcp_handshake.py docker run -i --rm inn-check-ru-mcp:ci
+
       - name: "отраслевые нормы: агрегация и порог публикации (офлайн)"
         run: python3 eval/run_benchmarks_eval.py
 

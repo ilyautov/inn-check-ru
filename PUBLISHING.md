@@ -162,6 +162,23 @@ mcp-publisher publish        # из корня репозитория
 Автоматизация по паттерну publish-registry.yml из marketplaces-mcp-ru
 (OIDC + ожидание PyPI) — следующий шаг, когда пакет стабилизируется на PyPI.
 
+## Каталоги (состояние на 24.09.2026)
+
+| каталог | состояние |
+|---|---|
+| официальный реестр MCP | опубликован, `io.github.ilyautov/inn-check-ru` |
+| Glama | страница есть, оценка A, владение подтверждено |
+| punkpeye/awesome-mcp-servers | PR #15020 (Legal) |
+| ComposioHQ/awesome-claude-skills | PR #1985 (Business & Marketing) |
+| Chat2AnyLLM/awesome-claude-skills | в каталоге автоматически |
+| skills.sh | есть |
+| Docker MCP Registry | `Dockerfile` в корне, образ проверяется в CI; PR в docker/mcp-registry — после зелёного CI |
+| travisvn/awesome-claude-skills | позже: закрывает PR скиллов меньше 10 звёзд и PR, поданные с помощью ИИ, — подавать руками |
+| VoltAgent/awesome-agent-skills | позже: не берёт скиллы без сложившегося сообщества |
+| mcp.so | **нет**: размещение платное |
+| Smithery | **нет, сознательно**: требует HTTP-сервер у них в облаке — каждый проверяемый ИНН шёл бы через чужую инфраструктуру (тот же «узел в середине», что отвергнут в роадмапе §11), а из облака вне РФ половина источников отвечала бы «не проверено» |
+| PulseMCP | подтягивает официальный реестр сам; страница закрыта Cloudflare, проверить не удалось |
+
 ## Social preview репозитория (ручной шаг)
 
 GitHub не даёт API для загрузки Social preview (проверено 19.09.2026).
