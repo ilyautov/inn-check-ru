@@ -18,7 +18,7 @@ jobs:
       - name: ruff
         run: |
           pip install ruff
-          ruff check scripts/ eval/ mcp/
+          ruff check scripts/ eval/ mcp/ calibration/
 
       - name: skill frontmatter is valid YAML
         run: |
@@ -171,6 +171,9 @@ jobs:
 
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
+
+      - name: "калибровка порогов: разметка, веса, без утечки будущего (офлайн)"
+        run: python3 eval/run_calibration_eval.py
 
       - name: mcp server smoke test
         run: |
