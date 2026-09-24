@@ -5,7 +5,7 @@
 > **Не отгружай в долг вслепую.** Открытый AI-скилл, который по одному ИНН собирает открытые реестры (ЕГРЮЛ, ФССП, суды, банкротства, финансы) и выдаёт **светофор риска 🟢/🟡/🔴** с рекомендацией: отсрочка, только предоплата или избегать. Для Claude Code, Cursor, Codex, ChatGPT и Gemini. Бесплатно, Apache-2.0, данные — из настоящих реестров, а не из головы модели.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.11.1-blueviolet)](CHANGELOG.md)
+[![Версия](https://img.shields.io/badge/версия-1.12.0-blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/inn-check-ru?style=social)](https://github.com/ilyautov/inn-check-ru/stargazers)
 [![skills.sh](https://skills.sh/b/ilyautov/inn-check-ru)](https://skills.sh/ilyautov/inn-check-ru/inn-check-ru)
 

@@ -1,6 +1,6 @@
 {
   "name": "inn-check-ru",
-  "version": "1.11.1",
+  "version": "1.12.0",
   "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом, мониторинг снимками. | Counterparty due-diligence by Russian INN over open registries, code-computed risk flags.",
   "author": {
     "name": "Ilya Utov",
