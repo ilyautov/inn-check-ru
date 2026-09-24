@@ -29,10 +29,10 @@ pending publisher на PyPI, первая публикация в реестр M
 
 ## PyPI: пакет `inn-check-ru` (Trusted Publishing, разовая настройка)
 
-Состояние на 23.09.2026: **опубликованы оба пакета 1.11.1** — `inn-check-ru`
+Состояние на 24.09.2026: **опубликованы оба пакета 1.12.0** — `inn-check-ru`
 и `inn-check-ru-mcp` (колесо + sdist, Trusted Publishing, токена в секретах нет).
 Проверено: CLI из чистого venv отвечает, канон и `proxy` на месте;
-`python3 eval/mcp_handshake.py uvx inn-check-ru-mcp==1.11.1` с живого PyPI —
+`python3 eval/mcp_handshake.py uvx inn-check-ru-mcp==<версия>` с живого PyPI —
 initialize + 14 инструментов.
 
 До этого пакет не публиковался ни разу, и причин было ТРИ — каждая следующая
@@ -140,27 +140,26 @@ exists` — эта версия уже загружена, поднять вер
 
 Манифест `server.json` в корне готов (description ≤ 100 символов, схема
 camelCase — оба подводных камня учтены и проверяются версионным гейтом).
-Состояние на 23.09.2026: **опубликовано**, `io.github.ilyautov/inn-check-ru`
-1.11.1, пакет `inn-check-ru-mcp`.
+Состояние на 24.09.2026: **опубликовано**, `io.github.ilyautov/inn-check-ru`
+1.12.0, пакет `inn-check-ru-mcp`.
 
-Публикация пока РУКАМИ, после того как PyPI отдаст ОБА пакета версии
-(первые минуты после загрузки CDN PyPI может ещё отвечать 404 — подождать).
-JWT реестра живёт недолго: `401 token is expired` лечится повторным
-`mcp-publisher login github`.
+Публикация — `.github/workflows/publish-registry.yml`, сама после успешного
+«Publish to PyPI» (тег `v*`): вход `mcp-publisher login github-oidc` (имя
+`io.github.ilyautov/*` подтверждает сам репозиторий, токена в секретах нет),
+ожидание, пока PyPI отдаст ОБА пакета версии, затем `publish`. `mcp-publisher`
+закреплён версией и sha256. Упал реестр при готовом PyPI — ручной запуск:
+`gh workflow run publish-registry.yml`.
+
 Реестр проверяет две вещи, и обе сверяет `eval/run_version_gate.py`: у пакета
 из `server.json` есть исполняемый файл с тем же именем, и в его README стоит
 `mcp-name: io.github.ilyautov/inn-check-ru`. README этого пакета —
 `packaging/inn-check-ru-mcp/README.md`, а не корневой.
 
-```bash
-brew install mcp-publisher   # или с релизов modelcontextprotocol/registry
-mcp-publisher login github
-mcp-publisher publish        # из корня репозитория
-```
+Руками (запасной путь): `mcp-publisher login github` (device-код живёт 15
+минут; `401 token is expired` лечится повторным входом), затем
+`mcp-publisher publish` из корня репозитория.
 
 Проверка: `curl -s "https://registry.modelcontextprotocol.io/v0.1/servers?search=inn-check-ru"`.
-Автоматизация по паттерну publish-registry.yml из marketplaces-mcp-ru
-(OIDC + ожидание PyPI) — следующий шаг, когда пакет стабилизируется на PyPI.
 
 ## Каталоги (состояние на 24.09.2026)
 
@@ -172,7 +171,7 @@ mcp-publisher publish        # из корня репозитория
 | ComposioHQ/awesome-claude-skills | PR #1985 (Business & Marketing) |
 | Chat2AnyLLM/awesome-claude-skills | в каталоге автоматически |
 | skills.sh | есть |
-| Docker MCP Registry | `Dockerfile` в корне, образ проверяется в CI; PR в docker/mcp-registry — после зелёного CI |
+| Docker MCP Registry | `Dockerfile` в корне, образ проверяется в CI; PR docker/mcp-registry #5223 (`servers/inn-check-ru/server.yaml`, `source.commit` — коммит релиза: после каждого релиза его надо поднимать) |
 | travisvn/awesome-claude-skills | позже: закрывает PR скиллов меньше 10 звёзд и PR, поданные с помощью ИИ, — подавать руками |
 | VoltAgent/awesome-agent-skills | позже: не берёт скиллы без сложившегося сообщества |
 | mcp.so | **нет**: размещение платное |
