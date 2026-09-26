@@ -228,7 +228,9 @@ def _истина(v):
 
 def _состояние_блока(fetch, block):
     """(состояние, причина, дата) блока по `_доступность` (словарь §1.1 или строка)
-    с поправкой «manual as truth»: блок со своим статусом «проверено» считается ok."""
+    с поправкой «manual as truth»: ручной блок (браузер или свой статус «проверено»)
+    считается ok только по контракту — заявлен проверенным, есть ISO-дата и URL;
+    своё «не проверено» у блока побеждает всегда."""
     av = (fetch.get("_доступность") or {}).get(block) if isinstance(fetch.get("_доступность"), dict) else None
     blk = fetch.get(block)
     state, reason, date = None, None, None
@@ -246,12 +248,48 @@ def _состояние_блока(fetch, block):
             state, reason = "не проверено", av
     if isinstance(blk, dict):
         own = str(blk.get("статус") or "").strip().lower()
-        if own in ("проверено", "ok", "ок", "собрано") and state != "ok":
-            state = "ok"
-            reason = reason or "по статусу блока (ручной ввод / браузер)"
-        elif own.startswith(("не проверено", "не собрано")):
+        заявлено = own in ("проверено", "ok", "ок", "собрано")
+        src = _sources()
+        браузерный = bool(src and (getattr(src, "SOURCES", {}).get(block) or {}).get("требует") == "браузер")
+        ручной = браузерный or "браузер" in (
+            str(blk.get("ввод") or ""), str(av.get("ввод") or "") if isinstance(av, dict) else "")
+        if own.startswith(("не проверено", "не собрано")) or (
+                own.startswith("проверено") and not заявлено):
+            # Честное «не проверено» блока — как и «проверено частично» —
+            # побеждает всё, включая ok скрипта, дату и URL.
             state = "не проверено"
-            reason = blk.get("причина") or blk.get("примечание") or reason or own
+            reason = blk.get("причина") or blk.get("примечание") or (
+                "статус блока «%s» — частичная проверка не засчитывается "
+                "(контракт: references/brauzer.md)" % own
+                if own.startswith("проверено") else reason or own)
+        elif ручной or (заявлено and state != "ok"):
+            # Ручной блок (браузер, со слов пользователя) принимается как проверенный,
+            # только если он заявлен проверенным и у него есть ISO-дата проверки и
+            # http(s)-URL, где смотрели (references/brauzer.md): иначе «проверено
+            # вручную» нельзя ни повторить, ни датировать. Контракт действует и при
+            # _доступность = ok: скрипт браузерный источник сам не собирает.
+            def _поле(имя):
+                return blk.get(имя) or (av.get(имя) if isinstance(av, dict) else None)
+            плохо = []
+            # Свой статус блока, если он есть, должен быть именно «проверено»:
+            # «проверено частично» и прочее не засчитывается даже при ok скрипта.
+            if not (заявлено or (not own and state in ("ok", "пусто"))):
+                плохо.append("статуса «проверено»")
+            дп = _поле("дата_проверки")
+            дп = дп.strip() if isinstance(дп, str) else ""
+            if not (re.fullmatch(r"\d{4}-\d{2}-\d{2}", дп) and _дата(дп)
+                    # +1 день: у пользователя на востоке РФ «сегодня» раньше, чем в UTC
+                    and _дата(дп) <= (datetime.datetime.now(datetime.timezone.utc)
+                                     + datetime.timedelta(days=1)).date()):
+                плохо.append("дата_проверки (ГГГГ-ММ-ДД, не в будущем)")
+            if not re.match(r"^https?://\S+\Z", str(_поле("url") or "")):
+                плохо.append("url (http/https)")
+            if плохо:
+                return ("не проверено", "ручной блок без %s — не принят как проверенный "
+                        "(контракт: references/brauzer.md)" % " и ".join(плохо), None)
+            if state != "пусто":
+                state = "ok"
+            reason = reason or "по статусу блока (ручной ввод / браузер)"
         date = date or blk.get("дата") or blk.get("дата_проверки")
     if state not in ("ok", "пусто", "не проверено"):
         state = "не проверено"
