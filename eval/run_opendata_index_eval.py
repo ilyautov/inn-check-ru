@@ -443,6 +443,63 @@ def case_размер_записи(tmpdir):
     return errors
 
 
+def case_недоимка(tmpdir):
+    """debtam/taxoffence: значения из живой выгрузки (сверены с XML фикстуры) и
+    проводка в fetch — сигнал только при записи с суммой > 0."""
+    errors = []
+    собрать(tmpdir, "debtam")
+    собрать(tmpdir, "taxoffence")
+    д = oi.найти("2723219327", "debtam", tmpdir)
+    check(errors, д["состояние"] == oi.ОК, "debtam: %r" % д.get("состояние"))
+    check(errors, д.get("недоимка_всего_руб") == 777326.34 and д.get("пени_руб") == 10744.13
+          and д.get("штрафы_руб") == 1000.0 and д.get("на_дату") == "01.09.2026",
+          "debtam прочитан неверно: %r" % д)
+    т = oi.найти("7707477834", "taxoffence", tmpdir)
+    check(errors, т.get("штрафы_руб") == 34082.0 and т.get("год") == 2024,
+          "taxoffence прочитан неверно: %r" % т)
+
+    # taxoffence лежит на data.nalog.ru: резолвер берёт хост со страницы, а
+    # чужой хост не принимает (разметка страницы снята живьём 26.09.2026).
+    od = oi.od
+    страница = ('<a href="https://data.nalog.ru/opendata/7707329152-taxoffence/'
+                'data-20251201-structure-20191201.zip">данные</a>'
+                '<a href="https://evil.example/opendata/7707329152-taxoffence/'
+                'data-20261201-structure-20191201.zip">x</a>')
+    url = od.выбрать_ссылку(страница, "taxoffence")[0]
+    check(errors, url == "https://data.nalog.ru/opendata/7707329152-taxoffence/"
+                         "data-20251201-structure-20191201.zip",
+          "резолвер taxoffence: %r" % url)
+
+    import fetch_counterparty as fc  # проводка в движок
+    сохранено = fc._load_sibling
+
+    class Фейк:
+        def __init__(self, ответ):
+            self.ответ = ответ
+
+        def найти_всё(self, инн):
+            return self.ответ
+    try:
+        fc._load_sibling = lambda имя: Фейк({"debtam": д, "taxoffence": т})
+        данные, av = fc.fetch_opendata_dumps(None, "2723219327")
+        check(errors, "777326.34" in str((данные or {}).get("налоговая_задолженность"))
+              and "01.09.2026" in str(данные.get("налоговая_задолженность")),
+              "сигнал недоимки без суммы и даты: %r" % (данные or {}).get("налоговая_задолженность"))
+        пусто = dict(д, состояние=oi.ПУСТО)
+        fc._load_sibling = lambda имя: Фейк({"debtam": пусто, "taxoffence": т})
+        данные, _ = fc.fetch_opendata_dumps(None, "2723219327")
+        check(errors, "налоговая_задолженность" not in (данные or {}),
+              "«нет записи в debtam» превратилось в значение сигнала: %r" % данные)
+        ноль = dict(д, недоимка_всего_руб=0.0)
+        fc._load_sibling = lambda имя: Фейк({"debtam": ноль})
+        данные, _ = fc.fetch_opendata_dumps(None, "2723219327")
+        check(errors, "налоговая_задолженность" not in (данные or {}),
+              "нулевая недоимка подняла сигнал: %r" % данные)
+    finally:
+        fc._load_sibling = сохранено
+    return errors
+
+
 КЕЙСЫ = [
     ("сборка трёх индексов", case_сборка),
     ("ИНН с ведущим нулём не теряется", case_ведущий_ноль),
@@ -460,6 +517,8 @@ def case_размер_записи(tmpdir):
     ("--статус различает построенный и отсутствующий", case_статус),
     ("CLI: коды возврата без traceback", case_cli),
     ("размер записи сходится с файлом", case_размер_записи),
+    ("недоимка и штрафы: суммы, дата, «нет записи» не равно «долга нет»",
+     case_недоимка),
 ]
 
 
