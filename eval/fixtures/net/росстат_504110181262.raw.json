@@ -1,0 +1,63 @@
+[
+ {
+  "id": "87917764",
+  "type": 4.0,
+  "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+  "short_name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+  "okpo_ul": "2051051020",
+  "okpo": "2051051020",
+  "date_reg": "2026-04-07",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": null,
+  "update_type": 3.0,
+  "record_comment": null,
+  "inn": "504110181262",
+  "ogrn": "326508100214173",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 12006.0,
+   "code": "46464000000",
+   "name": "Реутов",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 112537.0,
+   "code": "46764000001",
+   "name": "г Реутов",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 12006.0,
+   "code": "46464000000",
+   "name": "Реутов",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 112537.0,
+   "code": "46764000001",
+   "name": "г Реутов",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 90.0,
+   "code": "50102",
+   "name": "Индивидуальные предприниматели",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 259.0,
+   "code": "4210015",
+   "name": "Индивидуальные предприниматели",
+   "parent_id": null
+  }
+ }
+]

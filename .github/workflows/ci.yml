@@ -94,6 +94,12 @@ jobs:
       - name: "санкционные перечни: парсер и сверка (офлайн)"
         run: python3 eval/run_sanctions_eval.py
 
+      - name: "список ЦБ (warning-list): разбор, кэш, сигнал (офлайн)"
+        run: python3 eval/run_cbr_warning_eval.py
+
+      - name: "--офлайн: ни одного сетевого вызова (audit-хук)"
+        run: python3 eval/run_offline_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |
@@ -123,6 +129,7 @@ jobs:
           assert "ндс_вычет" in sources.PROFILE_IDS, sources.PROFILE_IDS
           import dossier, extract_inn, opendata_index, opendata_refresh, paper_vat  # noqa: F401
           import retro_verdict  # noqa: F401
+          import cbr_warning  # noqa: F401 — fetch_counterparty грузит его рядом
           print("модули волны 3 импортируются из колеса")
           # check_access делает `import proxy`: забудь модуль в py-modules —
           # и установленный пакет падает на probe, хотя из репозитория работает.

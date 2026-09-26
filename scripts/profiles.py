@@ -471,7 +471,13 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
                 найден = (block, date, _значение(fetch_json, path))
                 break
             if v is False:
-                отсутствует.append((block, date))
+                # Оговорка источника к «нет» (список ЦБ: ИНН есть лишь у части
+                # записей) — видна в факте. Текст — из реестра, а не из причины
+                # прогона: в снимке причины нет, и ретро потеряло бы оговорку.
+                оговорка = ((getattr(sources, "SOURCES", {}).get(block) or {})
+                            .get("пусто_с_оговоркой") if state == "пусто" and
+                            sources is not None else None) or None
+                отсутствует.append((block, date, оговорка))
             elif state == "ok":
                 причины.append("%s: поле %s не отдано (null внутри ok-блока)" % (block, path.split(".", 1)[-1]))
         if найден:
@@ -479,9 +485,11 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
             rec.update(статус="найден", источник_id=block, источник=_имя_источника(block, sources),
                        дата=date, значение=val if not isinstance(val, dict) else json.dumps(val, ensure_ascii=False)[:200])
         elif отсутствует:
-            block, date = отсутствует[0]
+            block, date, оговорка = отсутствует[0]
             rec.update(статус="отсутствует", источник_id=block,
                        источник=_имя_источника(block, sources), дата=date)
+            if оговорка:
+                rec["оговорка"] = оговорка
             if причины:
                 rec["причина"] = "частично: " + "; ".join(dict.fromkeys(причины))
         else:
@@ -526,6 +534,8 @@ def _факт(rec):
         # «нет» по одному пути, а другие пути промолчали (например, усечённая выдача
         # Федресурса): отсутствие не доказано всеми путями — видно, каким не доказано.
         факт["неполно"] = rec["причина"]
+    if st == "отсутствует" and rec.get("оговорка"):
+        факт["оговорка"] = rec["оговорка"]
     return факт
 
 

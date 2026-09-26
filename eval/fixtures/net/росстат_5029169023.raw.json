@@ -1,0 +1,307 @@
+[
+ {
+  "id": "724501",
+  "type": 1.0,
+  "name": "ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО \"ЕВРОТРАНС\"",
+  "short_name": "ПАО \"ЕВРОТРАНС\"",
+  "okpo_ul": "18198528",
+  "okpo": "18198528",
+  "date_reg": "2012-12-13",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": "18198528460001",
+  "update_type": 2.0,
+  "record_comment": null,
+  "inn": "5029169023",
+  "ogrn": "1125029011117",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 13.0,
+   "code": "12247",
+   "name": "Публичные акционерные общества",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 153.0,
+   "code": "4210014",
+   "name": "Организации, учрежденные юридическими лицами или гражданами, или юридическими лицами и гражданами совместно",
+   "parent_id": null
+  }
+ },
+ {
+  "id": "84457140",
+  "type": 3.0,
+  "name": "Головное подразделение ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО \"ЕВРОТРАНС\"",
+  "short_name": "ПАО \"ЕВРОТРАНС\"",
+  "okpo_ul": "18198528",
+  "okpo": "18198528460001",
+  "date_reg": "2012-12-13",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": "18198528460001",
+  "update_type": 2.0,
+  "record_comment": null,
+  "inn": "5029169023",
+  "ogrn": "1125029011117",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 33.0,
+   "code": "30004",
+   "name": "Структурные подразделения обособленных подразделений юридических лиц",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 153.0,
+   "code": "4210014",
+   "name": "Организации, учрежденные юридическими лицами или гражданами, или юридическими лицами и гражданами совместно",
+   "parent_id": null
+  }
+ },
+ {
+  "id": "84457139",
+  "type": 3.0,
+  "name": "Территориально обособленное структурное подразделение АЗС 25  ПУБЛИЧНОГО АКЦИОНЕРНОГО  ОБЩЕСТВА \"ЕВРОТРАНС\"",
+  "short_name": "ТОСП  АЗС 25 ПАО «ЕВРОТРАНС»",
+  "okpo_ul": "18198528",
+  "okpo": "18198528460002",
+  "date_reg": "2012-12-13",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": "18198528460002",
+  "update_type": 2.0,
+  "record_comment": null,
+  "inn": "5029169023",
+  "ogrn": "1125029011117",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 197182.0,
+   "code": "46404000000",
+   "name": "Балашиха",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 112340.0,
+   "code": "46704000001",
+   "name": "г Балашиха",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 33.0,
+   "code": "30004",
+   "name": "Структурные подразделения обособленных подразделений юридических лиц",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 153.0,
+   "code": "4210014",
+   "name": "Организации, учрежденные юридическими лицами или гражданами, или юридическими лицами и гражданами совместно",
+   "parent_id": null
+  }
+ },
+ {
+  "id": "86501056",
+  "type": 3.0,
+  "name": "Территориально обособленное структурное подразделение ПУБЛИЧНОГО АКЦИОНЕРНОГО ОБЩЕСТВА \"ЕВРОТРАНС\" для С-1",
+  "short_name": "ТОСП ПАО \"ЕВРОТРАНС\" для С-1",
+  "okpo_ul": "18198528",
+  "okpo": "18198528460003",
+  "date_reg": "2012-12-13",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": "18198528460003",
+  "update_type": 2.0,
+  "record_comment": null,
+  "inn": "5029169023",
+  "ogrn": "1125029011117",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 613920.0,
+   "code": "46455511000",
+   "name": "Звенигород",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 677542.0,
+   "code": "46755000011",
+   "name": "г Звенигород",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 33.0,
+   "code": "30004",
+   "name": "Структурные подразделения обособленных подразделений юридических лиц",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 153.0,
+   "code": "4210014",
+   "name": "Организации, учрежденные юридическими лицами или гражданами, или юридическими лицами и гражданами совместно",
+   "parent_id": null
+  }
+ },
+ {
+  "id": "87705216",
+  "type": 3.0,
+  "name": "Территориально обособленное структурное подразделение ПУБЛИЧНОГО АКЦИОНЕРНОГО ОБЩЕСТВА \"ЕВРОТРАНС\"  для С-1",
+  "short_name": "ТОСП ПАО \"ЕВРОТРАНС\" для С-1",
+  "okpo_ul": "18198528",
+  "okpo": "18198528460004",
+  "date_reg": "2012-12-13",
+  "reg_resolution_authority": null,
+  "reg_resolution_date": null,
+  "reg_resolution_num": null,
+  "tosp_id": "18198528460004",
+  "update_type": 2.0,
+  "record_comment": null,
+  "inn": "5029169023",
+  "ogrn": "1125029011117",
+  "address_fact": null,
+  "okato_reg": {
+   "id": 277005.0,
+   "code": "46446000016",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "oktmo_reg": {
+   "id": 217085.0,
+   "code": "46746000116",
+   "name": "д Афанасово",
+   "parent_id": null
+  },
+  "okato_fact": {
+   "id": 215577.0,
+   "code": "46451000000",
+   "name": "Ногинск",
+   "parent_id": null
+  },
+  "oktmo_fact": {
+   "id": 672816.0,
+   "code": "46751000001",
+   "name": "г Ногинск",
+   "parent_id": null
+  },
+  "okved2_fact": null,
+  "okopf": {
+   "id": 33.0,
+   "code": "30004",
+   "name": "Структурные подразделения обособленных подразделений юридических лиц",
+   "parent_id": null
+  },
+  "okfs": {
+   "id": 12.0,
+   "code": "16",
+   "name": "Частная собственность",
+   "parent_id": null
+  },
+  "okogu": {
+   "id": 153.0,
+   "code": "4210014",
+   "name": "Организации, учрежденные юридическими лицами или гражданами, или юридическими лицами и гражданами совместно",
+   "parent_id": null
+  }
+ }
+]

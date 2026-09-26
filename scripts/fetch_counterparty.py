@@ -317,7 +317,7 @@ def _http_status_reason(status, step=""):
 # Двухсловные («не покрыто:», «ранний выход:») тоже полноценные префиксы, поэтому
 # проверка идёт по списку, а не по «первому слову с двоеточием».
 ПРЕФИКСЫ_ПРИЧИН = ("сеть:", "tls:", "гео:", "капча:", "антибот:", "дедлайн:", "схема:",
-                   "не покрыто:", "профиль:", "probe:", "режим:", "ранний выход:")
+                   "не покрыто:", "профиль:", "probe:", "режим:", "ранний выход:", "кэш:")
 
 
 def _есть_префикс(s):
@@ -1442,6 +1442,37 @@ def fetch_opendata_dumps(opener, inn):
     return _not_checked("дампы_фнс", причины or "кэш: индексы дампов недоступны")
 
 
+def fetch_cbr_warning(opener, inn):
+    """Список ЦБ с признаками нелегальной деятельности на финрынке — по кэшу
+    выгрузки (cbr_warning.py --refresh). Сеть не дёргается: ИНН в ЦБ не уходит.
+
+    Совпало — ok; не совпало — «пусто» с оговоркой о покрытии (ИНН есть лишь у
+    части записей); совпало только с записью-клоном (ЦБ: «использует данные
+    легального участника») — данные остаются, но состояние «не проверено»: это
+    не признак против владельца ИНН, а повод проверить, с кем имеете дело.
+    """
+    try:
+        cw = _load_sibling("cbr_warning")
+    except Exception:
+        return _not_checked("список_цб", "не покрыто: cbr_warning.py не найден рядом "
+                                         "со скриптом")
+    try:
+        рез, причина = cw.lookup(inn)
+    except Exception as e:
+        return _not_checked("список_цб", "схема: сбой сверки по кэшу (%s)" % type(e).__name__)
+    if рез is None:
+        return _not_checked("список_цб", причина)
+    if рез["в_списке"] is False:
+        # Без даты выгрузки и счётчиков: причина входит в хеш снимка, и каждое
+        # обновление кэша давало бы в диффе «изменилось что-то вне отслеживаемого».
+        return None, _av("список_цб", "пусто", "совпадения по ИНН нет; "
+                         + SOURCES["список_цб"]["пусто_с_оговоркой"])
+    if рез["в_списке"] is None:
+        return рез, _av("список_цб", "не проверено",
+                        "не покрыто: " + рез.get("формулировка", "совпадение только с клоном"))
+    return рез, _av("список_цб", "ok")
+
+
 def fetch_sanctions(opener, inn):
     """«санкции» отражает готовность sanctions_check.py: fetch сверку НЕ запускает
     (нужны ФИО/наименование), а смотрит mtime кэшей перечней (§1.3). Все перечни
@@ -1629,6 +1660,110 @@ def fetch_bankrupt(opener, inn):
         return _not_checked("банкротство", "не покрыто: поиск ИП в ЕФРСБ скриптом не "
                                            "поддержан — проверьте вручную (%s)" % ЕФРСБ)
     return parse_bankrupt(raw_bankrupt(opener, inn), inn)
+
+
+РОССТАТ = "https://websbor.rosstat.gov.ru/webstat/api/gs/organizations"
+# Коды «type» в ответе websbor — сняты с живых ответов 26.09.2026: 1 — юрлицо,
+# 4 — ИП (головные записи); 2 — филиал/представительство (свой ОКПО, в названии
+# «филиал», «дополнительный офис»); 3 — территориально обособленное структурное
+# подразделение (ТОСП, в т.ч. «Головное подразделение» самой организации).
+# Прочие коды (живьём видели 8) показываются как есть, без толкования.
+РОССТАТ_ГОЛОВНЫЕ = {1: "юрлицо", 4: "ип"}
+РОССТАТ_ТИПЫ = {2: "филиалы_и_представительства", 3: "обособленные_подразделения"}
+
+
+def _rec_rosstat(raw, inn):
+    for r in raw if isinstance(raw, list) else []:
+        if isinstance(r, dict) and r.get("type") in РОССТАТ_ГОЛОВНЫЕ \
+                and str(r.get("inn") or "").strip() == str(inn):
+            return r
+    return None
+
+
+def _справочник(v):
+    """{code, name} справочника websbor -> {код, наименование} или None."""
+    if isinstance(v, dict) and (v.get("code") or v.get("name")):
+        return {"код": v.get("code"), "наименование": v.get("name")}
+    return None
+
+
+def parse_rosstat(raw, inn):
+    """Список записей статрегистра Росстата по ИНН -> блок «росстат» (факт, без цвета).
+
+    Головная запись (юрлицо/ИП) — ровно одна и с этим ИНН; остальные строки —
+    подразделения той же организации. Пустой список — «пусто»: websbor не отдаёт
+    и ликвидированные организации (проверено на 0276944817), поэтому это «записи
+    в статрегистре нет», а не «организации не существует».
+    """
+    if not isinstance(raw, list) or not all(isinstance(r, dict) for r in raw):
+        return _not_checked("росстат", "схема: ответ не список объектов")
+    if not raw:
+        return None, _av("росстат", "пусто",
+                         "в статрегистре Росстата записи по ИНН нет (ликвидированные "
+                         "websbor не отдаёт)")
+    if any(not isinstance(r.get("inn"), str) or not r["inn"].strip() for r in raw):
+        return _not_checked("росстат", "схема: не найдено поле inn в записи выдачи")
+    if any(r["inn"].strip() != str(inn) for r in raw):
+        return _not_checked("росстат", "схема: в выдаче записи с другим ИНН")
+    if any(not isinstance(r.get("type"), (int, float)) or isinstance(r.get("type"), bool)
+           for r in raw):
+        return _not_checked("росстат", "схема: поле type не число")
+    головные = [r for r in raw if r["type"] in РОССТАТ_ГОЛОВНЫЕ]
+    if len(головные) != 1:
+        return _not_checked("росстат", "схема: головных записей %d, ждали одну"
+                            % len(головные))
+    rec = головные[0]
+    missing = _schema_missing("росстат", inn, rec)
+    if missing:
+        return _not_checked("росстат", "схема: не найдено поле %s" % missing)
+    # Счёт подразделений держится на двух полях: tosp_id головы (у ИП null) и
+    # okpo каждой строки. Пропади любое — «Головное подразделение» посчиталось
+    # бы отдельным, и число подразделений выросло бы молча; поэтому — схема.
+    tosp = rec.get("tosp_id")
+    if "tosp_id" not in rec or not (tosp is None and int(rec["type"]) == 4) and (
+            not isinstance(tosp, str) or not tosp.strip()):
+        return _not_checked("росстат", "схема: не найдено поле tosp_id головной записи")
+    if any(not isinstance(r.get("okpo"), str) or not r["okpo"].strip() for r in raw):
+        return _not_checked("росстат", "схема: не найдено поле okpo в записи выдачи")
+    tosp_головы = rec.get("tosp_id")
+    по_типам = {}
+    for r in raw:
+        if r is rec or r["type"] in РОССТАТ_ГОЛОВНЫЕ:
+            continue
+        if tosp_головы and r.get("okpo") == tosp_головы:
+            continue  # «Головное подразделение» — сама организация, не подразделение
+        ключ = РОССТАТ_ТИПЫ.get(int(r["type"]), "тип_%d" % int(r["type"]))
+        по_типам[ключ] = по_типам.get(ключ, 0) + 1
+    данные = {
+        "окпо": rec.get("okpo"),
+        "наименование": rec.get("name"),
+        "дата_регистрации_росстат": rec.get("date_reg"),
+        "окфс": _справочник(rec.get("okfs")),
+        "окопф": _справочник(rec.get("okopf")),
+        "окогу": _справочник(rec.get("okogu")),
+        "октмо_регистрации": _справочник(rec.get("oktmo_reg")),
+        "подразделений": sum(по_типам.values()),
+        "подразделения_по_типам": по_типам,
+        "источник": "websbor.rosstat.gov.ru, статрегистр (коды статистики)",
+    }
+    if _справочник(rec.get("okved2_fact")):
+        данные["оквэд_факт"] = _справочник(rec.get("okved2_fact"))
+    return данные, _av("росстат", "ok")
+
+
+def raw_rosstat(opener, inn):
+    body = json.dumps({"inn": str(inn)}).encode("utf-8")
+    text = _http_post(opener, РОССТАТ, body, {
+        "User-Agent": UA_ПРОЕКТА, "Content-Type": "application/json",
+        "Accept": "application/json"})
+    j = _safe_json(text)
+    if j is None:
+        raise SourceUnavailable("схема: websbor вернул не-JSON")
+    return j
+
+
+def fetch_rosstat(opener, inn):
+    return parse_rosstat(raw_rosstat(opener, inn), inn)
 
 
 ФЕДРЕСУРС = "https://fedresurs.ru"
@@ -1823,6 +1958,8 @@ FETCHERS = {
     "спецреестры": fetch_special_registries,
     "еркнм": lambda opener, inn: fetch_registry_cache("еркнм", inn),
     "рнп": lambda opener, inn: fetch_registry_cache("рнп", inn),
+    "список_цб": fetch_cbr_warning,
+    "росстат": fetch_rosstat,
     "санкции": fetch_sanctions,
     "дампы_фнс": fetch_opendata_dumps,
     "федресурс": fetch_fedresurs,
@@ -1838,6 +1975,7 @@ PARSERS = {
     "мсп": parse_msp,
     "нпд": parse_npd,
     "спецреестры": parse_special_registries,
+    "росстат": parse_rosstat,
 }
 
 # Источники, чей fetcher принимает третьим аргументом контекст — данные уже
@@ -1851,6 +1989,7 @@ CONTEXT_FETCHERS = {"спецреестры"}
 RAW_RECORD["спецреестры"] = _rec_special
 RAW_RECORD["банкротство"] = _rec_bankrupt
 RAW_RECORD["федресурс"] = _rec_fedresurs
+RAW_RECORD["росстат"] = _rec_rosstat
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка
@@ -2016,6 +2155,8 @@ def _run_source(source_id, inn, opener=None, профиль=None, контекс
         return _not_checked(source_id, "профиль: не требуется для %s" % профиль)
     if d.get("требует") == "браузер" or source_id not in FETCHERS:
         return _not_checked(source_id, "не покрыто: %s" % _browser_note(source_id, inn))
+    if d.get("требует") == "сеть" and _офлайн():
+        return _not_checked(source_id, "режим: офлайн — сетевой источник не запрашивался")
     if d.get("требует") == "сеть":
         blocked = _probe_block(source_id)
         if blocked:
@@ -2027,6 +2168,8 @@ def _run_source(source_id, inn, opener=None, профиль=None, контекс
     except (SourceUnavailable, DeadlineExceeded) as e:
         return _not_checked(source_id, _classify_exc(e))
     except Exception as e:
+        if str(e).startswith("офлайн:"):
+            return _not_checked(source_id, "режим: " + str(e))
         return _not_checked(source_id, "схема: непредвиденное исключение %s: %s"
                             % (type(e).__name__, e))
     if av.get("состояние") == "ok" and not data:
@@ -2077,6 +2220,37 @@ def build_summary(av_map):
 РЕЖИМЫ = ("quick", "полный", "всё")
 MAX_WORKERS = 4                 # уважение к ФНС: не больше четырёх запросов разом
 _THREAD_LOCAL = threading.local()
+
+
+def _офлайн():
+    """--офлайн или INN_CHECK_OFFLINE=1: только кэш и дампы, сеть запрещена."""
+    return os.environ.get("INN_CHECK_OFFLINE") == "1"
+
+
+_СЕТЬ_ЗАПРЕЩЕНА = []
+
+
+def _запретить_сеть():
+    """Офлайн — не обещание, а запрет: любое соединение из процесса падает.
+
+    Страховка от источника, который «кэш» по реестру, но вдруг полез бы в сеть
+    (обновление кэша, канарейка, штамп времени): такой источник станет «не
+    проверено» с причиной «сеть:», а ИНН наружу не уйдёт. Запрет — на весь
+    процесс и необратим; ставится один раз.
+    """
+    if _СЕТЬ_ЗАПРЕЩЕНА:
+        return
+    _СЕТЬ_ЗАПРЕЩЕНА.append(True)
+
+    def отказ(*_a, **_k):
+        raise OSError("офлайн: сеть запрещена (--офлайн / INN_CHECK_OFFLINE=1)")
+    socket.socket.connect = отказ
+    socket.socket.connect_ex = отказ
+    socket.create_connection = отказ
+    socket.getaddrinfo = отказ
+    socket.gethostbyname = отказ
+    socket.gethostbyname_ex = отказ
+    socket.gethostbyaddr = отказ
 
 
 def _sequential():
@@ -2209,6 +2383,8 @@ def collect(inn, профиль=None, режим="полный", opener=None):
         режим = "полный"
     reset_deadline()
     начало = time.monotonic()
+    if _офлайн():
+        _запретить_сеть()
     if opener is None and _sequential():
         opener = _make_opener()
     result = {"инн": inn, "тип": _тип_контрагента(inn), "профиль": профиль or "нейтрально"}
@@ -2258,6 +2434,7 @@ def collect(inn, профиль=None, режим="полный", opener=None):
         "ранний_выход": ранний_выход,
         "причина_остановки": причина,
         "параллельно": not _sequential(),
+        "офлайн": _офлайн(),
     }
     result["_сеть"] = proxy.описание(
         _ПРОКСИ, insecure=os.environ.get("COUNTERPARTY_INSECURE") == "1")
@@ -2361,6 +2538,9 @@ USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--
          "        манифест с SHA-256; INN_CHECK_TSA=<url> — ещё и штамп времени\n"
          "        RFC 3161 (на сервер уходит только хеш). Проверка пакета:\n"
          "        python3 evidence_pack.py --проверить <каталог>.\n"
+         "--офлайн: только кэш и дампы (санкции, РНП, ЕРКНМ, дампы ФНС, список ЦБ);\n"
+         "        сетевые источники — «не проверено», любое соединение запрещено\n"
+         "        (то же — INN_CHECK_OFFLINE=1).\n"
          % ", ".join(sources.PROFILE_IDS))
 
 
@@ -2388,6 +2568,8 @@ def _parse_args(argv):
             снимок = next(it, None)
         elif a.startswith(("--снимок=", "--snapshot=")):
             снимок = a.split("=", 1)[1]
+        elif a in ("--офлайн", "--offline"):
+            os.environ["INN_CHECK_OFFLINE"] = "1"
         elif a == "--канарейки":
             canaries = True
         elif a in ("--профиль", "--profile"):
@@ -2415,6 +2597,12 @@ def main(argv):
     if _ПРОКСИ["url"]:
         sys.stderr.write("сеть: через прокси %s (%s)\n"
                          % (_ПРОКСИ["маска"], _ПРОКСИ["источник"]))
+    if _офлайн() and (canaries or os.environ.get("INN_CHECK_TSA")):
+        sys.stdout.write(json.dumps(
+            {"ошибка": "офлайн: %s требует сети" % ("--канарейки" if canaries
+                                                     else "штамп времени INN_CHECK_TSA")},
+            ensure_ascii=False, indent=2) + "\n")
+        return 2
     if canaries:
         out, failed = run_canaries()
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")

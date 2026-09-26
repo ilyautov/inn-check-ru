@@ -1223,6 +1223,38 @@ def case_fedresurs(fc):
     return errors
 
 
+def case_rosstat(fc):
+    """Росстат websbor: дрейф полей, на которых держится счёт подразделений."""
+    errors = []
+    base = json.loads((FIXTURES / "росстат_5029169023.raw.json").read_text(encoding="utf-8"))
+    данные, av = fc.parse_rosstat(copy.deepcopy(base), "5029169023")
+    check(errors, av["состояние"] == "ok", "эталон: %r" % av)
+    эталон = данные["подразделений"]
+    for имя, правка in (
+            ("пропал tosp_id головы", lambda raw: next(
+                r for r in raw if r["type"] == 1).pop("tosp_id")),
+            ("пропал okpo подразделения", lambda raw: next(
+                r for r in raw if r["type"] != 1).pop("okpo")),
+            ("tosp_id головы пустой", lambda raw: next(
+                r for r in raw if r["type"] == 1).__setitem__("tosp_id", " ")),
+            ("tosp_id юрлица null", lambda raw: next(
+                r for r in raw if r["type"] == 1).__setitem__("tosp_id", None)),
+            ("okpo подразделения null", lambda raw: next(
+                r for r in raw if r["type"] != 1).__setitem__("okpo", None))):
+        raw = copy.deepcopy(base)
+        правка(raw)
+        данные, av = fc.parse_rosstat(raw, "5029169023")
+        check(errors, av["состояние"] == "не проверено"
+              and str(av["причина"]).startswith("схема:"),
+              "%s: счёт подразделений %r вместо «схема:» (эталон %d)"
+              % (имя, данные and данные.get("подразделений"), эталон))
+    # у ИП tosp_id null — это норма, а не дрейф
+    ип = json.loads((FIXTURES / "росстат_504110181262.raw.json").read_text(encoding="utf-8"))
+    _, av = fc.parse_rosstat(ип, "504110181262")
+    check(errors, av["состояние"] == "ok", "ИП с tosp_id null: %r" % av)
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
     fc._http_get_настоящий = fc._http_get  # для теста транспорта на фейковом opener
@@ -1243,6 +1275,7 @@ def main():
         "прокси-и-кэш-доступа": case_proxy(fc),
         "ефрсб-банкротство": case_bankrupt(fc),
         "федресурс-роли": case_fedresurs(fc),
+        "росстат-подразделения": case_rosstat(fc),
     }
     failed = 0
     for name, errors in cases.items():

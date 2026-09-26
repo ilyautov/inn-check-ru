@@ -46,6 +46,7 @@ py-modules = [
   "fetch_counterparty",
   "fin_scoring",
   "sanctions_check",
+  "cbr_warning",
   "affiliates_graph",
   "droblenie_check",
   "diff_counterparty",
