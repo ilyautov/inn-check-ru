@@ -24,9 +24,20 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError:
-    sys.stderr.write(
-        "Не найден пакет mcp (официальный MCP SDK). Установка: "
-        "pip install mcp — подробности в mcp/README.md\n")
+    try:
+        from importlib.metadata import version as _ver
+        _sdk = _ver("mcp")
+    except Exception:
+        _sdk = None
+    if _sdk and not _sdk.startswith("1."):
+        # mcp 2.x переименовал FastMCP в MCPServer — «не найден» тут вводил бы в заблуждение
+        sys.stderr.write(
+            "Установлен mcp %s, сервер работает на mcp 1.x (>=1.30,<2). Установка: "
+            "pip install 'mcp>=1.30,<2' — подробности в mcp/README.md\n" % _sdk)
+    else:
+        sys.stderr.write(
+            "Не найден пакет mcp (официальный MCP SDK). Установка: "
+            "pip install mcp — подробности в mcp/README.md\n")
     sys.exit(1)
 
 try:
