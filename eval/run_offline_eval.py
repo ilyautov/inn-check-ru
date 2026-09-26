@@ -79,7 +79,7 @@ def case_офлайн(аргументы, env_офлайн=False):
     for sid, d in sources.SOURCES.items():
         a = av.get(sid) or {}
         причина = str(a.get("причина") or "")
-        if d.get("требует") == "сеть":
+        if d.get("требует") in ("сеть", "ключ"):
             if a.get("состояние") != "не проверено" or not причина.startswith("режим: офлайн"):
                 errors.append("сетевой %s в офлайне: %r" % (sid, a))
         elif d.get("требует") == "кэш" and причина.startswith(("режим:", "сеть:")):

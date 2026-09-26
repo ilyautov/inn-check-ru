@@ -1766,6 +1766,148 @@ def fetch_rosstat(opener, inn):
     return parse_rosstat(raw_rosstat(opener, inn), inn)
 
 
+CHECKO = "https://api.checko.ru/v2/company"
+DADATA = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party"
+
+
+def _ключ_агрегатора():
+    """(провайдер, ключ) из окружения; Checko первым — у него явные булевы флаги."""
+    for провайдер, имя in (("checko", "CHECKO_API_KEY"), ("dadata", "DADATA_API_KEY")):
+        ключ = (os.environ.get(имя) or "").strip()
+        if ключ:
+            return провайдер, ключ
+    return None, None
+
+
+def _нет_ключа(source_id):
+    if source_id == "агрегатор" and _ключ_агрегатора()[0] is None:
+        return ("не покрыто: ключ агрегатора не задан — CHECKO_API_KEY (бесплатно, "
+                "100 запросов в сутки) или DADATA_API_KEY (признак недостоверности — "
+                "только на тарифе «Максимальный»); агрегатор увидит проверяемый ИНН")
+    return None
+
+
+_КОНТРАКТ_АГРЕГАТОРА = ("по документации (checko.ru/integration/api/company, "
+                        "dadata.ru/api/find-party) на 26.09.2026; живьём без ключа "
+                        "не проверен")
+
+
+def parse_checko(raw, inn):
+    """Ответ Checko v2/company -> блок «агрегатор».
+
+    Признак засчитывается «есть» по любому true; «нет» — только если все
+    булевы ключи на месте и false. Пропавший ключ — не «нет», а поле не отдано.
+    """
+    if not isinstance(raw, dict) or not isinstance(raw.get("meta"), dict):
+        return _not_checked("агрегатор", "схема: checko — ответ без meta")
+    meta = raw["meta"]
+    if meta.get("status") != "ok":
+        return _not_checked("агрегатор", "сеть: checko — %s"
+                            % str(meta.get("message") or meta.get("status"))[:200])
+    d = raw.get("data")
+    if not isinstance(d, dict):
+        return _not_checked("агрегатор", "схема: checko — нет объекта data")
+    if not d:
+        # Не «пусто»: профиль прочёл бы его как «нет» по обоим признакам сразу.
+        return _not_checked("агрегатор", "не покрыто: checko не нашёл организацию по ИНН")
+    if str(d.get("ИНН") or "").strip() != str(inn):
+        return _not_checked("агрегатор", "схема: checko — в ответе другой ИНН или нет поля ИНН")
+    if not isinstance(d.get("ЮрАдрес"), dict) or not isinstance(d.get("Руковод"), list):
+        return _not_checked("агрегатор", "схема: checko — нет ЮрАдрес или Руковод")
+
+    недост, флаги_недост = [], []
+    части = [("юридический адрес", d["ЮрАдрес"])]
+    части += [("руководитель", r) for r in d["Руковод"] if isinstance(r, dict)]
+    if isinstance(d.get("УпрОрг"), dict) and d["УпрОрг"]:
+        части.append(("управляющая организация", d["УпрОрг"]))
+    учред = d.get("Учред") if isinstance(d.get("Учред"), dict) else {}
+    for записи in учред.values():
+        for r in записи if isinstance(записи, list) else []:
+            if isinstance(r, dict):
+                части.append(("учредитель", r))
+    for где, узел in части:
+        v = узел.get("Недост")
+        флаги_недост.append(v if isinstance(v, bool) else None)
+        if v is True:
+            недост.append({"где": где, "описание": узел.get("НедостОпис") or None})
+    дискв, флаги_дискв = [], []
+    for r in d["Руковод"]:
+        if not isinstance(r, dict):
+            continue
+        v = r.get("ДисквЛицо")
+        флаги_дискв.append(v if isinstance(v, bool) else None)
+        if v is True:
+            дискв.append({"должность": r.get("НаимДолжн") or None,
+                          "с": r.get("ДисквДатаНач") or None,
+                          "по": r.get("ДисквДатаОконч") or None})
+    if d.get("ДисквЛица") is True and not дискв:
+        дискв.append({"должность": None, "с": None, "по": None})
+
+    данные = {"агрегатор": "checko", "контракт": _КОНТРАКТ_АГРЕГАТОРА,
+              "источник": "Checko API v2/company — пересказ ЕГРЮЛ и реестра "
+                          "дисквалифицированных, не первоисточник"}
+    if недост:
+        данные["недостоверность_сведений"] = True
+        данные["недостоверность"] = недост
+    elif (флаги_недост and None not in флаги_недост and isinstance(d.get("Учред"), dict)
+          and "УпрОрг" in d):
+        # «нет» — только когда на месте все узлы, где бывает отметка: пропавший
+        # Учред или УпрОрг — не «недостоверности нет», а поле не отдано.
+        данные["недостоверность_сведений"] = False
+    if дискв:
+        данные["дисквалификация_руководителя"] = True
+        данные["дисквалификация"] = дискв
+    elif флаги_дискв and None not in флаги_дискв and d.get("ДисквЛица") in (False, None):
+        данные["дисквалификация_руководителя"] = False
+    return данные, _av("агрегатор", "ok")
+
+
+def parse_dadata(raw, inn):
+    """Ответ DaData findById/party -> блок «агрегатор». invalid — только true;
+    null не превращается в «нет» (тариф ниже «Максимального» отдаёт тот же null)."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("suggestions"), list):
+        return _not_checked("агрегатор", "схема: dadata — нет массива suggestions")
+    основные = [s.get("data") for s in raw["suggestions"]
+                if isinstance(s, dict) and isinstance(s.get("data"), dict)
+                and str(s["data"].get("inn") or "") == str(inn)
+                and s["data"].get("branch_type") in ("MAIN", None)]
+    if not raw["suggestions"]:
+        return _not_checked("агрегатор", "не покрыто: dadata не нашла организацию по ИНН")
+    if len(основные) != 1:
+        return _not_checked("агрегатор", "схема: dadata — головных записей с этим ИНН %d"
+                            % len(основные))
+    d = основные[0]
+    данные = {"агрегатор": "dadata", "контракт": _КОНТРАКТ_АГРЕГАТОРА,
+              "источник": "DaData findById/party — пересказ ЕГРЮЛ, не первоисточник"}
+    if d.get("invalid") is True:
+        данные["недостоверность_сведений"] = True
+    return данные, _av("агрегатор", "ok")
+
+
+def fetch_aggregator(opener, inn):
+    провайдер, ключ = _ключ_агрегатора()
+    if провайдер == "checko":
+        # ключ в query-строке: пакет доказательств маскирует key= до записи
+        url = "%s?%s" % (CHECKO, urllib.parse.urlencode({"key": ключ, "inn": str(inn)}))
+        status, text = _http_get(opener, url, ua=UA_ПРОЕКТА, повторы=False, xhr=False)
+        j = _safe_json(text)
+        if j is None:
+            # 401/402/403 у Checko — ключ, баланс или лимит, а не геоблок
+            raise SourceUnavailable("сеть: checko HTTP %s (ключ, баланс или суточный лимит?)"
+                                    % status if status != 200 else
+                                    "схема: checko вернул не-JSON")
+        return parse_checko(j, inn)
+    if провайдер == "dadata":
+        text = _http_post(opener, DADATA, json.dumps({"query": str(inn)}).encode("utf-8"), {
+            "User-Agent": UA_ПРОЕКТА, "Content-Type": "application/json",
+            "Accept": "application/json", "Authorization": "Token " + ключ})
+        j = _safe_json(text)
+        if j is None:
+            raise SourceUnavailable("схема: dadata вернул не-JSON")
+        return parse_dadata(j, inn)
+    return _not_checked("агрегатор", _нет_ключа("агрегатор"))
+
+
 ФЕДРЕСУРС = "https://fedresurs.ru"
 # Тип сообщения (как в выдаче) -> (поле блока, правило роли). Правила сняты с живых
 # ответов 26.09.2026: намерение кредитора публикует кредитор, должник — в
@@ -1949,6 +2091,7 @@ def fetch_fedresurs(opener, inn):
 
 
 FETCHERS = {
+    "агрегатор": fetch_aggregator,
     "банкротство": fetch_bankrupt,
     "егрюл": fetch_egrul,
     "риски": fetch_risks,
@@ -2155,8 +2298,10 @@ def _run_source(source_id, inn, opener=None, профиль=None, контекс
         return _not_checked(source_id, "профиль: не требуется для %s" % профиль)
     if d.get("требует") == "браузер" or source_id not in FETCHERS:
         return _not_checked(source_id, "не покрыто: %s" % _browser_note(source_id, inn))
-    if d.get("требует") == "сеть" and _офлайн():
+    if d.get("требует") in ("сеть", "ключ") and _офлайн():
         return _not_checked(source_id, "режим: офлайн — сетевой источник не запрашивался")
+    if d.get("требует") == "ключ" and opener is None:
+        opener = _make_opener()  # нет ключа — fetcher сам вернёт «не покрыто»
     if d.get("требует") == "сеть":
         blocked = _probe_block(source_id)
         if blocked:

@@ -1255,6 +1255,158 @@ def case_rosstat(fc):
     return errors
 
 
+def _checko(**изм):
+    """Ответ Checko v2/company в форме документации (checko.ru/integration/api/
+    company, 26.09.2026) — живьём без ключа не снят; ИНН — Сбербанк."""
+    raw = {"data": {"ОГРН": "1027700132195", "ИНН": "7707083893",
+                    "ЮрАдрес": {"АдресРФ": "г. Москва", "Недост": False},
+                    "Руковод": [{"ФИО": "ФИО УБРАНО ИЗ ФИКСТУРЫ", "НаимДолжн": "ПРЕЗИДЕНТ",
+                                 "Недост": False, "МассРуковод": False,
+                                 "ДисквЛицо": False}],
+                    "Учред": {"РосОрг": [{"Недост": False}]},
+                    "УпрОрг": None,
+                    "ДисквЛица": False},
+           "meta": {"status": "ok", "today_request_count": 1}}
+    for путь, v in изм.items():
+        узел = raw
+        *голова, лист = путь.split(".")
+        for k in голова:
+            узел = узел[int(k)] if k.isdigit() else узел[k]
+        if v is _УДАЛИТЬ:
+            узел.pop(лист)
+        else:
+            узел[лист] = v
+    return raw
+
+
+_УДАЛИТЬ = object()
+
+
+def case_aggregator(fc):
+    """Агрегатор по ключу: маппинг Checko/DaData, «нет» только по явному false."""
+    errors = []
+    ИНН = "7707083893"
+    д, av = fc.parse_checko(_checko(), ИНН)
+    check(errors, av["состояние"] == "ok" and д["недостоверность_сведений"] is False
+          and д["дисквалификация_руководителя"] is False and "по документации" in д["контракт"],
+          "checko всё false: %r %r" % (д, av))
+    д, _ = fc.parse_checko(_checko(**{"data.ЮрАдрес.Недост": True,
+                                     "data.ЮрАдрес.НедостОпис": "адрес недостоверен"}), ИНН)
+    check(errors, д["недостоверность_сведений"] is True
+          and д["недостоверность"][0]["где"] == "юридический адрес", "адрес: %r" % д)
+    д, _ = fc.parse_checko(_checko(**{"data.Учред.РосОрг.0.Недост": True}), ИНН)
+    check(errors, д.get("недостоверность_сведений") is True, "учредитель: %r" % д)
+    д, _ = fc.parse_checko(_checko(**{"data.Руковод.0.ДисквЛицо": True,
+                                     "data.Руковод.0.ДисквДатаНач": "2025-01-10",
+                                     "data.Руковод.0.ДисквДатаОконч": "2027-01-10"}), ИНН)
+    check(errors, д["дисквалификация_руководителя"] is True
+          and д["дисквалификация"][0]["по"] == "2027-01-10"
+          and "ФИО" not in json.dumps(д, ensure_ascii=False), "дисквалификация: %r" % д)
+    д, _ = fc.parse_checko(_checko(**{"data.ДисквЛица": True}), ИНН)
+    check(errors, д.get("дисквалификация_руководителя") is True, "ДисквЛица: %r" % д)
+    # пропавший флаг — не «нет»: поле просто не отдано
+    for путь, поле in (("data.Руковод.0.Недост", "недостоверность_сведений"),
+                       ("data.Руковод.0.ДисквЛицо", "дисквалификация_руководителя")):
+        д, av = fc.parse_checko(_checko(**{путь: _УДАЛИТЬ}), ИНН)
+        check(errors, av["состояние"] == "ok" and поле not in д,
+              "пропал %s — %s должно отсутствовать: %r" % (путь, поле, д))
+        д, _ = fc.parse_checko(_checko(**{путь: "нет"}), ИНН)
+        check(errors, поле not in д, "%s строкой принят как false: %r" % (путь, д))
+    for имя, raw, префикс, сост in (
+            ("meta error", _checko(**{"meta.status": "error", "meta.message": "Превышен лимит"}),
+             "сеть:", "не проверено"),
+            ("чужой ИНН", _checko(**{"data.ИНН": "7707000000"}), "схема:", "не проверено"),
+            ("без ЮрАдрес", _checko(**{"data.ЮрАдрес": _УДАЛИТЬ}), "схема:", "не проверено"),
+            ("не найдена", {"data": {}, "meta": {"status": "ok"}}, "не покрыто:",
+             "не проверено"),
+            ("не объект", [], "схема:", "не проверено")):
+        д, av = fc.parse_checko(raw, ИНН)
+        check(errors, av["состояние"] == сост and д is None and
+              (префикс is None or str(av.get("причина")).startswith(префикс)),
+              "checko %s: %r" % (имя, av))
+
+    def dadata(invalid=None, branch="MAIN", inn=ИНН):
+        return {"suggestions": [{"value": "ПАО СБЕРБАНК", "data": {
+            "inn": inn, "branch_type": branch, "invalid": invalid,
+            "management": {"name": "ФИО УБРАНО ИЗ ФИКСТУРЫ", "disqualified": None}}}]}
+    д, av = fc.parse_dadata(dadata(None), ИНН)
+    check(errors, av["состояние"] == "ok" and "недостоверность_сведений" not in д
+          and "дисквалификация_руководителя" not in д,
+          "dadata null превратился в «нет»: %r" % д)
+    д, _ = fc.parse_dadata(dadata(True), ИНН)
+    check(errors, д.get("недостоверность_сведений") is True, "dadata invalid: %r" % д)
+    _, av = fc.parse_dadata(dadata(True, branch="BRANCH"), ИНН)
+    check(errors, str(av.get("причина")).startswith("схема:"), "dadata филиал: %r" % av)
+    _, av = fc.parse_dadata({"suggestions": []}, ИНН)
+    check(errors, av["состояние"] == "не проверено", "dadata пусто: %r" % av)
+    # без узлов Учред / УпрОрг «недостоверности нет» не выдаётся
+    for узел, v in (("Учред", _УДАЛИТЬ), ("Учред", None), ("УпрОрг", _УДАЛИТЬ)):
+        raw = _checko(**{"data.УпрОрг": None})
+        if v is _УДАЛИТЬ:
+            raw["data"].pop(узел)
+        else:
+            raw["data"][узел] = v
+        д, _ = fc.parse_checko(raw, ИНН)
+        check(errors, "недостоверность_сведений" not in д,
+              "%s=%r — выдано «нет»: %r" % (узел, v, д))
+    # сквозь профиль: пустой ответ агрегатора не даёт «отсутствует»
+    pf0 = load_module("profiles", ROOT / "scripts" / "profiles.py")
+    for raw, разбор in (({"data": {}, "meta": {"status": "ok"}}, fc.parse_checko),
+                        ({"suggestions": []}, fc.parse_dadata)):
+        д, av = разбор(raw, ИНН)
+        ф = {f["сигнал"]: f for f in pf0.resolve(
+            {"инн": ИНН, "тип": "юрлицо", "агрегатор": д, "_доступность": {"агрегатор": av}},
+            None, "предоплата")["факты"]}
+        check(errors, all(ф.get(с, {}).get("статус") != "отсутствует" for с in
+                          ("недостоверность_сведений", "дисквалификация_руководителя")),
+              "пустой ответ агрегатора стал «нет»: %r" % {с: ф.get(с) for с in
+                                                         ("недостоверность_сведений",
+                                                          "дисквалификация_руководителя")})
+
+    # без ключа — «не покрыто», ни одного запроса; с ключом — один GET, ключ
+    # маскируется в пакете доказательств
+    сохр = {k: os.environ.pop(k, None) for k in ("CHECKO_API_KEY", "DADATA_API_KEY")}
+    try:
+        д, av = fc.run_source("агрегатор", ИНН)
+        check(errors, av["состояние"] == "не проверено"
+              and str(av["причина"]).startswith("не покрыто: ключ"), "без ключа: %r" % av)
+        os.environ["CHECKO_API_KEY"] = "секрет123"
+        запросы = []
+        orig = fc._http_get
+
+        def ответ(opener, url, **kw):
+            запросы.append((url, kw))
+            return 200, json.dumps(_checko(**{"data.ЮрАдрес.Недост": True}))
+        fc._http_get = ответ
+        try:
+            д, av = fc.run_source("агрегатор", ИНН)
+        finally:
+            fc._http_get = orig
+        check(errors, av["состояние"] == "ok" and д["недостоверность_сведений"] is True
+              and len(запросы) == 1 and "inn=" + ИНН in запросы[0][0]
+              and запросы[0][1].get("ua") == fc.UA_ПРОЕКТА
+              and "секрет123" not in fc._без_секретов(запросы[0][0]),
+              "с ключом: %r %r" % (av, запросы))
+    finally:
+        os.environ.pop("CHECKO_API_KEY", None)
+        for k, v in сохр.items():
+            if v is not None:
+                os.environ[k] = v
+
+    # сигнал профиля: агрегатор поднимает недостоверность; ретро по снимку — то же
+    pf = load_module("profiles", ROOT / "scripts" / "profiles.py")
+    д, av = fc.parse_checko(_checko(**{"data.ЮрАдрес.Недост": True}), ИНН)
+    fetch = {"инн": ИНН, "тип": "юрлицо", "агрегатор": д, "_доступность": {"агрегатор": av}}
+    рез = pf.resolve(fetch, None, "предоплата")
+    ф = {f["сигнал"]: f for f in рез["факты"]}.get("недостоверность_сведений") or {}
+    check(errors, ф.get("статус") == "найден" and рез.get("светофор") == "🔴",
+          "профиль: %r / %r" % (ф, рез.get("светофор")))
+    sn = load_module("snapshot", ROOT / "scripts" / "snapshot.py")
+    check(errors, (sn.вердиктные(fetch).get("агрегатор") or {}).get(
+        "недостоверность_сведений") is True, "снимок не хранит признак агрегатора")
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
     fc._http_get_настоящий = fc._http_get  # для теста транспорта на фейковом opener
@@ -1276,6 +1428,7 @@ def main():
         "ефрсб-банкротство": case_bankrupt(fc),
         "федресурс-роли": case_fedresurs(fc),
         "росстат-подразделения": case_rosstat(fc),
+        "агрегатор-по-ключу": case_aggregator(fc),
     }
     failed = 0
     for name, errors in cases.items():
