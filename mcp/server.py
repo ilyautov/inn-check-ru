@@ -240,19 +240,26 @@ def paper_vat_signs(inn: str, subject: str = "", amount: str = "") -> dict:
 
 @mcp_server.tool()
 def due_diligence_dossier(inn: str, profile: str = "нейтрально",
-                          subject: str = "", amount: str = "") -> dict:
+                          subject: str = "", amount: str = "",
+                          evidence_dir: str = "", timestamp: bool = False) -> dict:
     """Досье должной осмотрительности в Markdown: что было видно в открытых
     источниках на дату проверки, что осталось непроверенным и почему.
     Документ заключением не является и ценен только тогда, когда составлен ДО
     сделки — это написано в нём самом. Файл DOCX собирает dossier.py.
+    evidence_dir — новый/пустой локальный каталог для пакета доказательств
+    (сырые ответы источников + манифест SHA-256); timestamp — штамп времени
+    RFC 3161 (на публичный TSA уходит только хеш).
 
     Due-diligence dossier as Markdown: what open sources showed on the date of
     the check, and what stayed unchecked. Not an opinion, and only meaningful
-    when produced BEFORE the deal.
+    when produced BEFORE the deal. evidence_dir saves raw source responses with
+    a SHA-256 manifest; timestamp adds an RFC 3161 timestamp (hash only).
     """
     return tools_impl.due_diligence_dossier(inn, profile=profile,
                                             subject=subject or None,
-                                            amount=amount or None)
+                                            amount=amount or None,
+                                            evidence_dir=evidence_dir or None,
+                                            timestamp=timestamp)
 
 
 @mcp_server.tool()

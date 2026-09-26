@@ -162,6 +162,34 @@ def case_tools_impl(ti):
         a = ti.access_check()
         check(a.get("ip_класс") == "не-РФ", "access_check: %s" % a)
 
+        # досье с пакетом доказательств: каталог уходит и в сбор, и в досье,
+        # штамп включается только флагом и только переменной окружения.
+        пакетные = []
+
+        def fake_пакет(script, args, stdin_text=None, timeout=None, сырой=False, env=None):
+            пакетные.append((script, list(args), env))
+            if script == "fetch_counterparty.py":
+                return dict(FIXTURE_FETCH)
+            return "# досье"
+        ti.run_script = fake_пакет
+        d = ti.due_diligence_dossier("7707083893", evidence_dir="/tmp/пакет", timestamp=True)
+        check(d.get("пакет") == "/tmp/пакет" and d.get("документ") == "# досье",
+              "dossier+пакет: %s" % d)
+        сбор = [c for c in пакетные if c[0] == "fetch_counterparty.py"]
+        check(bool(сбор) and "--пакет" in сбор[0][1]
+              and (сбор[0][2] or {}).get("INN_CHECK_TSA") == "да",
+              "сбор без --пакет или без штампа: %s" % сбор)
+        check(any(c[0] == "dossier.py" and "--пакет" in c[1] for c in пакетные),
+              "досье не получило --пакет: %s" % пакетные)
+        пакетные.clear()
+        t = ti.due_diligence_dossier("7707083893", timestamp=True)
+        check(t.get("статус") == "не проверено" and not пакетные,
+              "timestamp без evidence_dir молча проигнорирован: %s" % t)
+        ti.due_diligence_dossier("7707083893")
+        check(all("--пакет" not in c[1] and c[2] is None for c in пакетные),
+              "без evidence_dir пакет/штамп просочились: %s" % пакетные)
+        ti.run_script = fake
+
         # ошибочный путь: runner падает таймаутом -> «не проверено», не traceback
         def boom(script, args, stdin_text=None, timeout=None):
             raise subprocess.TimeoutExpired(cmd=script, timeout=1)

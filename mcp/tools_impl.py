@@ -70,7 +70,7 @@ def _guarded(fn):
     return wrapper
 
 
-def run_script(script, args, stdin_text=None, timeout=None, сырой=False):
+def run_script(script, args, stdin_text=None, timeout=None, сырой=False, env=None):
     """Запуск scripts/<script> и разбор его JSON-stdout.
 
     Возвращает dict скрипта как есть; любая деградация (таймаут, не-JSON,
@@ -88,6 +88,7 @@ def run_script(script, args, stdin_text=None, timeout=None, сырой=False):
             [sys.executable, path, *args],
             input=stdin_text, capture_output=True, text=True,
             timeout=timeout or TIMEOUT, check=False,
+            env=dict(os.environ, **env) if env else None,
         )
     except subprocess.TimeoutExpired:
         return _не_проверено(
@@ -259,21 +260,27 @@ def access_check():
     return run_script("check_access.py", ["--json"])
 
 
-def _сбор(inn, режим="всё"):
+def _сбор(inn, режим="всё", пакет=None, штамп=False):
     """Общий шаг инструментов волны 3: полный сбор движком.
 
     Отдельной функцией, потому что все трое ниже начинают одинаково, и
     ошибочный JSON движка должен доходить до модели как есть, а не
     прятаться за собственным «не проверено» обёртки.
     """
-    return run_script("fetch_counterparty.py", [inn, "--режим", str(режим)])
+    args = [inn, "--режим", str(режим)]
+    if not пакет:
+        return run_script("fetch_counterparty.py", args)
+    args += ["--пакет", str(пакет)]
+    if штамп:
+        return run_script("fetch_counterparty.py", args, env={"INN_CHECK_TSA": "да"})
+    return run_script("fetch_counterparty.py", args)
 
 
-def _сбор_или_ошибка(inn, режим="всё"):
+def _сбор_или_ошибка(inn, режим="всё", пакет=None, штамп=False):
     inn = _valid_inn(inn)
     if inn is None:
         return None, _не_проверено("некорректный ИНН (ожидается 10 или 12 цифр)")
-    fetch = _сбор(inn, режим)
+    fetch = _сбор(inn, режим, пакет=пакет, штамп=штамп)
     if "инн" not in fetch:
         return None, fetch
     return fetch, None
@@ -316,15 +323,27 @@ def paper_vat_signs(inn, subject=None, amount=None):
 
 
 @_guarded
-def due_diligence_dossier(inn, profile="нейтрально", subject=None, amount=None):
+def due_diligence_dossier(inn, profile="нейтрально", subject=None, amount=None,
+                          evidence_dir=None, timestamp=False):
     """Досье должной осмотрительности в Markdown — документ на дату проверки.
 
     Фиксирует, что было видно в открытых источниках, что осталось
     непроверенным и почему. Заключением не является и ценен только тогда,
     когда составлен ДО сделки — это написано в самом документе. DOCX здесь
     не отдаётся: инструмент возвращает текст, файл собирает dossier.py.
+
+    `evidence_dir` — новый или пустой каталог на машине пользователя: туда
+    ляжет пакет доказательств (сырые ответы источников + манифест SHA-256),
+    а досье получит раздел о его целостности. `timestamp` — ещё и штамп
+    времени RFC 3161 (на публичный TSA уходит только хеш манифеста).
     """
-    fetch, ошибка = _сбор_или_ошибка(inn)
+    if timestamp and not evidence_dir:
+        return _не_проверено("штамп времени ставится на пакет доказательств: "
+                             "укажите evidence_dir (новый или пустой каталог)")
+    # Непригодный каталог движок отклоняет ДО сбора: {"ошибка": ...} без «инн»
+    # доходит до модели как есть через _сбор_или_ошибка.
+    fetch, ошибка = _сбор_или_ошибка(inn, пакет=evidence_dir or None,
+                                     штамп=bool(timestamp))
     if ошибка is not None:
         return ошибка
     import tempfile
@@ -333,8 +352,10 @@ def due_diligence_dossier(inn, profile="нейтрально", subject=None, amo
         json.dump(fetch, fh, ensure_ascii=False)
         путь = fh.name
     try:
-        args = ["--fetch", путь, "--профиль", str(profile or "нейтрально"),
-                "--markdown"]
+        # С пакетом досье читает fetch.json пакета: тот же сбор, а байтовое
+        # сравнение с пересериализованной копией дало бы ложное «разные проверки».
+        args = (["--пакет", str(evidence_dir)] if evidence_dir else ["--fetch", путь])
+        args += ["--профиль", str(profile or "нейтрально"), "--markdown"]
         if subject:
             args += ["--предмет", str(subject)]
         if amount not in (None, ""):
@@ -347,8 +368,11 @@ def due_diligence_dossier(inn, profile="нейтрально", subject=None, amo
             pass
     if isinstance(текст, dict):
         return текст
-    return {"статус": "ок", "инн": fetch.get("инн"), "формат": "markdown",
-            "документ": текст}
+    ответ = {"статус": "ок", "инн": fetch.get("инн"), "формат": "markdown",
+             "документ": текст}
+    if evidence_dir:
+        ответ["пакет"] = str(evidence_dir)
+    return ответ
 
 
 @_guarded

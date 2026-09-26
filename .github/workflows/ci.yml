@@ -186,6 +186,9 @@ jobs:
       - name: "калибровка порогов: разметка, веса, без утечки будущего (офлайн)"
         run: python3 eval/run_calibration_eval.py
 
+      - name: "пакет доказательств: сырьё, манифест, штамп RFC 3161 (офлайн)"
+        run: python3 eval/run_evidence_pack_eval.py
+
       - name: mcp server smoke test
         run: |
           pip install -r mcp/requirements.txt

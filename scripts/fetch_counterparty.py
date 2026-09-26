@@ -80,6 +80,7 @@ import http.cookiejar
 import importlib.util
 import json
 import os
+import re
 import socket
 import ssl
 import sys
@@ -199,6 +200,47 @@ def _make_opener():
     )
 
 
+# Пакет доказательств (--пакет): каждый ответ госисточника сохраняется как есть —
+# байты, URL, время, HTTP-код. Досье пересказывает разобранный JSON, а пакет
+# позволяет любому проверить, что источник в тот момент ответил именно так.
+_ЗАПИСЬ = {"включена": False, "ответы": []}
+_ЗАПИСЬ_LOCK = threading.Lock()
+_ИСТОЧНИК = threading.local()
+
+
+# Пакет уходит третьим лицам (юрист, налоговая): ключи в query-строке не пишем.
+_СЕКРЕТНЫЕ_ПАРАМЕТРЫ = re.compile(r"([?&](?:key|api_key|apikey|token|access_token)=)[^&#]*",
+                                  re.IGNORECASE)
+
+
+def _без_секретов(url):
+    return _СЕКРЕТНЫЕ_ПАРАМЕТРЫ.sub(r"\1***", url or "")
+
+
+def _записать(метод, url, статус, данные, тело_запроса=None):
+    if not _ЗАПИСЬ["включена"]:
+        return
+    with _ЗАПИСЬ_LOCK:
+        _ЗАПИСЬ["ответы"].append({
+            "источник": getattr(_ИСТОЧНИК, "id", None),
+            "метод": метод, "url": _без_секретов(url), "статус": статус,
+            "время_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+            "данные": данные or b"",
+            "тело_запроса": тело_запроса,
+        })
+
+
+def _тело_ошибки(e):
+    """Тело HTTP-ошибки для пакета (страница геоблока — тоже доказательство).
+    Читается только при включённой записи: иначе поведение движка не меняется."""
+    if not _ЗАПИСЬ["включена"]:
+        return b""
+    try:
+        return e.read() or b""
+    except Exception:
+        return b""
+
+
 def _http_get(opener, url, referer=None, accept="application/json, text/plain, */*"):
     headers = {"User-Agent": UA, "Accept": accept}
     if referer:
@@ -213,8 +255,10 @@ def _http_get(opener, url, referer=None, accept="application/json, text/plain, *
         try:
             resp = opener.open(req, timeout=min(TIMEOUT, max(1.0, left)))
             data = resp.read()
+            _записать("GET", url, resp.status, data)
             return resp.status, data.decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
+            _записать("GET", url, e.code, _тело_ошибки(e))
             # 429/5xx — временные (rate-limit/перегрузка): ретраим с backoff;
             # остальные коды (403, 404 и т.п.) ретраить бессмысленно.
             if e.code in (429, 500, 502, 503, 504) and attempt < RETRIES:
@@ -236,8 +280,11 @@ def _http_post(opener, url, body, headers):
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
         resp = opener.open(req, timeout=min(TIMEOUT, max(1.0, left)))
-        return resp.read().decode("utf-8", "replace")
+        data = resp.read()
+        _записать("POST", url, resp.status, data, body)
+        return data.decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
+        _записать("POST", url, e.code, _тело_ошибки(e), body)
         raise SourceUnavailable(_http_status_reason(e.code, "POST"))
     except Exception as e:
         raise SourceUnavailable(_classify_exc(e))
@@ -1530,6 +1577,10 @@ def _run_canary(source_id, canary, opener):
         if _time_left() <= POLL_DELAY * 2:
             result = ("не запускалась", "дедлайн: бюджет времени исчерпан")
         else:
+            # В пакете доказательств контрольный запрос виден отдельно: он
+            # показывает, что «пусто» — ответ живого источника, а не сбой.
+            прежний = getattr(_ИСТОЧНИК, "id", None)
+            _ИСТОЧНИК.id = "%s (канарейка %s)" % (source_id, canary["инн"])
             try:
                 data, av = _call_fetcher(source_id, opener, canary["инн"],
                                          canary.get("контекст"))
@@ -1549,12 +1600,25 @@ def _run_canary(source_id, canary, opener):
                     result = ("провал", "схема: канарейка пуста — парсер сломан")
                 else:
                     result = ("не запускалась", av.get("причина"))
+            finally:
+                _ИСТОЧНИК.id = прежний
         with _CANARY_LOCK:
             _CANARY_CACHE[key] = result
         return result
 
 
 def run_source(source_id, inn, opener=None, профиль=None, контекст=None):
+    """Обёртка: пока идёт источник, его id метит запросы в пакете доказательств;
+    после — метка снимается, чтобы чужой запрос того же потока её не унаследовал."""
+    прежний = getattr(_ИСТОЧНИК, "id", None)
+    _ИСТОЧНИК.id = source_id
+    try:
+        return _run_source(source_id, inn, opener, профиль, контекст)
+    finally:
+        _ИСТОЧНИК.id = прежний
+
+
+def _run_source(source_id, inn, opener=None, профиль=None, контекст=None):
     """Один источник по реестру: профиль -> браузер -> probe-кэш -> fetcher ->
     канарейка. Всегда (данные|None, _доступность); исключения — в «не проверено».
 
@@ -1907,15 +1971,27 @@ USAGE = ("Использование: python3 fetch_counterparty.py <ИНН> [--
          "        --снимок полный — сохранить весь JSON, как раньше.\n"
          "--прокси: свой http/https-прокси (или INN_CHECK_PROXY / HTTPS_PROXY).\n"
          "        Узел видит, какие ИНН вы проверяете, — только своя нода.\n"
+         "--пакет <каталог>: пакет доказательств — сырые ответы источников,\n"
+         "        манифест с SHA-256; INN_CHECK_TSA=<url> — ещё и штамп времени\n"
+         "        RFC 3161 (на сервер уходит только хеш). Проверка пакета:\n"
+         "        python3 evidence_pack.py --проверить <каталог>.\n"
          % ", ".join(sources.PROFILE_IDS))
 
 
 def _parse_args(argv):
     args, do_save, профиль, canaries, режим = [], False, None, False, None
     снимок = None
+    пакет = None
     прокси = None
     it = iter(argv[1:])
     for a in it:
+        if a in ("--пакет", "--evidence"):
+            # Пустое значение — не «без пакета»: main откажет, а не промолчит.
+            пакет = next(it, "")
+            continue
+        if a.startswith(("--пакет=", "--evidence=")):
+            пакет = a.split("=", 1)[1]
+            continue
         if a in ("--прокси", "--proxy"):
             прокси = next(it, None)
         elif a.startswith(("--прокси=", "--proxy=")):
@@ -1940,11 +2016,11 @@ def _parse_args(argv):
             режим = a.split("=", 1)[1]
         else:
             args.append(a)
-    return args, do_save, профиль, canaries, режим, снимок, прокси
+    return args, do_save, профиль, canaries, режим, снимок, пакет, прокси
 
 
 def main(argv):
-    args, do_save, профиль, canaries, режим, снимок, прокси = _parse_args(argv)
+    args, do_save, профиль, canaries, режим, снимок, пакет, прокси = _parse_args(argv)
     ошибка_прокси = установить_прокси(прокси)
     if ошибка_прокси:
         sys.stdout.write(json.dumps(
@@ -1995,9 +2071,30 @@ def main(argv):
             "ВНИМАНИЕ: снимок в режиме %r неполный — для мониторинга "
             "используйте --режим всё\n" % режим)
 
-    result = collect(inn, профиль=профиль, режим=режим or "полный")
+    if пакет is not None:
+        evidence_pack = _load_sibling("evidence_pack")
+        ошибка_пакета = (evidence_pack.каталог_годится(пакет) if пакет
+                         else "не указан каталог (--пакет <каталог>)")
+        if ошибка_пакета:
+            sys.stdout.write(json.dumps(
+                {"ошибка": "пакет: " + ошибка_пакета}, ensure_ascii=False, indent=2) + "\n")
+            return 2
+        with _ЗАПИСЬ_LOCK:
+            _ЗАПИСЬ["ответы"] = []
+            _ЗАПИСЬ["включена"] = True
+    try:
+        result = collect(inn, профиль=профиль, режим=режим or "полный")
+    finally:
+        _ЗАПИСЬ["включена"] = False
     if do_save:
         save_snapshot(inn, result, полный=(снимок == "полный"))
+    if пакет is not None:
+        итог = evidence_pack.записать_пакет(
+            пакет, inn, result, _ЗАПИСЬ["ответы"],
+            штамп=os.environ.get("INN_CHECK_TSA") or None)
+        sys.stderr.write("пакет доказательств: %s (%d ответов источников)%s\n" % (
+            итог["каталог"], итог["ответов"],
+            "; штамп времени: " + итог["штамп"] if итог.get("штамп") else ""))
     sys.stdout.write(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
     return 0
 
