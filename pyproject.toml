@@ -31,7 +31,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.30,<2"]
+mcp = ["mcp>=1.30,<3"]
 
 [project.urls]
 Repository = "https://github.com/ilyautov/inn-check-ru"
