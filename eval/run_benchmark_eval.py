@@ -8,6 +8,7 @@ run_benchmark_eval.py — офлайн-eval бенчмарка (волна 5, б
 import copy
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -67,6 +68,22 @@ def case_сравнение(b):
     э2["записи"][0]["егрюл"] = None
     в = {s["поле"]: s["вердикт"] for s in b.сравнить(э2, п)}
     check(errors, в["огрн"] == "эталон не собран", "эталон не собран: %r" % в)
+    # нет ответа плеча или состояния — не «совпало» (мутации из ревью Codex)
+    п = прогон()
+    del п["ответы"]["1"]["_доступность"]["банкротство"]
+    в = вердикты(п)
+    check(errors, в["номер_дела"] == "источник недоступен"
+          and в["банкротство_есть_запись"] != "совпало", "без состояния: %r" % в)
+    в = {s["поле"]: s["вердикт"] for s in b.сравнить(эталон, {"ответы": {}})}
+    check(errors, "совпало" not in в.values(), "без ответа плеча: %r" % в)
+    # неполная или битая выдача ЕФРСБ — эталон не собран, а не «записи нет»
+    for raw in ({"pageData": [], "total": 1}, {"pageData": None, "total": 1},
+                {"pageData": []}, {"total": 0}):
+        check(errors, b.эталон_записи("1", None, raw)["банкротство"] is None,
+              "неполная выдача ЕФРСБ принята: %r" % raw)
+    check(errors, b.эталон_записи("1", None, {"pageData": [], "total": 0})["банкротство"]
+          == {"есть_запись": False, "номер_дела": None, "стадия_код": None},
+          "полная пустая выдача — не «записи нет»")
     отчёт = b.отчёт_md({"собрано_utc": "x", "сеть": "y", "не_собрано": {"суды": "z"},
                         "записи": эталон["записи"]},
                        dict(прогон(), плечо="п", версия="1", дата_utc="d", сеть="s", тариф="t",
@@ -84,24 +101,35 @@ def case_эталон(b):
     b.замаскировать("ефрсб", д)
     check(errors, д["pageData"][0]["lastLegalCase"]["arbitrManagerFio"] == b.МАСКА,
           "управляющий не замаскирован")
-    путь = ROOT / "benchmark" / "etalon" / "etalon.json"
-    if not путь.exists():
-        return errors
-    мета = json.loads(путь.read_text(encoding="utf-8"))
-    for запись in мета["записи"]:
-        свежая = b.эталон_из_сырых(запись["инн"], мета["сырые"])
-        check(errors, свежая == запись, "%s: эталон не воспроизводится из сырых" % запись["инн"])
-    for f in (ROOT / "benchmark" / "etalon" / "raw").glob("*.json"):
+    for путь in (ROOT / "benchmark" / "etalon").glob("*/etalon.json"):
+        мета = json.loads(путь.read_text(encoding="utf-8"))
+        for запись in мета["записи"]:
+            свежая = b.эталон_из_сырых(запись["инн"], мета["сырые"], путь.parent)
+            check(errors, свежая == запись, "%s: эталон не воспроизводится из сырых"
+                  % запись["инн"])
+            рук = (запись.get("егрюл") or {}).get("руководитель")
+            check(errors, рук is None or str(рук).startswith("hmac:"),
+                  "%s: руководитель не под HMAC" % запись["инн"])
+        for имя, м in мета["сырые"].items():
+            check(errors, not any(k.startswith("sha256_исх") for k in м),
+                  "%s: опубликован хеш исходного тела" % имя)
+    for f in (ROOT / "benchmark" / "etalon").glob("*/raw/*.json"):
         j = json.loads(f.read_text(encoding="utf-8"))
         for r in j.get("rows") or []:
             check(errors, r.get("g") in (None, "", b.МАСКА), "%s: ФИО в g" % f.name)
         for r in j.get("pageData") or []:
             check(errors, (r.get("lastLegalCase") or {}).get("arbitrManagerFio")
                   in (None, "", b.МАСКА), "%s: ФИО управляющего" % f.name)
+    for f in (ROOT / "benchmark" / "runs").glob("*.json"):
+        for inn, о in json.loads(f.read_text(encoding="utf-8"))["ответы"].items():
+            рук = (о.get("егрюл") or {}).get("руководитель")
+            check(errors, рук is None or str(рук).startswith("hmac:"),
+                  "%s/%s: руководитель в прогоне не под HMAC" % (f.name, inn))
     return errors
 
 
 def main():
+    os.environ.setdefault("INN_CHECK_BENCH_KEY", "ключ-только-для-eval")
     b = load_module("bench", ROOT / "benchmark" / "bench.py")
     cases = {"категории дефектов": case_сравнение(b), "эталон и маскирование": case_эталон(b)}
     failed = 0

@@ -22,7 +22,9 @@ bench.py — бенчмарк волны 5 (блок G): перечень деф
 import csv
 import datetime
 import hashlib
+import hmac
 import json
+import os
 import random
 import sys
 import time
@@ -34,7 +36,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 КОГОРТА = ROOT / "calibration" / "cohort_2021.csv"
 ВЫБОРКА = HERE / "cohort.json"
-ЭТАЛОН = HERE / "etalon"
+ЭТАЛОНЫ = HERE / "etalon"        # снимки эталона по датам: etalon/<ГГГГ-ММ-ДД>/
 РУБРИКА = HERE / "rubric.json"
 ПРОГОНЫ = HERE / "runs"
 UA = "inn-check-ru benchmark (+https://github.com/ilyautov/inn-check-ru)"
@@ -44,9 +46,29 @@ SEED = 2026
 МАСКА = "ФИО УБРАНО ИЗ ФИКСТУРЫ"
 
 
+КЛЮЧ_HMAC = Path(os.path.expanduser("~/.cache/inn-check-ru/benchmark_hmac.key"))
+
+
+def _ключ():
+    """Секрет HMAC вне репозитория: INN_CHECK_BENCH_KEY или локальный файл (создаётся).
+    Голый sha256 не годится: строку руководителя из публичного ЕГРЮЛ можно
+    захешировать и сверить с опубликованной."""
+    env = os.environ.get("INN_CHECK_BENCH_KEY")
+    if env:
+        return env.encode()
+    if not КЛЮЧ_HMAC.exists():
+        КЛЮЧ_HMAC.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(КЛЮЧ_HMAC), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(os.urandom(32).hex())
+    return КЛЮЧ_HMAC.read_text().strip().encode()
+
+
 def хеш_фио(v):
-    """ФИО физлиц в репозиторий не кладём: руководитель сравнивается по хешу."""
-    return None if not v else "sha256:" + hashlib.sha256(str(v).strip().encode()).hexdigest()
+    """ФИО физлиц в репозиторий не кладём: руководитель сравнивается по HMAC."""
+    if not v:
+        return None
+    return "hmac:" + hmac.new(_ключ(), str(v).strip().encode(), hashlib.sha256).hexdigest()
 
 
 def замаскировать(имя, данные):
@@ -97,6 +119,16 @@ def _запрос(url, data=None, headers=None):
             return r.status, r.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read() or b""
+    except (OSError, ValueError) as e:   # обрыв, таймаут: раздел эталона — «не собран»
+        return 0, ("сеть: %s" % type(e).__name__).encode()
+
+
+def _json(тело):
+    try:
+        j = json.loads(тело)
+    except ValueError:
+        return None
+    return j if isinstance(j, dict) else None
 
 
 def _егрюл(inn):
@@ -104,24 +136,22 @@ def _егрюл(inn):
                                    "region": "", "PreventChromeAutocomplete": ""}).encode()
     код, тело = _запрос(ЕГРЮЛ, body, {"Content-Type": "application/x-www-form-urlencoded",
                                      "Referer": ЕГРЮЛ})
-    t = json.loads(тело).get("t") if код == 200 else None
+    t = (_json(тело) or {}).get("t") if код == 200 else None
     if not t:
         return код, тело, None
     for _ in range(10):
         time.sleep(1.5)
         код, тело = _запрос(ЕГРЮЛ + "search-result/" + t, headers={"Referer": ЕГРЮЛ})
-        if код == 200 and isinstance(json.loads(тело).get("rows"), list):
-            return код, тело, json.loads(тело)
+        j = _json(тело) if код == 200 else None
+        if j is not None and isinstance(j.get("rows"), list):
+            return код, тело, j
     return код, тело, None
 
 
 def _ефрсб(inn):
     url = "%s/backend/cmpbankrupts?searchString=%s&limit=15&offset=0" % (ЕФРСБ, inn)
     код, тело = _запрос(url, headers={"Referer": ЕФРСБ + "/"})
-    try:
-        return код, тело, json.loads(тело) if код == 200 else None
-    except ValueError:
-        return код, тело, None
+    return код, тело, _json(тело) if код == 200 else None
 
 
 def эталон_записи(inn, егрюл, ефрсб):
@@ -136,10 +166,14 @@ def эталон_записи(inn, егрюл, ефрсб):
             "огрн": r.get("o"), "наименование_полное": r.get("n"),
             "дата_регистрации": r.get("r"), "руководитель": r.get("g"),
             "дата_прекращения": r.get("e") or None}
-    if ефрсб is None:
+    выдача = ефрсб.get("pageData") if isinstance(ефрсб, dict) else None
+    всего = ефрсб.get("total") if isinstance(ефрсб, dict) else None
+    свои = [r for r in выдача or [] if isinstance(r, dict) and str(r.get("inn")) == inn]
+    if not isinstance(выдача, list) or not isinstance(всего, int) or isinstance(всего, bool) \
+            or (not свои and всего > len(выдача)):
+        # не список, нет total или выдача неполная — отсутствие записи не доказано
         out["банкротство"] = None
     else:
-        свои = [r for r in ефрсб.get("pageData") or [] if str(r.get("inn")) == inn]
         if not свои:
             out["банкротство"] = {"есть_запись": False, "номер_дела": None, "стадия_код": None}
         else:
@@ -149,7 +183,9 @@ def эталон_записи(inn, егрюл, ефрсб):
     return out
 
 
-def собрать_эталон():
+def собрать_эталон(дата=None):
+    дата = дата or datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    ЭТАЛОН = ЭТАЛОНЫ / дата
     выбор = json.loads(ВЫБОРКА.read_text(encoding="utf-8"))
     (ЭТАЛОН / "raw").mkdir(parents=True, exist_ok=True)
     записи, сырые = [], {}
@@ -158,7 +194,9 @@ def собрать_эталон():
         for имя, f in (("егрюл", _егрюл), ("ефрсб", _ефрсб)):
             код, тело, данные = f(inn)
             путь = ЭТАЛОН / "raw" / ("%s_%s.json" % (inn, имя))
-            сырые[путь.name] = {"http": код, "sha256_исходного": hashlib.sha256(тело).hexdigest()}
+            # хеш исходного тела не публикуется: по нему, как и по голому хешу
+            # ФИО, можно было бы сверять кандидатов; хешируется сохранённый файл
+            сырые[путь.name] = {"http": код}
             if данные is None:
                 путь.write_bytes(тело)
             else:
@@ -168,10 +206,12 @@ def собрать_эталон():
                 путь.write_text(json.dumps(замаскировать(имя, данные), ensure_ascii=False,
                                            indent=1) + "\n", encoding="utf-8")
                 сырые[путь.name]["замаскировано"] = "ФИО заменены на «%s»" % МАСКА
+            сырые[путь.name]["sha256_файла"] = hashlib.sha256(путь.read_bytes()).hexdigest()
             time.sleep(1)
-        записи.append(эталон_из_сырых(inn, сырые))
+        записи.append(эталон_из_сырых(inn, сырые, ЭТАЛОН))
     мета = {"собрано_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
             "сеть": "не-РФ IP, без прокси", "ua": UA, "сырые": сырые,
+            "руководитель": "HMAC-SHA256 с локальным ключом вне репозитория",
             "не_собрано": {"суды": "КАД — только браузер (JS, капча): эталон не собирался"},
             "записи": записи}
     (ЭТАЛОН / "etalon.json").write_text(json.dumps(мета, ensure_ascii=False, indent=1) + "\n",
@@ -179,7 +219,7 @@ def собрать_эталон():
     return мета
 
 
-def эталон_из_сырых(inn, сырые):
+def эталон_из_сырых(inn, сырые, ЭТАЛОН):
     def прочесть(имя):
         путь = ЭТАЛОН / "raw" / ("%s_%s.json" % (inn, имя))
         try:
@@ -189,7 +229,7 @@ def эталон_из_сырых(inn, сырые):
     егрюл = прочесть("егрюл")
     ефрсб = прочесть("ефрсб")
     запись = эталон_записи(inn, егрюл if isinstance(егрюл, dict) and "rows" in егрюл else None,
-                           ефрсб if isinstance(ефрсб, dict) and "pageData" in ефрсб else None)
+                           ефрсб if isinstance(ефрсб, dict) else None)
     if запись["егрюл"] is not None:
         запись["егрюл"]["руководитель"] = (
             сырые.get("%s_егрюл.json" % inn, {}).get("руководитель") or {}).get(inn)
@@ -200,7 +240,19 @@ def эталон_из_сырых(inn, сырые):
 # Плечо inn-check-ru и сравнение
 # ---------------------------------------------------------------------------
 
+def последний_эталон():
+    снимки = sorted(p for p in ЭТАЛОНЫ.glob("*/etalon.json"))
+    if not снимки:
+        raise SystemExit("эталона нет: сначала bench.py эталон (и коммит до прогона)")
+    return снимки[-1]
+
+
+def _sha(путь):
+    return hashlib.sha256(Path(путь).read_bytes()).hexdigest()
+
+
 def прогон_наше():
+    эталон = последний_эталон()
     sys.path.insert(0, str(ROOT / "scripts"))
     import fetch_counterparty as fc
     выбор = json.loads(ВЫБОРКА.read_text(encoding="utf-8"))
@@ -222,6 +274,10 @@ def прогон_наше():
             "дата_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
             "сеть": "не-РФ IP, без прокси; своей ноды нет — плечо «через свою ноду» не прогонялось",
             "тариф": "без ключей", "ручные_шаги": "нет", "секунд_всего": round(time.monotonic() - начало, 1),
+            # прогон привязан к снимку эталона и рубрики: новый эталон через неделю
+            # не переоценит старый прогон
+            "эталон": str(эталон.relative_to(HERE)), "эталон_sha256": _sha(эталон),
+            "рубрика_sha256": _sha(РУБРИКА),
             "ответы": ответы}
 
 
@@ -232,19 +288,24 @@ def прогон_наше():
                             lambda б: (б.get("егрюл") or {}).get("наименование_полное")),
     "дата_регистрации": ("егрюл", "дата_регистрации",
                          lambda б: (б.get("егрюл") or {}).get("дата_регистрации")),
-    # в прогоне руководитель уже хеширован (прогон_наше), как и в эталоне
+    # в прогоне руководитель уже под HMAC (прогон_наше), как и в эталоне
     "руководитель": ("егрюл", "руководитель", lambda б: (б.get("егрюл") or {}).get("руководитель")),
     "дата_прекращения": ("егрюл", "дата_прекращения",
                          lambda б: (б.get("егрюл") or {}).get("дата_прекращения")),
     "банкротство_есть_запись": ("банкротство", "есть_запись",
-                                lambda б: None if б.get("банкротство") is None
-                                else True),
+                                lambda б: True if isinstance(б.get("банкротство"), dict)
+                                else None),
     "номер_дела": ("банкротство", "номер_дела",
                    lambda б: ((б.get("банкротство") or {}).get("дело") or {}).get("номер")),
     "стадия_код": ("банкротство", "стадия_код",
                    lambda б: ((б.get("банкротство") or {}).get("дело") or {}).get("стадия_код")),
 }
 ИСТОЧНИК_ПОЛЯ = {"егрюл": "егрюл", "банкротство": "банкротство"}
+
+
+def _пусто(v):
+    """Пустое значение поля (не False: «записи нет» — тоже факт)."""
+    return v is None or v == ""
 
 
 def сравнить(эталон, прогон):
@@ -257,22 +318,24 @@ def сравнить(эталон, прогон):
             эт = э.get(раздел)
             av = (б.get("_доступность") or {}).get(ИСТОЧНИК_ПОЛЯ[раздел]) or {}
             сост = av.get("состояние")
+            эт_знач = эт.get(ключ) if эт is not None else None
+            плечо = извлечь(б)
+            if поле == "банкротство_есть_запись" and сост == "пусто":
+                плечо = False
             if эт is None:
-                вердикт, эт_знач = "эталон не собран", None
-                плечо = None
+                вердикт = "эталон не собран"
+            elif сост == "не проверено":
+                вердикт = ("функция не поддерживается"
+                           if str(av.get("причина", "")).startswith("не покрыто:")
+                           else "источник недоступен")
+            elif сост not in ("ok", "пусто"):
+                # нет ответа плеча или состояния источника — не «совпало»
+                вердикт = "источник недоступен"
+                av = dict(av, причина=av.get("причина") or "плечо не отдало состояние источника")
+            elif эт_знач == плечо or (_пусто(эт_знач) and _пусто(плечо)):
+                вердикт = "совпало"
             else:
-                эт_знач = эт.get(ключ)
-                плечо = извлечь(б)
-                if поле == "банкротство_есть_запись" and сост == "пусто":
-                    плечо = False
-                if сост == "не проверено":
-                    вердикт = ("функция не поддерживается"
-                               if str(av.get("причина", "")).startswith("не покрыто:")
-                               else "источник недоступен")
-                elif эт_знач == плечо or (not эт_знач and not плечо):
-                    вердикт = "совпало"
-                else:
-                    вердикт = "ошибка факта"
+                вердикт = "ошибка факта"
             строки.append({"инн": inn, "поле": поле, "вердикт": вердикт, "эталон": эт_знач,
                            "плечо": плечо, "причина": av.get("причина")})
     return строки
@@ -318,8 +381,11 @@ def main(argv):
         print(путь)
         return 0
     if argv[1:2] == ["отчёт"] and len(argv) == 3:
-        эталон = json.loads((ЭТАЛОН / "etalon.json").read_text(encoding="utf-8"))
         прогон = json.loads(Path(argv[2]).read_text(encoding="utf-8"))
+        путь = HERE / прогон["эталон"]
+        if _sha(путь) != прогон["эталон_sha256"]:
+            raise SystemExit("эталон %s изменён после прогона — отчёт не строится" % путь)
+        эталон = json.loads(путь.read_text(encoding="utf-8"))
         sys.stdout.write(отчёт_md(эталон, прогон, сравнить(эталон, прогон)))
         return 0
     sys.stderr.write(__doc__)
