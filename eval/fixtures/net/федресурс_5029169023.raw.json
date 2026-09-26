@@ -1,0 +1,381 @@
+{
+ "компании": {
+  "pageData": [
+   {
+    "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+    "ogrn": "1125029011117",
+    "inn": "5029169023",
+    "name": "ПАО \"ЕВРОТРАНС\"",
+    "egrulAddress": "141044, МОСКОВСКАЯ ОБЛАСТЬ, Г. МЫТИЩИ, Д. АФАНАСОВО, УЛ. БЕРЕЗОВАЯ РОЩА, ВЛАДЕНИЕ 2",
+    "status": "Действующее",
+    "isActive": true
+   }
+  ],
+  "found": 1
+ },
+ "публикации": {
+  "pageData": [
+   {
+    "publicationType": "SfactMessage",
+    "guid": "a2c1771d-6ae2-4caf-ab2b-027461c87b8d",
+    "number": "39387982",
+    "datePublish": "2026-09-26T13:13:13.956942",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "32ee8a50-11de-4baf-81f6-334a42b966ea",
+    "number": "39369597",
+    "datePublish": "2026-09-25T15:04:16.9885",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "АО \"АБ \"РОССИЯ\"",
+     "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"АБ \"РОССИЯ\"",
+      "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "b196f47b-420a-4d09-a530-0d57b10d72cd",
+    "number": "39358178",
+    "datePublish": "2026-09-24T18:06:15.574488",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ООО \"АЛЬФАМОНОЛИТ\"",
+     "guid": "f4b632a7-2c3a-4401-9046-8c491db03a4c",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "ООО \"АЛЬФАМОНОЛИТ\"",
+      "guid": "f4b632a7-2c3a-4401-9046-8c491db03a4c",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "8897d743-289b-42ef-8931-56a7618a7d19",
+    "number": "38583797",
+    "datePublish": "2026-08-24T11:37:49.888319",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "АО \"АБ \"РОССИЯ\"",
+     "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"АБ \"РОССИЯ\"",
+      "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "2777735e-85c2-44df-be8d-12a94e7f5b4f",
+    "number": "38114319",
+    "datePublish": "2026-08-05T14:37:46.930025",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "2bc8f378-a591-4f0b-b731-f592822e7fbd",
+    "number": "37952431",
+    "datePublish": "2026-07-29T13:53:38.031845",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Выпуск независимой гарантии",
+    "publisher": {
+     "name": "ООО \"ГАРАНТИЯ\"",
+     "guid": "af506d2e-7f2a-11f0-9d21-00620be2fa80",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ГАРАНТИЯ\"",
+      "guid": "af506d2e-7f2a-11f0-9d21-00620be2fa80",
+      "type": "Company"
+     },
+     {
+      "name": "ООО \"ДИАЛОГ\"",
+      "guid": "36677f4c-59f2-4770-98cd-b0ba4e909925",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "9e0f987d-5462-4b3c-a236-44f70ee0b3de",
+    "number": "37880709",
+    "datePublish": "2026-07-29T10:07:38.991482",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение должника обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ООО \"ДСУ-96\"",
+     "guid": "fa208541-859c-424b-8e86-9a5034843c4e",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ДСУ-96\"",
+      "guid": "fa208541-859c-424b-8e86-9a5034843c4e",
+      "type": "Company"
+     },
+     {
+      "name": "ООО \"АБСОЛЮТ СТРАХОВАНИЕ\"",
+      "guid": "d78a570d-d101-45a7-b6c6-7b8417b0e89b",
+      "type": "Company"
+     },
+     {
+      "name": "УФНС РОССИИ ПО Г. МОСКВЕ",
+      "guid": "16f3b294-8906-4eec-b86c-e6aa6f1967df",
+      "type": "Company"
+     },
+     {
+      "name": "ПК \"АРТЕЛЬ СТАРАТЕЛЕЙ \"ЦЕНТРАЛЬНАЯ\"\"",
+      "guid": "9587b76b-29e5-4faa-9775-ba2b0c4d507f",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "ООО \"КОРС НОВОМОСКОВСК\"",
+      "guid": "2e6514a3-c046-4694-85f5-d1cf39b656bf",
+      "type": "Company"
+     },
+     {
+      "name": "ООО \"ТРАНСЭКОНЕРУД\"",
+      "guid": "1a12d215-6109-4da5-bd9b-00665ed5631b",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "9b5777f1-0279-4336-876e-3f0c09c76f8a",
+    "number": "37737057",
+    "datePublish": "2026-07-23T08:51:36.516774",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "АО \"АБ \"РОССИЯ\"",
+     "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"АБ \"РОССИЯ\"",
+      "guid": "0d165084-6c4d-4555-936e-0007dd5d0dff",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "cc121c75-5bad-4fff-ba39-8616b093db2f",
+    "number": "35890842",
+    "datePublish": "2026-05-06T12:51:05.215249",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сведения о бухгалтерской (финансовой) отчетности и консолидированной финансовой отчетности",
+    "publisher": {
+     "name": "ПАО \"ЕВРОТРАНС\"",
+     "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО АУДИТОРСКАЯ КОМПАНИЯ \"АУДИТ ПРОФ ГАРАНТ\"",
+      "guid": "d0b48288-f694-41d6-928d-73be9cd26ab9",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "4d1ab601-8ffa-4418-abb8-02a8e82be1b0",
+    "number": "35890665",
+    "datePublish": "2026-05-06T12:13:44.611076",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сведения о бухгалтерской (финансовой) отчетности и консолидированной финансовой отчетности",
+    "publisher": {
+     "name": "ПАО \"ЕВРОТРАНС\"",
+     "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО АУДИТОРСКАЯ КОМПАНИЯ \"АУДИТ ПРОФ ГАРАНТ\"",
+      "guid": "d0b48288-f694-41d6-928d-73be9cd26ab9",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "f51d623a-b808-4e40-af67-c621e729f250",
+    "number": "34248454",
+    "datePublish": "2026-02-26T10:45:07.750502",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Заключение договора финансовой аренды (лизинга)",
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "f8791b3f-30a9-4c3d-ac45-0ca7815156bf",
+    "number": "33766163",
+    "datePublish": "2026-02-03T10:24:52.902701",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Заключение договора финансовой аренды (лизинга)",
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "8948a3eb-ab14-4341-9c4f-c96318aa44ad",
+    "number": "33766148",
+    "datePublish": "2026-02-03T10:24:51.352321",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Заключение договора финансовой аренды (лизинга)",
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "56dc6324-50b3-4f08-9525-4988b8ae4167",
+    "number": "31482871",
+    "datePublish": "2025-10-29T10:54:33.667245",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Заключение договора финансовой аренды (лизинга)",
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "bc9427b1-3b18-46d9-941d-ebaa30e587a8",
+    "number": "31482837",
+    "datePublish": "2025-10-29T10:54:29.279525",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Заключение договора финансовой аренды (лизинга)",
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     }
+    ]
+   }
+  ],
+  "found": 135
+ }
+}

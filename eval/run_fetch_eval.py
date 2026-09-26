@@ -1082,6 +1082,147 @@ def case_bankrupt(fc):
     return errors
 
 
+def case_fedresurs(fc):
+    """Федресурс: роль субъекта, чужой должник, аннулирование, усечение, транспорт."""
+    errors = []
+
+    def загрузить(inn):
+        return json.loads((FIXTURES / ("федресурс_%s.raw.json" % inn)).read_text(encoding="utf-8"))
+
+    # компания-кредитор (Сбербанк публикует намерения о чужих банкротствах) — без сигнала
+    данные, av = fc.parse_fedresurs(загрузить("7707083893"), "7707083893")
+    check(errors, av["состояние"] == "ok" and not данные["намерение_кредитора"]
+          and данные["сообщения"], "кредитор-публикатор не субъект: %r" % данные)
+    # должник: намерения кредиторов — сигнал; чужое намерение должника, где он участник, — нет
+    данные, av = fc.parse_fedresurs(загрузить("5029169023"), "5029169023")
+    check(errors, str(данные["намерение_кредитора"]).count("сообщение") == 6,
+          "должник: шесть намерений кредиторов: %r" % данные["намерение_кредитора"])
+    чужое = [x for x in данные["сообщения"] if x["тип"].startswith("Намерение должника")]
+    check(errors, чужое and чужое[0]["субъект"] is False and данные["намерение_должника"] is None,
+          "чужое намерение должника (компания — кредитор): %r" % чужое)
+    # усечённая выдача: «нет» не утверждается
+    check(errors, данные["выдача"]["усечена"] and данные["решение_о_ликвидации"] is None,
+          "усечена: отсутствие должно быть None: %r" % данные["выдача"])
+    # аннулированное сообщение не считается
+    raw = загрузить("9500007240")
+    raw["публикации"]["pageData"][0]["isAnnulled"] = True
+    данные, av = fc.parse_fedresurs(raw, "9500007240")
+    check(errors, данные["решение_о_ликвидации"] is False and данные["аннулировано"] == 1,
+          "аннулированная ликвидация не должна давать сигнал: %r" % данные)
+    # роль не распознана: компании нет ни в публикаторах, ни в участниках
+    raw = загрузить("9500007240")
+    raw["публикации"]["pageData"][0]["publisher"] = {"guid": "чужой", "type": "Company",
+                                                     "name": "ООО Другое"}
+    данные, av = fc.parse_fedresurs(raw, "9500007240")
+    check(errors, данные["решение_о_ликвидации"] is None and данные.get("роль_не_распознана"),
+          "ликвидация, опубликованная другим лицом, — не сигнал и не «нет» (None): %r"
+          % данные)
+    # пустой публикатор у намерения кредитора: кредитор не установлен — не сигнал и не «нет»
+    raw = загрузить("7707083893")
+    for m in raw["публикации"]["pageData"]:
+        if m["type"].startswith("Намерение кредитора"):
+            m["publisher"] = {}
+    raw["публикации"]["found"] = len(raw["публикации"]["pageData"])
+    данные, av = fc.parse_fedresurs(raw, "7707083893")
+    check(errors, данные["намерение_кредитора"] is None,
+          "намерение кредитора без guid публикатора — None: %r" % данные["намерение_кредитора"])
+    # собственное намерение должника — сигнал
+    raw = загрузить("9500007240")
+    raw["публикации"]["pageData"][0]["type"] = (
+        "Намерение должника обратиться в суд с заявлением о банкротстве")
+    данные, av = fc.parse_fedresurs(raw, "9500007240")
+    check(errors, str(данные["намерение_должника"]).startswith("2023-04-19"),
+          "своё намерение должника: %r" % данные["намерение_должника"])
+    # кредитор-физлицо: ФИО в вывод не попадает
+    raw = загрузить("5029169023")
+    for m in raw["публикации"]["pageData"]:
+        if m["type"].startswith("Намерение кредитора"):
+            m["publisher"] = {"guid": "p1", "type": "Person", "name": "ТЕСТОВ ТЕСТ ТЕСТОВИЧ"}
+    данные, av = fc.parse_fedresurs(raw, "5029169023")
+    check(errors, данные["намерение_кредитора"]
+          and "ТЕСТОВ" not in json.dumps(данные, ensure_ascii=False),
+          "ФИО кредитора-физлица не должно попадать в вывод")
+    # недостоверность: публикатор ЕГРЮЛ без guid, компания — участник
+    данные, av = fc.parse_fedresurs(загрузить("7713392265"), "7713392265")
+    check(errors, str(данные["недостоверность_сведений"]).startswith("2026-08-12"),
+          "недостоверность (публикатор ЕГРЮЛ): %r" % данные["недостоверность_сведений"])
+    # схема: битое сообщение, found не числом, нет компании при усечённом поиске
+    for имя, порча in (
+            ("type", lambda r: r["публикации"]["pageData"][0].pop("type")),
+            ("publicationType", lambda r: r["публикации"]["pageData"][0].pop("publicationType")),
+            ("пустой publicationType", lambda r: r["публикации"]["pageData"][0].__setitem__(
+                "publicationType", "")),
+            ("пустой type", lambda r: r["публикации"]["pageData"][0].__setitem__("type", " ")),
+            ("participants", lambda r: r["публикации"]["pageData"][0].__setitem__(
+                "participants", [None])),
+            ("datePublish", lambda r: r["публикации"]["pageData"][0].__setitem__(
+                "datePublish", "вчера")),
+            ("found bool", lambda r: r["публикации"].__setitem__("found", True)),
+            ("found", lambda r: r["публикации"].__setitem__("found", "1")),
+            ("поиск", lambda r: r["компании"].__setitem__("pageData", [{"inn": "1"}]))):
+        raw = загрузить("9500007240")
+        порча(raw)
+        if имя == "поиск":
+            raw["компании"]["found"] = 5
+        данные, av = fc.parse_fedresurs(raw, "9500007240")
+        check(errors, av["состояние"] == "не проверено" and str(av["причина"]).startswith("схема:"),
+              "схема %s: %r" % (имя, av))
+    # чужой ИНН в выдаче поиска — не наша компания
+    raw = загрузить("9500007240")
+    raw["компании"]["pageData"][0]["inn"] = "9500007241"
+    данные, av = fc.parse_fedresurs(raw, "9500007240")
+    check(errors, av["состояние"] == "пусто" and данные is None,
+          "чужой ИНН в поиске — «пусто», а не чужие сообщения: %r" % av)
+    raw = загрузить("9500007240")
+    raw["компании"] = {"pageData": [], "found": 0}
+    данные, av = fc.parse_fedresurs(raw, "9500007240")
+    check(errors, av["состояние"] == "пусто", "нет компании — «пусто»: %r" % av)
+
+    # транспорт: два запроса, Referer страницы, без повторов/XHR, антибот
+    orig_get = fc._http_get
+    журнал = []
+    ответы = {"поиск": загрузить("9500007240")["компании"],
+              "публикации": загрузить("9500007240")["публикации"]}
+    статус = {"код": 200}
+
+    def фейк(opener, url, referer=None, accept=None, ua=None, повторы=True, xhr=True):
+        журнал.append((url, referer, ua, повторы, xhr))
+        тело = ответы["публикации" if "/publications" in url else "поиск"]
+        return статус["код"], json.dumps(тело, ensure_ascii=False)
+    fc._http_get = фейк
+    try:
+        данные, av = fc.fetch_fedresurs(None, "9500007240")
+        check(errors, len(журнал) == 2 and av["состояние"] == "ok"
+              and данные["решение_о_ликвидации"], "два запроса и сигнал: %r %r" % (журнал, av))
+        check(errors, all(not п and not x and ua == fc.UA_ПРОЕКТА for _, _, ua, п, x in журнал),
+              "без повторов, без XHR, UA проекта: %r" % журнал)
+        check(errors, журнал[0][1] == "https://fedresurs.ru/"
+              and журнал[1][1].startswith("https://fedresurs.ru/companies/"),
+              "Referer страниц сайта: %r" % [j[1] for j in журнал])
+        for код, префикс in ((403, "антибот:"), (302, "антибот:"), (500, "сеть:")):
+            статус["код"] = код
+            n = len(журнал)
+            try:
+                fc.fetch_fedresurs(None, "9500007240")
+                errors.append("%d: ожидалось SourceUnavailable" % код)
+            except fc.SourceUnavailable as e:
+                check(errors, str(e).startswith(префикс) and len(журнал) == n + 1,
+                      "%d: %s без второго запроса: %r" % (код, префикс, str(e)))
+        статус["код"] = 200
+        n = len(журнал)
+        _, av = fc.fetch_fedresurs(None, "504110181262")
+        check(errors, len(журнал) == n and str(av["причина"]).startswith("не покрыто:"),
+              "ИП: без запроса: %r" % av)
+        os.environ["INN_CHECK_BEZ_REFERER"] = "1"
+        _, av = fc.fetch_fedresurs(None, "9500007240")
+        check(errors, len(журнал) == n and str(av["причина"]).startswith("не покрыто:"),
+              "INN_CHECK_BEZ_REFERER=1: %r" % av)
+    finally:
+        os.environ.pop("INN_CHECK_BEZ_REFERER", None)
+        fc._http_get = orig_get
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
     fc._http_get_настоящий = fc._http_get  # для теста транспорта на фейковом opener
@@ -1101,6 +1242,7 @@ def main():
         "спецреестры-дисквалификация": case_special_registries(fc),
         "прокси-и-кэш-доступа": case_proxy(fc),
         "ефрсб-банкротство": case_bankrupt(fc),
+        "федресурс-роли": case_fedresurs(fc),
     }
     failed = 0
     for name, errors in cases.items():

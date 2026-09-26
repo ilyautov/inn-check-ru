@@ -1631,6 +1631,188 @@ def fetch_bankrupt(opener, inn):
     return parse_bankrupt(raw_bankrupt(opener, inn), inn)
 
 
+ФЕДРЕСУРС = "https://fedresurs.ru"
+# Тип сообщения (как в выдаче) -> (поле блока, правило роли). Правила сняты с живых
+# ответов 26.09.2026: намерение кредитора публикует кредитор, должник — в
+# participants; намерение должника и ликвидацию публикует сама компания;
+# недостоверность публикует ЕГРЮЛ (без guid), компания — в participants.
+ФЕДРЕСУРС_ТИПЫ = {
+    "Намерение кредитора обратиться в суд с заявлением о банкротстве":
+        ("намерение_кредитора", "участник_не_публикатор"),
+    "Намерение должника обратиться в суд с заявлением о банкротстве":
+        ("намерение_должника", "публикатор"),
+    "Ликвидация юридического лица": ("решение_о_ликвидации", "публикатор"),
+    "Недостоверность сведений": ("недостоверность_сведений", "участник"),
+}
+
+
+def _rec_fedresurs(raw, inn):
+    rows = _g(raw, "компании", "pageData")
+    for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict) and str(r.get("inn") or "").strip() == str(inn):
+            return r
+    return None
+
+
+def _роль_федресурс(m, guid):
+    """Роль компании в сообщении: «публикатор» / «участник» / None (её там нет)."""
+    if _g(m, "publisher", "guid") == guid:
+        return "публикатор"
+    if any(isinstance(p, dict) and p.get("guid") == guid for p in m.get("participants") or []):
+        return "участник"
+    return None
+
+
+_ДАТА_ISO_ПРЕФИКС = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+def _непустая(v):
+    return isinstance(v, str) and bool(v.strip())
+
+
+def _сообщение_ок(m):
+    return (isinstance(m, dict) and _непустая(m.get("type"))
+            and _непустая(m.get("publicationType"))
+            # publisher бывает null (лизинг, живьём 26.09.2026) — роль тогда по участникам
+            and isinstance(m.get("publisher"), (dict, type(None)))
+            and isinstance(m.get("datePublish"), str)
+            and bool(_ДАТА_ISO_ПРЕФИКС.match(m["datePublish"]))
+            and isinstance(m.get("isAnnulled"), bool)
+            and isinstance(m.get("participants") or [], list)
+            and all(isinstance(p, dict) for p in m.get("participants") or []))
+
+
+def parse_fedresurs(raw, inn):
+    """{компании: поиск, публикации: первая страница} -> блок «федресурс».
+
+    Сигнал поднимается, только если компания — СУБЪЕКТ сообщения (правило роли
+    по типу), а не публикатор чужого: Сбербанк публикует намерения о банкротстве
+    своих должников. Аннулированные не считаются. Выдача неполная (found > страницы)
+    — найденное остаётся, а «нет» становится None (не проверено), не False.
+    """
+    if not isinstance(raw, dict) or not isinstance(_g(raw, "компании", "pageData"), list):
+        return _not_checked("федресурс", "схема: не найдено поле pageData поиска")
+    строки = raw["компании"]["pageData"]
+    if not all(isinstance(r, dict) for r in строки) or (
+            строки and not all(isinstance(r.get("inn"), str) and r["inn"].strip()
+                               for r in строки)):
+        return _not_checked("федресурс", "схема: не найдено поле inn в строке поиска")
+    rec = _rec_fedresurs(raw, inn)
+    if rec is None:
+        найдено = _g(raw, "компании", "found")
+        if not isinstance(найдено, int) or isinstance(найдено, bool) or найдено > len(строки):
+            return _not_checked("федресурс", "схема: выдача поиска усечена или без found")
+        return None, _av("федресурс", "пусто", "в Федресурсе нет компании с этим ИНН "
+                                               "(поиск по точному ИНН)")
+    missing = _schema_missing("федресурс", inn, rec)
+    if missing:
+        return _not_checked("федресурс", "схема: не найдено поле %s" % missing)
+    pub = raw.get("публикации")
+    if not isinstance(pub, dict) or not isinstance(pub.get("pageData"), list):
+        return _not_checked("федресурс", "схема: не найдено поле pageData публикаций")
+    всего = pub.get("found")
+    if not isinstance(всего, int) or isinstance(всего, bool) or всего < len(pub["pageData"]):
+        return _not_checked("федресурс", "схема: поле found публикаций не число (%r)" % (всего,))
+    if not all(_сообщение_ок(m) for m in pub["pageData"]):
+        return _not_checked("федресурс", "схема: сообщение без type/publisher/datePublish/"
+                                         "isAnnulled")
+    guid = rec["guid"]
+    усечена = всего > len(pub["pageData"])
+    найдено = {поле: [] for поле, _ in ФЕДРЕСУРС_ТИПЫ.values()}
+    неясно = set()  # поля, по которым есть сообщение с нераспознанной ролью
+    сообщения, не_распознано, аннулировано = [], [], 0
+    for m in pub["pageData"]:
+        if m.get("publicationType") != "SfactMessage":
+            continue  # сообщения ЕФРСБ — в блоке «банкротство»
+        if m["isAnnulled"]:
+            аннулировано += 1
+            continue
+        роль = _роль_федресурс(m, guid)
+        дата = m["datePublish"][:10]
+        запись = {"дата": дата, "тип": m["type"], "номер": m.get("number"), "роль": роль,
+                  "карточка": "%s/sfactmessages/%s" % (ФЕДРЕСУРС, m.get("guid"))}
+        правило = ФЕДРЕСУРС_ТИПЫ.get(m["type"])
+        if правило:
+            поле, нужна = правило
+            if нужна == "участник_не_публикатор" and not _g(m, "publisher", "guid"):
+                # публикатор без guid: не доказано, что это не сама компания
+                роль = None
+            субъект = (роль == "участник" if нужна == "участник_не_публикатор"
+                       else роль == нужна)
+            запись["субъект"] = субъект
+            запись["роль"] = роль
+            if субъект:
+                кто = m["publisher"] or {}
+                найдено[поле].append("%s: %s (сообщение %s%s)" % (
+                    дата, m["type"].lower(), m.get("number") or "без номера",
+                    "; публикатор %s" % кто.get("name")
+                    if кто.get("type") == "Company" and нужна == "участник_не_публикатор"
+                    else ""))
+            elif роль is None:
+                # Компании нет ни в публикаторе, ни в участниках — не знаем, о ней ли
+                # сообщение: «нет» по этому полю не утверждаем.
+                не_распознано.append(запись)
+                неясно.add(поле)
+        сообщения.append(запись)
+    данные = {поле: ("; ".join(v) if v else (None if усечена or поле in неясно else False))
+              for поле, v in найдено.items()}
+    данные.update({
+        "сообщения": сообщения,
+        "аннулировано": аннулировано,
+        "выдача": {"показано": len(pub["pageData"]), "всего": всего, "усечена": усечена},
+        "карточка": "%s/companies/%s" % (ФЕДРЕСУРС, guid),
+    })
+    if не_распознано:
+        данные["роль_не_распознана"] = не_распознано
+    if усечена:
+        данные["примечание"] = ("показана первая страница публикаций (%d из %d): найденное "
+                                "верно, отсутствие не проверено" % (len(pub["pageData"]), всего))
+    return данные, _av("федресурс", "ok")
+
+
+def raw_fedresurs(opener, inn):
+    """Два запроса: поиск по ИНН и первая страница публикаций найденной компании."""
+    opener = _make_opener(редиректы=False)
+    raw = {"компании": _json_политика(
+        opener, "%s/backend/companies?searchString=%s&limit=15&offset=0"
+        % (ФЕДРЕСУРС, urllib.parse.quote(str(inn))), ФЕДРЕСУРС + "/", "Федресурс", "поиск")}
+    rec = _rec_fedresurs(raw, inn)
+    if rec and rec.get("guid"):
+        g = urllib.parse.quote(str(rec["guid"]))
+        raw["публикации"] = _json_политика(
+            opener, "%s/backend/companies/%s/publications?limit=15&offset=0" % (ФЕДРЕСУРС, g),
+            "%s/companies/%s" % (ФЕДРЕСУРС, g), "Федресурс", "публикации")
+    return raw
+
+
+def _json_политика(opener, url, referer, имя, шаг):
+    """Один GET по политике JSON сайтов: без повторов, 401/403/429/3xx — антибот."""
+    try:
+        status, text = _http_get(opener, url, referer=referer, ua=UA_ПРОЕКТА,
+                                 повторы=False, xhr=False)
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e))
+    if status in (401, 403, 429) or 300 <= status < 400:
+        raise SourceUnavailable("антибот: %s ответил %d на шаге «%s» — без обхода, "
+                                "проверьте вручную" % (имя, status, шаг))
+    if status != 200:
+        raise SourceUnavailable(_http_status_reason(status, шаг))
+    j = _safe_json(text)
+    if j is None:
+        raise SourceUnavailable("антибот: %s вернул не-JSON на шаге «%s»" % (имя, шаг))
+    return j
+
+
+def fetch_fedresurs(opener, inn):
+    if os.environ.get("INN_CHECK_BEZ_REFERER") == "1":
+        return _not_checked("федресурс", "не покрыто: INN_CHECK_BEZ_REFERER=1 — "
+                                         "Федресурс только браузером (%s)" % ФЕДРЕСУРС)
+    if _тип_контрагента(inn) == "ип":
+        return _not_checked("федресурс", "не покрыто: ИП в Федресурсе — физлицо, поиск по "
+                                         "ИНН скриптом не поддержан (%s)" % ФЕДРЕСУРС)
+    return parse_fedresurs(raw_fedresurs(opener, inn), inn)
+
+
 FETCHERS = {
     "банкротство": fetch_bankrupt,
     "егрюл": fetch_egrul,
@@ -1643,11 +1825,13 @@ FETCHERS = {
     "рнп": lambda opener, inn: fetch_registry_cache("рнп", inn),
     "санкции": fetch_sanctions,
     "дампы_фнс": fetch_opendata_dumps,
+    "федресурс": fetch_fedresurs,
 }
 
 # id источника -> чистый парсер (raw, inn) -> (данные, _доступность); гоняет eval.
 PARSERS = {
     "банкротство": parse_bankrupt,
+    "федресурс": parse_fedresurs,
     "егрюл": parse_egrul,
     "риски": parse_risks,
     "финансы": parse_finance,
@@ -1666,6 +1850,7 @@ CONTEXT_FETCHERS = {"спецреестры"}
 # из неё eval дрейфа схемы удаляет поля контракта по очереди.
 RAW_RECORD["спецреестры"] = _rec_special
 RAW_RECORD["банкротство"] = _rec_bankrupt
+RAW_RECORD["федресурс"] = _rec_fedresurs
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка

@@ -1,0 +1,432 @@
+{
+ "компании": {
+  "pageData": [
+   {
+    "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+    "ogrn": "1027700132195",
+    "inn": "7707083893",
+    "name": "ПАО СБЕРБАНК",
+    "egrulAddress": "117312, Г.МОСКВА, УЛ. ВАВИЛОВА, Д.19",
+    "status": "Действующее",
+    "okvedName": "Денежное посредничество прочее",
+    "isActive": true
+   }
+  ],
+  "found": 1
+ },
+ "публикации": {
+  "pageData": [
+   {
+    "publicationType": "SfactMessage",
+    "guid": "a2c1771d-6ae2-4caf-ab2b-027461c87b8d",
+    "number": "39387982",
+    "datePublish": "2026-09-26T13:13:13.956942",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"ЕВРОТРАНС\"",
+      "guid": "10b26c20-6f1b-45b0-be17-d2f2e20e53e6",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "7aaafed5-e0e9-49b7-a9d4-4e9eccd9cbbc",
+    "number": "39387980",
+    "datePublish": "2026-09-26T13:03:14.764243",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "800670a4-868d-11ef-b9b6-00620be2fa80",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "1523a243-3356-4b6e-9d3f-de6a0aa02a51",
+    "number": "39387969",
+    "datePublish": "2026-09-26T12:33:55.736499",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"СТОКИ СТОП\"",
+      "guid": "b4b23a49-efb7-42c3-a62d-40a10f997154",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "3cfdfd00-eb22-4a15-a3c1-d6d5b754ac64",
+    "number": "39278924",
+    "datePublish": "2026-09-25T16:32:49.192599",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение должника обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "68e40f5e-eba1-4580-b17e-d4fca4f24ee3",
+     "type": "Person"
+    },
+    "participants": [
+     {
+      "name": "АО \"РОССЕЛЬХОЗБАНК\"",
+      "guid": "657730a3-c51f-40ea-9358-70e9d9fad8db",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"АЛЬФА-БАНК\"",
+      "guid": "257a9e18-b340-4fd9-8451-b19ef50d078d",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"ТБАНК\"",
+      "guid": "3fcbe15d-4741-4908-a9b2-c223c0baebb1",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"СОВКОМБАНК\"",
+      "guid": "0699fba9-b2bb-4b6a-97bc-a42eef585648",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "68e40f5e-eba1-4580-b17e-d4fca4f24ee3",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "44a4b91a-b0bb-4fd8-8586-225b82addc60",
+    "number": "39370205",
+    "datePublish": "2026-09-25T15:55:52.533765",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"РОСТАГРОБИЗНЕС\"",
+      "guid": "5a4dbf95-ec66-4acf-8ea4-ccca47aea2ac",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "0da2d379-6815-4f3a-ace9-bd9cc9fbfbf4",
+    "number": "39370183",
+    "datePublish": "2026-09-25T15:54:03.759833",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "65b0ab53-5bbe-40cf-a541-c7c55fb5a01e",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "07c2f6a5-7e86-40a6-913c-2c977ea42553",
+    "number": "39369818",
+    "datePublish": "2026-09-25T15:25:55.29944",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "d4ab90b9-727c-4fc8-9416-ce2249305dec",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "7a7b1279-d12b-4d35-a3e2-efb7fadfd1c0",
+    "number": "39369805",
+    "datePublish": "2026-09-25T15:23:38.594511",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ФЕНИКС\"",
+      "guid": "272b8f19-992a-4226-b45f-c3d26025b4b1",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "a7fd8271-645d-45d4-90f5-24c31563a5ad",
+    "number": "39369469",
+    "datePublish": "2026-09-25T14:55:18.553198",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО\"ВИКМОС\"",
+      "guid": "aad18691-32c6-4de8-a3d5-5e167907cf69",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "5e94932a-10b6-4c29-b9d7-efc7bd9c9142",
+    "number": "39369456",
+    "datePublish": "2026-09-25T14:53:13.503178",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "6990587e-eacd-4fc7-aed6-0854228c1134",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "9f22aee6-6949-4ea8-b61b-606e24a4889b",
+    "number": "39367767",
+    "datePublish": "2026-09-25T11:23:31.415246",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "e9afc0c3-6554-471a-846f-a134a314ba40",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "01eff024-ca8e-44e2-8884-5884e273c4e4",
+    "number": "39367734",
+    "datePublish": "2026-09-25T11:18:20.873315",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ФАВОРИТ\"",
+      "guid": "9011167e-85ce-4287-873b-8d102b00e996",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "d3fe7954-922d-44c9-86ca-e4393c3e3744",
+    "number": "39367725",
+    "datePublish": "2026-09-25T11:15:26.40121",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     },
+     {
+      "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+      "guid": "312ef36b-32ef-441a-add5-45b71b4bd68b",
+      "type": "Person"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "1be8682a-2eb4-490f-a921-a32626695efb",
+    "number": "39367688",
+    "datePublish": "2026-09-25T11:09:28.96197",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение кредитора обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ПАО СБЕРБАНК",
+     "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"АТОМ\"",
+      "guid": "20a4f0c5-0a99-4f19-9b19-afb586d68446",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "e5d5bb1a-d29c-471c-8194-02e9cf78d6f9",
+    "number": "39350740",
+    "datePublish": "2026-09-25T10:49:23.875863",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Намерение должника обратиться в суд с заявлением о банкротстве",
+    "publisher": {
+     "name": "ООО \"ВЕГА\"",
+     "guid": "e0fcdb50-a1c3-4dd3-9787-2bdfd1e04919",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ВЕГА\"",
+      "guid": "e0fcdb50-a1c3-4dd3-9787-2bdfd1e04919",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО СБЕРБАНК",
+      "guid": "9348548a-30a3-4344-8cf0-fb1f45c54dfb",
+      "type": "Company"
+     }
+    ]
+   }
+  ],
+  "found": 1001
+ }
+}

@@ -1,0 +1,308 @@
+{
+ "компании": {
+  "pageData": [
+   {
+    "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+    "ogrn": "1157746192328",
+    "inn": "7713392265",
+    "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+    "egrulAddress": "109462, Г.МОСКВА, ВН.ТЕР.Г. МУНИЦИПАЛЬНЫЙ ОКРУГ КУЗЬМИНКИ, Б-Р ВОЛЖСКИЙ, Д. 51, СТР. 2, ПОМЕЩ. 130",
+    "status": "Юридическое лицо признано несостоятельным (банкротом) и в отношении него открыто конкурсное производство",
+    "okvedName": "Торговля оптовая компьютерами, периферийными устройствами к компьютерам и программным обеспечением",
+    "isActive": true
+   }
+  ],
+  "found": 1
+ },
+ "публикации": {
+  "pageData": [
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "d6c08de7-a275-4b8d-88d6-d48aef79567a",
+    "number": "24805334",
+    "datePublish": "2026-09-26T13:08:45.477",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о включении заявленных требований в реестр требований кредиторов",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "65646085-9f45-476f-b95c-23e45b48dff3",
+    "number": "24764312",
+    "datePublish": "2026-09-23T23:42:44.09",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о собрании кредиторов",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "35c2d661-84e7-472c-9667-c762b6a2aaf2",
+    "number": "24380906",
+    "datePublish": "2026-08-27T23:44:52.663",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о судебном акте",
+    "actType": "об изменении судебного акта",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "689d1c2a-10e4-4bb4-878f-8532dbf524d4",
+    "number": "24227802",
+    "datePublish": "2026-08-17T23:41:14.4",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Уведомление о получении требований кредитора ",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "f78972ce-0374-4e56-a816-d5c5f73ffc18",
+    "number": "24227299",
+    "datePublish": "2026-08-17T21:26:59.05",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сведения о результатах инвентаризации имущества должника",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "5182a5bf-da5b-4648-93d7-6936025c713f",
+    "number": "24227270",
+    "datePublish": "2026-08-17T21:20:59.543",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Аннулирование ранее опубликованного сообщения",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "b385d877-d4f7-46a3-b159-968c7cf7a3eb",
+    "number": "24207711",
+    "datePublish": "2026-08-16T23:31:48.78",
+    "isAnnulled": true,
+    "isLocked": true,
+    "type": "Сведения о результатах инвентаризации имущества должника",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "5fe14d63-8006-4f47-b262-73cb7f066234",
+    "number": "24205516",
+    "datePublish": "2026-08-15T23:12:30.757",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Уведомление о получении требований кредитора ",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "fcf8ba59-9959-44f9-9e9d-dd38ca9999b9",
+    "number": "24199681",
+    "datePublish": "2026-08-14T16:19:41.46",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о включении заявленных требований в реестр требований кредиторов",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "6f4f6479-d853-47ac-b704-5f4218f61bc6",
+    "number": "24167750",
+    "datePublish": "2026-08-12T21:19:08.73",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о результатах проведения собрания кредиторов",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "53791414-95fa-11f1-83e1-3a68dd6f9e4f",
+    "number": "38213142",
+    "datePublish": "2026-08-12T06:02:59.999526",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Недостоверность сведений",
+    "publisher": {
+     "name": "ЕГРЮЛ"
+    },
+    "participants": [
+     {
+      "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+      "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "5bb9e818-a257-4179-8884-0fd7aa48a2d3",
+    "number": "24097249",
+    "datePublish": "2026-08-07T12:05:16.703",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Уведомление о получении требований кредитора ",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "536de088-f763-404e-a5bb-ea63c63de123",
+    "number": "24096713",
+    "datePublish": "2026-08-07T11:47:21.47",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Уведомление о получении требований кредитора ",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "0600b72a-c1ae-4a4b-af58-bc7830aed758",
+    "number": "24037933",
+    "datePublish": "2026-08-03T23:07:29.98",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Уведомление о получении требований кредитора ",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   },
+   {
+    "publicationType": "BankruptMessage",
+    "guid": "7be11dc4-8f9d-46e7-b20d-4b1b84f00049",
+    "number": "23956316",
+    "datePublish": "2026-07-28T23:25:45.26",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Сообщение о собрании кредиторов",
+    "publisher": {
+     "name": "ФИО УБРАНО ИЗ ФИКСТУРЫ",
+     "guid": "538671dc-47fc-4301-a12f-d2050a80ae2d",
+     "type": "Person"
+    },
+    "bankrupt": {
+     "name": "ООО \"ТОРГОВЫЙ ДОМ \"НЕБЕСНЫЙ ДРАКОН\"",
+     "guid": "40409956-9429-4632-8d68-505ab3bd69d0",
+     "type": "Company"
+    }
+   }
+  ],
+  "found": 38
+ }
+}
