@@ -1349,6 +1349,18 @@ def case_aggregator(fc):
         д, _ = fc.parse_checko(raw, ИНН)
         check(errors, "недостоверность_сведений" not in д,
               "%s=%r — выдано «нет»: %r" % (узел, v, д))
+    # повреждённые вложенные записи — не «нет» (второе ревью Codex)
+    д, _ = fc.parse_checko(_checko(**{"data.Учред.РосОрг": {"Недост": True}}), ИНН)
+    check(errors, "недостоверность_сведений" not in д, "Учред-объект дал «нет»: %r" % д)
+    raw = _checko(**{"data.УпрОрг": None})
+    raw["data"]["Руковод"].append(None)
+    д, _ = fc.parse_checko(raw, ИНН)
+    check(errors, "недостоверность_сведений" not in д and "дисквалификация_руководителя" not in д,
+          "null в Руковод дал «нет»: %r" % д)
+    raw["data"]["Руковод"][0]["ДисквЛицо"] = True
+    д, _ = fc.parse_checko(raw, ИНН)
+    check(errors, д.get("дисквалификация_руководителя") is True,
+          "найденный true потерян при повреждённой схеме: %r" % д)
     # сквозь профиль: пустой ответ агрегатора не даёт «отсутствует»
     pf0 = load_module("profiles", ROOT / "scripts" / "profiles.py")
     for raw, разбор in (({"data": {}, "meta": {"status": "ok"}}, fc.parse_checko),

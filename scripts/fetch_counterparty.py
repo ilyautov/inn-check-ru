@@ -1821,6 +1821,13 @@ def parse_checko(raw, inn):
     if isinstance(d.get("УпрОрг"), dict) and d["УпрОрг"]:
         части.append(("управляющая организация", d["УпрОрг"]))
     учред = d.get("Учред") if isinstance(d.get("Учред"), dict) else {}
+    # Схема цела, только если каждый руководитель — объект, каждая группа
+    # учредителей — список объектов, УпрОрг — объект или null. Иначе часть
+    # записей молча не прочитана, и «нет» по ним не доказано.
+    схема_цела = (all(isinstance(r, dict) for r in d["Руковод"])
+                  and all(isinstance(з, list) and all(isinstance(r, dict) for r in з)
+                          for з in учред.values())
+                  and (d.get("УпрОрг") is None or isinstance(d.get("УпрОрг"), dict)))
     for записи in учред.values():
         for r in записи if isinstance(записи, list) else []:
             if isinstance(r, dict):
@@ -1849,15 +1856,16 @@ def parse_checko(raw, inn):
     if недост:
         данные["недостоверность_сведений"] = True
         данные["недостоверность"] = недост
-    elif (флаги_недост and None not in флаги_недост and isinstance(d.get("Учред"), dict)
-          and "УпрОрг" in d):
+    elif (схема_цела and флаги_недост and None not in флаги_недост
+          and isinstance(d.get("Учред"), dict) and "УпрОрг" in d):
         # «нет» — только когда на месте все узлы, где бывает отметка: пропавший
         # Учред или УпрОрг — не «недостоверности нет», а поле не отдано.
         данные["недостоверность_сведений"] = False
     if дискв:
         данные["дисквалификация_руководителя"] = True
         данные["дисквалификация"] = дискв
-    elif флаги_дискв and None not in флаги_дискв and d.get("ДисквЛица") in (False, None):
+    elif (схема_цела and флаги_дискв and None not in флаги_дискв
+          and d.get("ДисквЛица") in (False, None)):
         данные["дисквалификация_руководителя"] = False
     return данные, _av("агрегатор", "ok")
 

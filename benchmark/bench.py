@@ -64,6 +64,12 @@ def _ключ():
     return КЛЮЧ_HMAC.read_text().strip().encode()
 
 
+def ключ_id():
+    """Отпечаток HMAC-ключа (не сам ключ): эталон и прогон под разными ключами
+    несравнимы — руководитель разошёлся бы у всех, и это были бы ложные дефекты."""
+    return hmac.new(_ключ(), b"inn-check-ru benchmark key id", hashlib.sha256).hexdigest()[:16]
+
+
 def хеш_фио(v):
     """ФИО физлиц в репозиторий не кладём: руководитель сравнивается по HMAC."""
     if not v:
@@ -168,9 +174,13 @@ def эталон_записи(inn, егрюл, ефрсб):
             "дата_прекращения": r.get("e") or None}
     выдача = ефрсб.get("pageData") if isinstance(ефрсб, dict) else None
     всего = ефрсб.get("total") if isinstance(ефрсб, dict) else None
+    # каждая строка — объект со строковым inn, иначе запись с нашим ИНН могла
+    # не распознаться (как и в parse_bankrupt движка — это ошибка схемы)
+    строки_целы = isinstance(выдача, list) and all(
+        isinstance(r, dict) and isinstance(r.get("inn"), str) for r in выдача)
     свои = [r for r in выдача or [] if isinstance(r, dict) and str(r.get("inn")) == inn]
-    if not isinstance(выдача, list) or not isinstance(всего, int) or isinstance(всего, bool) \
-            or (not свои and всего > len(выдача)):
+    if not строки_целы or not isinstance(всего, int) or isinstance(всего, bool) \
+            or всего < len(выдача) or (not свои and всего > len(выдача)):
         # не список, нет total или выдача неполная — отсутствие записи не доказано
         out["банкротство"] = None
     else:
@@ -212,6 +222,7 @@ def собрать_эталон(дата=None):
     мета = {"собрано_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
             "сеть": "не-РФ IP, без прокси", "ua": UA, "сырые": сырые,
             "руководитель": "HMAC-SHA256 с локальным ключом вне репозитория",
+            "ключ_id": ключ_id(),
             "не_собрано": {"суды": "КАД — только браузер (JS, капча): эталон не собирался"},
             "записи": записи}
     (ЭТАЛОН / "etalon.json").write_text(json.dumps(мета, ensure_ascii=False, indent=1) + "\n",
@@ -277,7 +288,7 @@ def прогон_наше():
             # прогон привязан к снимку эталона и рубрики: новый эталон через неделю
             # не переоценит старый прогон
             "эталон": str(эталон.relative_to(HERE)), "эталон_sha256": _sha(эталон),
-            "рубрика_sha256": _sha(РУБРИКА),
+            "рубрика_sha256": _sha(РУБРИКА), "ключ_id": ключ_id(),
             "ответы": ответы}
 
 
@@ -385,7 +396,12 @@ def main(argv):
         путь = HERE / прогон["эталон"]
         if _sha(путь) != прогон["эталон_sha256"]:
             raise SystemExit("эталон %s изменён после прогона — отчёт не строится" % путь)
+        if _sha(РУБРИКА) != прогон.get("рубрика_sha256"):
+            raise SystemExit("рубрика изменена после прогона — отчёт не строится")
         эталон = json.loads(путь.read_text(encoding="utf-8"))
+        if not эталон.get("ключ_id") or эталон.get("ключ_id") != прогон.get("ключ_id"):
+            raise SystemExit("эталон и прогон под разными HMAC-ключами — руководитель "
+                             "несравним, отчёт не строится")
         sys.stdout.write(отчёт_md(эталон, прогон, сравнить(эталон, прогон)))
         return 0
     sys.stderr.write(__doc__)

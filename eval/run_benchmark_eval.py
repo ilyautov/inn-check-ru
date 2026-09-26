@@ -81,6 +81,10 @@ def case_сравнение(b):
                 {"pageData": []}, {"total": 0}):
         check(errors, b.эталон_записи("1", None, raw)["банкротство"] is None,
               "неполная выдача ЕФРСБ принята: %r" % raw)
+    for raw in ({"pageData": [{"ИНН": "1"}], "total": 1}, {"pageData": [None], "total": 1},
+                {"pageData": [{"inn": "2"}, {"inn": "3"}], "total": 1}):
+        check(errors, b.эталон_записи("1", None, raw)["банкротство"] is None,
+              "повреждённая выдача ЕФРСБ принята как «записи нет»: %r" % raw)
     check(errors, b.эталон_записи("1", None, {"pageData": [], "total": 0})["банкротство"]
           == {"есть_запись": False, "номер_дела": None, "стадия_код": None},
           "полная пустая выдача — не «записи нет»")
@@ -89,6 +93,32 @@ def case_сравнение(b):
                        dict(прогон(), плечо="п", версия="1", дата_utc="d", сеть="s", тариф="t",
                             ручные_шаги="нет", секунд_всего=1), b.сравнить(эталон, прогон()))
     check(errors, "%" not in отчёт and "рейтинг" not in отчёт, "в отчёте доли/рейтинг")
+    return errors
+
+
+def case_привязка(b):
+    """Отчёт не строится при чужом ключе, изменённой рубрике или эталоне."""
+    import tempfile
+    errors = []
+    with tempfile.TemporaryDirectory() as td:
+        эт = Path(td) / "etalon.json"
+        эт.write_text(json.dumps({"ключ_id": b.ключ_id(), "записи": [], "не_собрано": {},
+                                  "собрано_utc": "x", "сеть": "y"}), encoding="utf-8")
+        база = {"эталон": str(эт), "эталон_sha256": b._sha(эт),
+                "рубрика_sha256": b._sha(b.РУБРИКА), "ключ_id": b.ключ_id(),
+                "плечо": "п", "версия": "1", "дата_utc": "d", "сеть": "s", "тариф": "t",
+                "ручные_шаги": "нет", "секунд_всего": 1, "ответы": {}}
+        for имя, правка in (("исходный", {}), ("чужой ключ", {"ключ_id": "0" * 16}),
+                            ("рубрика", {"рубрика_sha256": "0" * 64}),
+                            ("эталон", {"эталон_sha256": "0" * 64})):
+            пр = Path(td) / "run.json"
+            пр.write_text(json.dumps(dict(база, **правка)), encoding="utf-8")
+            try:
+                b.main(["bench.py", "отчёт", str(пр)])
+                прошло = True
+            except SystemExit:
+                прошло = False
+            check(errors, прошло == (имя == "исходный"), "%s: отчёт построен=%s" % (имя, прошло))
     return errors
 
 
@@ -131,7 +161,8 @@ def case_эталон(b):
 def main():
     os.environ.setdefault("INN_CHECK_BENCH_KEY", "ключ-только-для-eval")
     b = load_module("bench", ROOT / "benchmark" / "bench.py")
-    cases = {"категории дефектов": case_сравнение(b), "эталон и маскирование": case_эталон(b)}
+    cases = {"категории дефектов": case_сравнение(b), "эталон и маскирование": case_эталон(b),
+             "привязка отчёта к эталону, рубрике и ключу": case_привязка(b)}
     failed = 0
     for name, errors in cases.items():
         if errors:
