@@ -1,7 +1,7 @@
 {
   "name": "inn-check-ru",
   "displayName": "INN Check RU",
-  "version": "1.12.1",
+  "version": "1.12.2",
   "description": "Counterparty due-diligence by Russian INN over open registries (EGRUL, tax, SME, sanctions), code-computed financial and business-splitting risk flags, snapshot monitoring. RU+EN output, every number with source and date.",
   "author": {
     "name": "Ilya Utov",
