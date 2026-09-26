@@ -18,7 +18,7 @@ jobs:
       - name: ruff
         run: |
           pip install ruff
-          ruff check scripts/ eval/ mcp/ calibration/ packaging/
+          ruff check scripts/ eval/ mcp/ calibration/ packaging/ benchmark/
 
       - name: skill frontmatter is valid YAML
         run: |
@@ -102,6 +102,9 @@ jobs:
 
       - name: "измеренный светофор: отчёт и справочник воспроизводятся"
         run: python3 eval/run_svetofor_eval.py
+
+      - name: "бенчмарк: категории дефектов, эталон без ФИО"
+        run: python3 eval/run_benchmark_eval.py
 
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
