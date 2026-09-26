@@ -100,6 +100,9 @@ jobs:
       - name: "--офлайн: ни одного сетевого вызова (audit-хук)"
         run: python3 eval/run_offline_eval.py
 
+      - name: "измеренный светофор: отчёт и справочник воспроизводятся"
+        run: python3 eval/run_svetofor_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |
