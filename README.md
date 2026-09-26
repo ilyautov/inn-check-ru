@@ -5,7 +5,7 @@
 > **Не отгружай в долг вслепую.** Открытый AI-скилл, который по одному ИНН собирает открытые реестры (ЕГРЮЛ, ФССП, суды, банкротства, финансы) и выдаёт **светофор риска 🟢/🟡/🔴** с рекомендацией: отсрочка, только предоплата или избегать. Для Claude Code, Cursor, Codex, ChatGPT и Gemini. Бесплатно, Apache-2.0, данные — из настоящих реестров, а не из головы модели.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.12.0-blueviolet)](CHANGELOG.md)
+[![Версия](https://img.shields.io/badge/версия-1.12.1-blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/inn-check-ru?style=social)](https://github.com/ilyautov/inn-check-ru/stargazers)
 [![skills.sh](https://skills.sh/b/ilyautov/inn-check-ru)](https://skills.sh/ilyautov/inn-check-ru/inn-check-ru)
 
@@ -95,6 +95,15 @@ npx skills add ilyautov/inn-check-ru
 
 ## Установка
 
+| Где работаете | Как поставить | Что получите |
+|---|---|---|
+| Claude Code, Cowork | плагин (ниже) | скилл + MCP-сервер, обновления через маркетплейс |
+| Claude Desktop без плагинов | [inn-check-ru.mcpb](https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.mcpb) — открыть файл, «Установить» | MCP-сервер; Python ставить не нужно |
+| Claude.ai (веб) | ZIP скилла (ниже) | скилл |
+| Cursor, Codex и другие MCP-клиенты | `uvx inn-check-ru-mcp@latest` | MCP-сервер, [конфиги](mcp/README.md) |
+| Любой агент со скиллами | `npx skills add ilyautov/inn-check-ru` | скилл |
+| Терминал | `uvx inn-check-ru <ИНН>` | CLI |
+
 ### Через skills.sh (любой агент)
 
 ```bash
@@ -103,12 +112,22 @@ npx skills add ilyautov/inn-check-ru
 
 CLI [skills.sh](https://skills.sh) ставит скилл в каталог вашего агента (Claude Code, Cursor, Codex, Gemini CLI и др.).
 
-### Claude Code (плагин)
+### Claude Code и Cowork (плагин)
 
 ```text
 /plugin marketplace add ilyautov/inn-check-ru
 /plugin install inn-check-ru@inn-check-ru
 ```
+
+Сторонний маркетплейс сам не обновляется. Новая версия:
+
+```bash
+claude plugin marketplace update inn-check-ru && claude plugin update inn-check-ru@inn-check-ru
+```
+
+### Claude Desktop (расширение .mcpb)
+
+**[Скачать inn-check-ru.mcpb](https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.mcpb)**, открыть двойным кликом, «Установить». Приложение само поставит движок нужной версии через uv и спросит два необязательных поля: ключ checko.ru (граф связей) и свой прокси с российским IP. Оба хранятся в защищённом хранилище системы. Ставит только MCP-сервер; скилл — плагином или ZIP.
 
 ### Claude.ai (веб)
 

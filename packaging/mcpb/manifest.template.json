@@ -1,0 +1,56 @@
+{
+  "manifest_version": "0.4",
+  "name": "inn-check-ru",
+  "display_name": "INN Check RU",
+  "version": "{version}",
+  "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам, финансы и санкции кодом.",
+  "long_description": "Проверка российской компании или ИП по ИНН перед сделкой: ЕГРЮЛ/ЕГРИП, риск-флаги ФНС, реестр МСП, отчётность ГИР БО, санкционные перечни РФМ/OFAC/ЕС, РНП. Недоступный источник — «не проверено», а не «чисто»: зелёный свет из пустых данных не выдаётся. Финансовые флаги считает код, пороги откалиброваны на 30 006 компаниях. Часть реестров отвечает только российским IP — для них есть поле «прокси» (только своя нода: узел видит проверяемые ИНН).",
+  "author": {
+    "name": "Ilya Utov",
+    "url": "https://github.com/ilyautov"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilyautov/inn-check-ru"
+  },
+  "homepage": "https://github.com/ilyautov/inn-check-ru",
+  "documentation": "https://github.com/ilyautov/inn-check-ru/blob/main/mcp/README.md",
+  "support": "https://github.com/ilyautov/inn-check-ru/issues",
+  "server": {
+    "type": "uv",
+    "entry_point": "src/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "src/server.py"],
+      "env": {
+        "CHECKO_API_KEY": "${user_config.checko_api_key}",
+        "INN_CHECK_PROXY": "${user_config.proxy}"
+      }
+    }
+  },
+  "user_config": {
+    "checko_api_key": {
+      "type": "string",
+      "title": "Ключ checko.ru (необязательно)",
+      "description": "Бесплатный ключ checko.ru/integration/api — нужен только графу связей. Без него проверка работает, граф отвечает «не проверено».",
+      "sensitive": true,
+      "required": false
+    },
+    "proxy": {
+      "type": "string",
+      "title": "Свой прокси с российским IP (необязательно)",
+      "description": "http(s)://host:порт вашей ноды в России: часть реестров отвечает только РФ-IP. Узел видит проверяемые ИНН — только своя нода, не публичный прокси.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "linux", "win32"],
+    "runtimes": {
+      "python": ">=3.10"
+    }
+  },
+  "keywords": ["inn", "egrul", "counterparty", "due-diligence", "kyc", "sanctions", "russia"],
+  "license": "Apache-2.0",
+  "privacy_policies": ["https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md"]
+}

@@ -18,7 +18,7 @@ jobs:
       - name: ruff
         run: |
           pip install ruff
-          ruff check scripts/ eval/ mcp/ calibration/
+          ruff check scripts/ eval/ mcp/ calibration/ packaging/
 
       - name: skill frontmatter is valid YAML
         run: |
@@ -146,6 +146,17 @@ jobs:
           python "$GITHUB_WORKSPACE/eval/mcp_handshake.py" \
             uvx --no-cache --find-links "$RUNNER_TEMP/whl" --find-links "$RUNNER_TEMP/whl-mcp" \
             "inn-check-ru-mcp==$V"
+
+      # Расширение Claude Desktop (.mcpb, тип uv): хост ставит inn-check-ru[mcp]
+      # той же версии и запускает обёртку. Версии ещё нет на PyPI — колесо движка
+      # из шага выше подставляется через UV_FIND_LINKS.
+      - name: "расширение .mcpb: манифест валиден, сервер поднимается"
+        shell: bash
+        run: |
+          python3 packaging/mcpb/build.py --каталог
+          npx -y @anthropic-ai/mcpb@2.1.2 validate dist/mcpb/manifest.json
+          UV_FIND_LINKS="$RUNNER_TEMP/whl" python3 eval/mcp_handshake.py \
+            uv run --no-cache --directory "$GITHUB_WORKSPACE/dist/mcpb" src/server.py
 
       # Docker MCP Registry собирает образ из Dockerfile и проверяет tools/list —
       # тот же путь здесь: сломанный образ всплыл бы только в их CI.

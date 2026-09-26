@@ -65,8 +65,13 @@ python3 mcp/server.py
 С PyPI, одной командой (с 1.11.1). Код не нужен, репозиторий тоже:
 
 ```bash
-claude mcp add inn-check-ru -- uvx inn-check-ru-mcp
+claude mcp add inn-check-ru -- uvx inn-check-ru-mcp@latest
 ```
+
+`@latest` — чтобы `uvx` проверял новую версию при запуске, а не держал
+закешированную старую. Claude Desktop без терминала — расширение
+[inn-check-ru.mcpb](https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.mcpb)
+(сборка — `packaging/mcpb/build.py`).
 
 `inn-check-ru-mcp` — пакет-обёртка без кода: имя и точка входа, движок
 приезжает зависимостью `inn-check-ru[mcp]` той же версии. Он отдельный, потому
