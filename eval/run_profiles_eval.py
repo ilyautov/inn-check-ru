@@ -580,6 +580,56 @@ def case_k_tsepochka(pf):
     return errors
 
 
+def case_n_efrsb(pf):
+    """Блок ЕФРСБ из живых фикстур: идущее/завершённое дело — 🔴, прекращённое — 🟡."""
+    errors = []
+    net = ROOT / "eval" / "fixtures" / "net"
+    ожидания = {"0266051268": "🔴", "0272023903": "🔴", "0276944817": "🔴",
+                "0107022399": "🟡", "7707083893": "🟢"}
+    for inn, цвет in ожидания.items():
+        exp = json.loads((net / ("банкротство_%s.expected.json" % inn)).read_text(encoding="utf-8"))
+        fetch = fetch_clean(банкротство=exp["данные"])
+        fetch["_доступность"]["банкротство"] = _av(exp["_доступность"]["состояние"],
+                                                   tier="🔴")
+        res = pf.resolve(fetch, fin_ok(), "отсрочка")
+        поднят = [x.get("сигнал") for x in res.get("поднят_сигналами", [])]
+        check(errors, res.get("светофор") == цвет,
+              "ЕФРСБ %s: светофор %r, ожидался %s (%r)" % (inn, res.get("светофор"), цвет, поднят))
+        if цвет == "🟡":
+            check(errors, поднят == ["банкротство_прекращено"],
+                  "ЕФРСБ %s: прекращённое дело должно поднять только "
+                  "банкротство_прекращено: %r" % (inn, поднят))
+            # круговой тест: отпечаток -> восстановление -> тот же светофор
+            snap_mod = load_module("snapshot", SCRIPTS / "snapshot.py")
+            retro = load_module("retro_verdict", SCRIPTS / "retro_verdict.py")
+            восстановлено, _ = retro.восстановить(snap_mod.fingerprint(fetch))
+            рез = pf.resolve(восстановлено, fin_ok(), "отсрочка")
+            check(errors, any(x.get("сигнал") == "банкротство_прекращено"
+                              for x in рез.get("поднят_сигналами", [])),
+                  "ЕФРСБ %s: после отпечатка сигнал прекращённого дела потерян: %r"
+                  % (inn, рез.get("поднят_сигналами")))
+    # «пусто» (дела в ЕФРСБ нет) после отпечатка остаётся «пусто», а не «не проверено»
+    snap_mod = load_module("snapshot", SCRIPTS / "snapshot.py")
+    retro = load_module("retro_verdict", SCRIPTS / "retro_verdict.py")
+    fetch = fetch_clean(банкротство=None)
+    fetch["_доступность"]["банкротство"] = _av("пусто", tier="🔴")
+    восстановлено, _ = retro.восстановить(snap_mod.fingerprint(fetch))
+    факт = [x for x in pf.resolve(восстановлено, fin_ok(), "отсрочка").get("факты", [])
+            if x.get("сигнал") == "банкротство"]
+    check(errors, восстановлено["_доступность"]["банкротство"]["состояние"] == "пусто"
+          and факт and факт[0].get("статус") == "отсутствует",
+          "ЕФРСБ «пусто» после отпечатка — сигнал «отсутствует»: %r %r"
+          % (восстановлено["_доступность"]["банкротство"], факт))
+    # незнакомая стадия: блок «не проверено» — 🟢 не выдаётся
+    fetch = fetch_clean(банкротство=None)
+    fetch["_доступность"]["банкротство"] = _av(
+        "не проверено", "схема: стадия дела не распознана: X (x), дело А1", tier="🔴")
+    res = pf.resolve(fetch, fin_ok(), "отсрочка")
+    check(errors, res.get("светофор") != "🟢",
+          "ЕФРСБ: нераспознанная стадия не должна давать 🟢: %r" % res.get("светофор"))
+    return errors
+
+
 def main():
     import tempfile
     pf = load_module("profiles", SCRIPTS / "profiles.py")
@@ -599,6 +649,7 @@ def main():
             "к-тендер-рнп-стоп": case_j_tender(pf),
             "л-цепочка-без-вердикта": case_k_tsepochka(pf),
             "м-зелёный-только-при-проверенных-обязательных": case_m_green_needs_mandatory(pf),
+            "н-ефрсб-из-фикстур": case_n_efrsb(pf),
         }
     failed = 0
     for name, errors in cases.items():

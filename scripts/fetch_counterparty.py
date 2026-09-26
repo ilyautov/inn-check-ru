@@ -183,7 +183,14 @@ def _build_ssl_context():
 _SSL = _build_ssl_context()
 
 
-def _make_opener():
+class _БезРедиректов(urllib.request.HTTPRedirectHandler):
+    """3xx не следуем: отдаём как есть (HTTPError с кодом) — ровно один запрос."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _make_opener(редиректы=True):
     # Битый URL прокси — отказ, а не прямое соединение: пользователь прячет свой
     # IP намеренно, и «тихо пойдём напрямую» раскрыло бы его именно тогда, когда
     # этого не ждут. main() ловит то же самое раньше и печатает JSON с ошибкой;
@@ -191,13 +198,16 @@ def _make_opener():
     if _ПРОКСИ["ошибка"]:
         raise ValueError("прокси: " + _ПРОКСИ["ошибка"])
     cj = http.cookiejar.CookieJar()
-    return urllib.request.build_opener(
+    обработчики = [
         # ProxyHandler задаётся явно всегда: пустой отключает подхват переменных
         # окружения, и прямое соединение остаётся прямым, а не «как повезёт».
         proxy.handler(_ПРОКСИ["url"]),
         urllib.request.HTTPSHandler(context=_SSL),
         urllib.request.HTTPCookieProcessor(cj),
-    )
+    ]
+    if not редиректы:
+        обработчики.append(_БезРедиректов())
+    return urllib.request.build_opener(*обработчики)
 
 
 # Пакет доказательств (--пакет): каждый ответ госисточника сохраняется как есть —
@@ -241,13 +251,17 @@ def _тело_ошибки(e):
         return b""
 
 
-def _http_get(opener, url, referer=None, accept="application/json, text/plain, */*"):
-    headers = {"User-Agent": UA, "Accept": accept}
+def _http_get(opener, url, referer=None, accept="application/json, text/plain, */*",
+              ua=None, повторы=True, xhr=True):
+    """GET -> (статус, текст). `повторы=False` — ровно один запрос: для источников
+    с политикой «без повторов после отказа» (ЕФРСБ), там и 429, и обрыв — ответ."""
+    headers = {"User-Agent": ua or UA, "Accept": accept}
     if referer:
         headers["Referer"] = referer
-        headers["X-Requested-With"] = "XMLHttpRequest"
+        if xhr:
+            headers["X-Requested-With"] = "XMLHttpRequest"
     last_err = None
-    for attempt in range(RETRIES + 1):
+    for attempt in range(RETRIES + 1 if повторы else 1):
         left = _time_left()
         if left <= 0:
             raise DeadlineExceeded("бюджет времени %.0f с исчерпан" % DEADLINE)
@@ -261,14 +275,15 @@ def _http_get(opener, url, referer=None, accept="application/json, text/plain, *
             _записать("GET", url, e.code, _тело_ошибки(e))
             # 429/5xx — временные (rate-limit/перегрузка): ретраим с backoff;
             # остальные коды (403, 404 и т.п.) ретраить бессмысленно.
-            if e.code in (429, 500, 502, 503, 504) and attempt < RETRIES:
+            if повторы and e.code in (429, 500, 502, 503, 504) and attempt < RETRIES:
                 last_err = e
                 time.sleep(0.8 * (2 ** attempt))
                 continue
             return e.code, ""
         except Exception as e:
             last_err = e
-            time.sleep(0.8 * (2 ** attempt))
+            if повторы:
+                time.sleep(0.8 * (2 ** attempt))
     raise last_err if last_err else RuntimeError("unknown http error")
 
 
@@ -301,7 +316,7 @@ def _http_status_reason(status, step=""):
 # Машинно-различимые префиксы причин «не проверено» (§1.1 волны 1 + §1.2 волны 2).
 # Двухсловные («не покрыто:», «ранний выход:») тоже полноценные префиксы, поэтому
 # проверка идёт по списку, а не по «первому слову с двоеточием».
-ПРЕФИКСЫ_ПРИЧИН = ("сеть:", "tls:", "гео:", "капча:", "дедлайн:", "схема:",
+ПРЕФИКСЫ_ПРИЧИН = ("сеть:", "tls:", "гео:", "капча:", "антибот:", "дедлайн:", "схема:",
                    "не покрыто:", "профиль:", "probe:", "режим:", "ранний выход:")
 
 
@@ -521,7 +536,7 @@ def raw_egrul(opener, inn):
 
 
 def parse_egrul(raw, inn):
-    """Сырой {rows: [...]} -> карточка. Контракт: n, o, i, g, r, k (§0)."""
+    """Сырой {rows: [...]} -> карточка. Контракт: n, o, i, r, k (§0); g и e — если есть."""
     if not isinstance(raw, dict):
         return _not_checked("егрюл", "схема: ответ не JSON-объект")
     if not isinstance(raw.get("rows"), list):
@@ -551,9 +566,14 @@ def parse_egrul(raw, inn):
         "статус": None,
         "статус_источник": "не отдаётся egrul search-result (k — вид субъекта, не статус); "
                            "берётся из pb: риски.статус",
-        "дата_прекращения": None,
-        "дата_прекращения_источник": "не отдаётся egrul search-result; "
-                                     "см. риски.ликвидация и риски.статус",
+        # e — дата прекращения: есть только у прекративших деятельность (живьём
+        # 26.09.2026: 0276944817 e=09.02.2026, pb — «Деятельность прекращена»);
+        # у действующих поля нет, поэтому 19.09.2026 его сочли несуществующим.
+        "дата_прекращения": rec.get("e") or None,
+        "дата_прекращения_источник": (
+            "egrul search-result, поле e" if rec.get("e") else
+            "в egrul search-result поля e нет (у действующих его нет); "
+            "см. также риски.ликвидация и риски.статус"),
     }
     return card, _av("егрюл", "ok")
 
@@ -1460,7 +1480,159 @@ def fetch_sanctions(opener, inn):
 
 # id источника -> callable(opener, inn) -> (данные, _доступность).
 # Источники «требует: браузер» fetcher'а не имеют: run_source даёт «не покрыто».
+# ---------------------------------------------------------------------------
+# ЕФРСБ — bankrot.fedresurs.ru, JSON поиска по ИНН
+# ---------------------------------------------------------------------------
+#
+# Политика доступа (спека волны 5): JSON, который дёргает страница самого сайта.
+# Без Referer сайт отвечает 403, с Referer главной — JSON; от гео не зависит
+# (проверено 26.09.2026). Шлём тот Referer, что шлёт их страница, и честный
+# User-Agent проекта; никаких капч, челленджей, ротаций и повторов после отказа.
+# INN_CHECK_BEZ_REFERER=1 возвращает источник в браузерный слой.
+
+ЕФРСБ = "https://bankrot.fedresurs.ru"
+UA_ПРОЕКТА = sources.UA_ПРОЕКТА
+
+# Коды стадий дела — только снятые с живых ответов 26.09.2026. Неизвестный код не
+# угадывается: процедура остаётся null, код и описание уходят в данные.
+ЕФРСБ_ИДЁТ = {"Watching": "наблюдение", "Tender": "конкурсное производство"}
+ЕФРСБ_ЗАВЕРШЕНО = {"ProceedingsFinished": "производство по делу завершено"}
+ЕФРСБ_ПРЕКРАЩЕНО = {"ProceedingsStopped": "производство по делу прекращено"}
+
+
+def _rec_bankrupt(raw, inn):
+    # Только точный ИНН: _pick_by_inn без совпадения берёт первую запись — здесь это
+    # было бы чужое дело о банкротстве из нечёткой выдачи.
+    rows = _g(raw, "pageData")
+    for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict) and str(r.get("inn") or "").strip() == str(inn):
+            return r
+    return None
+
+
+def _дата_iso(s):
+    return s[:10] if isinstance(s, str) and len(s) >= 10 else None
+
+
+_ИНН_ФОРМАТ = re.compile(r"\d{10}|\d{12}")
+
+
+def _дело_raw_ok(дело_raw):
+    return bool(дело_raw.get("number")) and isinstance(дело_raw.get("status"), dict)
+
+
+def parse_bankrupt(raw, inn):
+    """{pageData: [...], total} -> блок «банкротство».
+
+    Совпадение — только точный ИНН. «Нет записи» — «пусто»: ЕФРСБ ведёт всех
+    должников, и поиск по ИНН полный (для профиля это подтверждённое отсутствие).
+    `процедура`: строка — идёт или завершено (сигнал 🔴; завершение конкурсного
+    производства — ликвидация юрлица, ст. 149 127-ФЗ), False — дело прекращено.
+    `прекращённое_дело`: строка — дело было и прекращено (сигнал 🟡), False — нет.
+    «Не проверено» (а не «пусто»/«ok»): незнакомая стадия, запись без номера дела,
+    битые строки выдачи, `total` не числом, усечённая выдача без точного ИНН.
+    """
+    if not isinstance(raw, dict):
+        return _not_checked("банкротство", "схема: ответ не JSON-объект")
+    if not isinstance(raw.get("pageData"), list):
+        return _not_checked("банкротство", "схема: не найдено поле pageData")
+    строки = raw["pageData"]
+    if not all(isinstance(r, dict) for r in строки):
+        return _not_checked("банкротство", "схема: строка выдачи не объект")
+    if any(not (isinstance(r.get("inn"), str) and _ИНН_ФОРМАТ.fullmatch(r["inn"].strip()))
+           for r in строки):
+        # поле переименовали или не заполнили — «нет совпадения» тогда не значит
+        # «нет должника»
+        return _not_checked("банкротство", "схема: не найдено поле inn (10/12 цифр) "
+                                           "в строке выдачи")
+    total = raw.get("total")
+    if not isinstance(total, int) or isinstance(total, bool) or total < len(строки):
+        return _not_checked("банкротство", "схема: поле total не число или меньше "
+                                           "выдачи (%r при %d строках)" % (total, len(строки)))
+    rec = _rec_bankrupt(raw, inn)
+    if rec is None and total > len(строки):
+        # «Нет» по неполной выдаче — не «нет»; это сбой проверки, а не предел инструмента.
+        return _not_checked("банкротство", "схема: выдача усечена (%d из %d), точного "
+                            "ИНН на первой странице нет" % (len(строки), total))
+    if rec is None:
+        return None, _av("банкротство", "пусто",
+                         "в ЕФРСБ нет должника с этим ИНН (поиск по точному ИНН)")
+    missing = _schema_missing("банкротство", inn, rec)
+    if missing:
+        return _not_checked("банкротство", "схема: не найдено поле %s" % missing)
+    дело_raw = rec.get("lastLegalCase") if isinstance(rec.get("lastLegalCase"), dict) else {}
+    стадия = дело_raw.get("status") if isinstance(дело_raw.get("status"), dict) else {}
+    код, описание = стадия.get("code"), стадия.get("description")
+    дело = {"номер": дело_raw.get("number"), "стадия_код": код, "стадия": описание,
+            "дата_стадии": _дата_iso(стадия.get("date"))}
+    if not _дело_raw_ok(дело_raw):
+        return _not_checked("банкротство", "схема: в записи ЕФРСБ нет номера или стадии "
+                            "дела — проверьте карточку (%s/bankrupts/%s)"
+                            % (ЕФРСБ, rec.get("guid") or ""))
+    if код in ЕФРСБ_ИДЁТ or код in ЕФРСБ_ЗАВЕРШЕНО:
+        процедура = "%s (дело %s, с %s)" % (описание or ЕФРСБ_ИДЁТ.get(код)
+                                            or ЕФРСБ_ЗАВЕРШЕНО.get(код),
+                                            дело["номер"], дело["дата_стадии"])
+    elif код in ЕФРСБ_ПРЕКРАЩЕНО:
+        процедура = False
+    else:
+        # Словарь стадий снят с живых ответов; незнакомая — не «нет процедуры».
+        return _not_checked("банкротство", "схема: стадия дела не распознана: %s (%s), "
+                            "дело %s — проверьте карточку ЕФРСБ" % (код, описание, дело["номер"]))
+    данные = {
+        "процедура": процедура,
+        "прекращённое_дело": ("дело %s: %s %s" % (дело["номер"], (описание or "").lower(),
+                                                   дело["дата_стадии"] or "")
+                              if процедура is False else False),
+        "дело": дело,
+        "статус_должника": rec.get("status"),
+        "категория": rec.get("category"),
+        "наименование": rec.get("name"),
+        "огрн": rec.get("ogrn"),
+        "источник_записи": "%s/bankrupts/%s" % (ЕФРСБ, rec.get("guid"))
+                           if rec.get("guid") else None,
+    }
+    return данные, _av("банкротство", "ok")
+
+
+def raw_bankrupt(opener, inn):
+    url = "%s/backend/cmpbankrupts?searchString=%s&limit=15&offset=0" % (
+        ЕФРСБ, urllib.parse.quote(str(inn)))
+    # Свой opener без редиректов: urllib иначе молча прошёл бы 302 → 302 → 200,
+    # и «один запрос» политики стал бы тремя.
+    opener = _make_opener(редиректы=False)
+    try:
+        # Один запрос, Referer и UA как в политике; X-Requested-With не шлём —
+        # это была бы имитация браузерного XHR, а JSON отдаётся и без него.
+        status, text = _http_get(opener, url, referer=ЕФРСБ + "/", ua=UA_ПРОЕКТА,
+                                 повторы=False, xhr=False)
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e))
+    if status in (401, 403, 429) or 300 <= status < 400:
+        raise SourceUnavailable("антибот: ЕФРСБ ответил %d — без обхода, проверьте "
+                                "вручную (bankrot.fedresurs.ru)" % status)
+    if status != 200:
+        raise SourceUnavailable(_http_status_reason(status))
+    j = _safe_json(text)
+    if j is None:
+        raise SourceUnavailable("антибот: ЕФРСБ вернул не-JSON (челлендж или смена схемы)")
+    return j
+
+
+def fetch_bankrupt(opener, inn):
+    if os.environ.get("INN_CHECK_BEZ_REFERER") == "1":
+        return _not_checked("банкротство", "не покрыто: INN_CHECK_BEZ_REFERER=1 — "
+                                           "ЕФРСБ только браузером (%s)" % ЕФРСБ)
+    if _тип_контрагента(inn) == "ип":
+        # prsnbankrupts с не-РФ IP отвечает 451 (26.09.2026), схему живьём не видели —
+        # разбирать её вслепую значило бы выдумывать.
+        return _not_checked("банкротство", "не покрыто: поиск ИП в ЕФРСБ скриптом не "
+                                           "поддержан — проверьте вручную (%s)" % ЕФРСБ)
+    return parse_bankrupt(raw_bankrupt(opener, inn), inn)
+
+
 FETCHERS = {
+    "банкротство": fetch_bankrupt,
     "егрюл": fetch_egrul,
     "риски": fetch_risks,
     "финансы": fetch_finance,
@@ -1475,6 +1647,7 @@ FETCHERS = {
 
 # id источника -> чистый парсер (raw, inn) -> (данные, _доступность); гоняет eval.
 PARSERS = {
+    "банкротство": parse_bankrupt,
     "егрюл": parse_egrul,
     "риски": parse_risks,
     "финансы": parse_finance,
@@ -1492,6 +1665,7 @@ CONTEXT_FETCHERS = {"спецреестры"}
 # Запись сырого ответа для источника «спецреестры» — как и для остальных,
 # из неё eval дрейфа схемы удаляет поля контракта по очереди.
 RAW_RECORD["спецреестры"] = _rec_special
+RAW_RECORD["банкротство"] = _rec_bankrupt
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка

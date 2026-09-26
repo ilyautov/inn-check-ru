@@ -15,6 +15,7 @@ import datetime as dt
 import importlib.util
 import io
 import json
+import os
 import socket
 import ssl
 import sys
@@ -156,6 +157,64 @@ def case_targets(ca, src):
         check(errors, sid in ids, "источник %s не попал в цели" % sid)
     for sid in src.TLS_MINCIFRY_PROBES:
         check(errors, sid in ids, "TLS-хост %s не попал в цели" % sid)
+    # Referer из дескриптора доходит до requester'а (ЕФРСБ без него отвечает 403)
+    ефрсб = [t for t in targets if t["id"] == "банкротство"]
+    check(errors, ефрсб and ефрсб[0].get("referer") == "https://bankrot.fedresurs.ru/",
+          "банкротство: probe без Referer: %r" % ефрсб)
+    if ефрсб:
+        принято = []
+
+        def requester(url, method, timeout, referer=None, ua=None):
+            принято.append((referer, ua))
+            return 200, '{"pageData": [], "total": 0}'
+        строка = ca.probe_one(ефрсб[0], requester)
+        check(errors, принято == [("https://bankrot.fedresurs.ru/", src.UA_ПРОЕКТА)],
+              "probe_one: Referer и UA проекта: %r" % принято)
+        check(errors, строка["состояние"] == "доступен", "ЕФРСБ JSON: %r" % строка)
+        for статус, тело, ждём in ((403, "", "антибот"), (429, "", "антибот"),
+                                   (200, "<html>qrator</html>", "антибот"),
+                                   (451, "", "гео")):
+            строка = ca.probe_one(ефрсб[0], lambda *a, _с=статус, _т=тело, **k: (_с, _т))
+            check(errors, строка["состояние"] == ждём,
+                  "ЕФРСБ probe %d %r: %r, ждали %s" % (статус, тело[:10], строка, ждём))
+        os.environ["INN_CHECK_BEZ_REFERER"] = "1"
+        try:
+            ids = [t["id"] for t in ca.probe_targets()]
+        finally:
+            os.environ.pop("INN_CHECK_BEZ_REFERER", None)
+        check(errors, "банкротство" not in ids and "егрюл" in ids,
+              "INN_CHECK_BEZ_REFERER=1: probe ЕФРСБ не должен уходить: %r" % ids)
+    # и сам requester кладёт его в заголовок (а без referer — не кладёт)
+    заголовки = []
+
+    class Ответ:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self, n=-1):
+            return b"{}"
+
+    class Opener:
+        def open(self, req, timeout=None):
+            заголовки.append((req.get_header("Referer"), req.get_header("User-agent")))
+            return Ответ()
+    orig = ca.urllib.request.build_opener
+    ca.urllib.request.build_opener = lambda *a, **k: Opener()
+    try:
+        req = ca.make_requester(ctx=object())
+        req("https://bankrot.fedresurs.ru/x", "GET", 5, referer="https://bankrot.fedresurs.ru/",
+            ua=src.UA_ПРОЕКТА)
+        req("https://egrul.nalog.ru/", "GET", 5)
+    finally:
+        ca.urllib.request.build_opener = orig
+    check(errors, заголовки == [("https://bankrot.fedresurs.ru/", src.UA_ПРОЕКТА),
+                                (None, ca.UA)],
+          "requester: заголовки Referer/UA %r" % заголовки)
     return errors
 
 

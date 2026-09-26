@@ -285,7 +285,7 @@ def case_run_source(fc):
               and av["причина"] == "профиль: не требуется для клиент_115фз",
               "профиль: %r" % av)
         # браузерные источники — всегда «не покрыто»
-        for sid in ("фссп", "суды", "банкротство"):
+        for sid in ("фссп", "суды"):
             data, av = fc.run_source(sid, "504110181262")
             check(errors, av["состояние"] == "не проверено"
                   and str(av["причина"]).startswith("не покрыто:"),
@@ -896,8 +896,195 @@ def case_proxy(fc):
     return errors
 
 
+def case_bankrupt(fc):
+    """ЕФРСБ: стадии, чужой ИНН, усечение, ИП-эндпоинт, антибот, флаг без Referer."""
+    errors = []
+    base = json.loads((FIXTURES / "банкротство_0266051268.raw.json").read_text(encoding="utf-8"))
+
+    def с_записью(**изм):
+        raw = copy.deepcopy(base)
+        rec = raw["pageData"][0]
+        for k, v in изм.items():
+            if k == "код":
+                rec["lastLegalCase"]["status"]["code"] = v
+            elif k == "номер":
+                rec["lastLegalCase"]["number"] = v
+            else:
+                rec[k] = v
+        return raw
+
+    данные, av = fc.parse_bankrupt(с_записью(код="SomethingNew"), "0266051268")
+    check(errors, av["состояние"] == "не проверено" and данные is None
+          and str(av["причина"]).startswith("схема:") and "SomethingNew" in av["причина"],
+          "неизвестная стадия — «не проверено: схема» с кодом: %r" % av)
+    данные, av = fc.parse_bankrupt(с_записью(номер=""), "0266051268")
+    check(errors, av["состояние"] == "не проверено" and "номера" in str(av["причина"]),
+          "запись без номера дела — «не проверено»: %r" % av)
+    данные, av = fc.parse_bankrupt(с_записью(код="ProceedingsStopped"), "0266051268")
+    check(errors, данные["процедура"] is False
+          and str(данные["прекращённое_дело"]).startswith("дело А07-40092/2023"),
+          "прекращённое дело: %r" % данные)
+    # чужой ИНН в выдаче (нечёткий поиск) — «пусто», а не чужое дело
+    данные, av = fc.parse_bankrupt(с_записью(inn="0266000000"), "0266051268")
+    check(errors, av["состояние"] == "пусто" and данные is None,
+          "чужой ИНН в выдаче должен давать «пусто»: %r %r" % (av, данные))
+    # усечённая выдача без точного ИНН — не «пусто»
+    raw = с_записью(inn="0266000000")
+    raw["total"] = 40
+    данные, av = fc.parse_bankrupt(raw, "0266051268")
+    check(errors, av["состояние"] == "не проверено" and str(av["причина"]).startswith("схема:")
+          and "усечена" in str(av["причина"]), "усечённая выдача — сбой, не предел: %r" % av)
+    for плохой in ([], {"total": 0}, {"pageData": {}}, {"pageData": [None], "total": 1},
+                   {"pageData": [{"inn": None}], "total": 1}, {"pageData": [], "total": "0"},
+                   {"pageData": [{"inn": ["0266051268"]}], "total": 1},
+                   {"pageData": [{"inn": "02660512"}], "total": 1},
+                   {"pageData": [], "total": -1},
+                   {"pageData": [{"inn": "0266000000"}, {"inn": "0266000001"}], "total": 1},
+                   {"pageData": []}, {"pageData": [], "total": True}):
+        данные, av = fc.parse_bankrupt(плохой, "0266051268")
+        check(errors, av["состояние"] == "не проверено"
+              and str(av["причина"]).startswith("схема:"), "схема %r: %r" % (плохой, av))
+
+    orig_get = fc._http_get
+    журнал = []
+    ответ = {"статус": 200, "тело": json.dumps(base, ensure_ascii=False)}
+
+    параметры = []
+
+    openers = []
+
+    def фейк(opener, url, referer=None, accept=None, ua=None, повторы=True, xhr=True):
+        журнал.append((url, referer, ua))
+        openers.append(opener)
+        параметры.append((повторы, xhr))
+        return ответ["статус"], ответ["тело"]
+    fc._http_get = фейк
+    try:
+        данные, av = fc.fetch_bankrupt(None, "0266051268")
+        url, referer, ua = журнал[-1]
+        check(errors, "/backend/cmpbankrupts?searchString=0266051268" in url,
+              "юрлицо — cmpbankrupts: %s" % url)
+        check(errors, referer == "https://bankrot.fedresurs.ru/",
+              "Referer — главная ЕФРСБ: %r" % referer)
+        check(errors, ua and "inn-check-ru" in ua and "github.com" in ua,
+              "UA проекта со ссылкой на репозиторий: %r" % ua)
+        check(errors, av["состояние"] == "ok" and данные["процедура"], "живой путь: %r" % av)
+        check(errors, параметры[-1] == (False, False),
+              "ЕФРСБ: один запрос без повторов и без X-Requested-With: %r" % (параметры[-1],))
+        check(errors, any(isinstance(h, fc._БезРедиректов)
+                          for h in getattr(openers[-1], "handlers", [])),
+              "ЕФРСБ: opener без редиректов")
+        # причина «антибот:» доживает до _доступность через run_source
+        ответ["статус"] = 403
+        _, av = fc.run_source("банкротство", "0266051268")
+        check(errors, str(av.get("причина")).startswith("антибот:"),
+              "run_source сохранил причину антибота: %r" % av)
+        ответ["статус"] = 200
+        n = len(журнал)
+        данные, av = fc.fetch_bankrupt(None, "504110181262")
+        check(errors, len(журнал) == n and str(av["причина"]).startswith("не покрыто:"),
+              "ИП: без запроса и «не покрыто»: %r" % av)
+        for код in (401, 403, 429, 302):
+            ответ["статус"] = код
+            n = len(журнал)
+            try:
+                fc.fetch_bankrupt(None, "0266051268")
+                errors.append("%d: ожидалось SourceUnavailable" % код)
+            except fc.SourceUnavailable as e:
+                check(errors, str(e).startswith("антибот:") and str(код) in str(e),
+                      "%d: причина %r" % (код, str(e)))
+            check(errors, len(журнал) == n + 1, "%d: повтор после отказа" % код)
+        ответ["статус"] = 451
+        try:
+            fc.fetch_bankrupt(None, "0266051268")
+            errors.append("451: ожидалось SourceUnavailable")
+        except fc.SourceUnavailable as e:
+            check(errors, str(e).startswith("гео:"), "451: %r" % str(e))
+        ответ.update(статус=200, тело="<html>challenge</html>")
+        try:
+            fc.fetch_bankrupt(None, "0266051268")
+            errors.append("не-JSON: ожидалось SourceUnavailable")
+        except fc.SourceUnavailable as e:
+            check(errors, str(e).startswith("антибот:"), "не-JSON: %r" % str(e))
+        os.environ["INN_CHECK_BEZ_REFERER"] = "1"
+        n = len(журнал)
+        данные, av = fc.fetch_bankrupt(None, "0266051268")
+        check(errors, len(журнал) == n and av["состояние"] == "не проверено"
+              and str(av["причина"]).startswith("не покрыто:"),
+              "INN_CHECK_BEZ_REFERER=1: без запроса и «не покрыто»: %r" % av)
+    finally:
+        os.environ.pop("INN_CHECK_BEZ_REFERER", None)
+        fc._http_get = orig_get
+
+    # сам транспорт: повторы=False — ровно одно обращение и на 429, и на обрыв
+    class Opener:
+        def __init__(self, exc):
+            self.exc, self.n = exc, 0
+
+        def open(self, req, timeout=None):
+            self.n += 1
+            raise self.exc
+    import urllib.error
+    orig_sleep, orig_start = fc.time.sleep, fc._START
+    fc.time.sleep = lambda s: None
+    fc._START = fc.time.monotonic()  # бюджет времени сбора — заново, иначе 0 обращений
+    try:
+        for exc in (urllib.error.HTTPError("https://x", 429, "rate", {}, None),
+                    ConnectionResetError("обрыв")):
+            op = Opener(exc)
+            try:
+                fc._http_get_настоящий(op, "https://x", referer="https://x/", повторы=False)
+            except Exception:
+                pass
+            check(errors, op.n == 1, "повторы=False: %d обращений на %r" % (op.n, exc))
+            op = Opener(exc)
+            try:
+                fc._http_get_настоящий(op, "https://x")
+            except Exception:
+                pass
+            check(errors, op.n > 1, "по умолчанию повторы остаются: %d на %r" % (op.n, exc))
+    finally:
+        fc.time.sleep, fc._START = orig_sleep, orig_start
+
+    # редиректы: локальный сервер отвечает 302 на себя — без редиректов ровно 1 запрос
+    import http.server
+    import threading
+    счёт = {"n": 0}
+
+    class Обработчик(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            счёт["n"] += 1
+            self.send_response(302)
+            self.send_header("Location", "/next%d" % счёт["n"])
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+    сервер = http.server.HTTPServer(("127.0.0.1", 0), Обработчик)
+    поток = threading.Thread(target=сервер.serve_forever, daemon=True)
+    поток.start()
+    fc._START = fc.time.monotonic()
+    try:
+        url = "http://127.0.0.1:%d/start" % сервер.server_port
+        статус, _ = fc._http_get_настоящий(fc._make_opener(редиректы=False), url,
+                                           повторы=False)
+        check(errors, статус == 302 and счёт["n"] == 1,
+              "без редиректов: статус %r, запросов %d" % (статус, счёт["n"]))
+        счёт["n"] = 0
+        try:
+            fc._http_get_настоящий(fc._make_opener(), url, повторы=False)
+        except Exception:
+            pass
+        check(errors, счёт["n"] > 1, "обычный opener следует редиректам (%d)" % счёт["n"])
+    finally:
+        сервер.shutdown()
+        fc._START = orig_start
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
+    fc._http_get_настоящий = fc._http_get  # для теста транспорта на фейковом opener
     fc._http_get = _no_network
     fc._http_post = _no_network
     os.environ["COUNTERPARTY_IGNORE_ACCESS_CACHE"] = "1"
@@ -913,6 +1100,7 @@ def main():
         "канарейка-потокобезопасна": case_canary_threadsafe(fc),
         "спецреестры-дисквалификация": case_special_registries(fc),
         "прокси-и-кэш-доступа": case_proxy(fc),
+        "ефрсб-банкротство": case_bankrupt(fc),
     }
     failed = 0
     for name, errors in cases.items():

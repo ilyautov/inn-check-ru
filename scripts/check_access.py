@@ -85,6 +85,8 @@ HINTS = {
     "гео": "нужен РФ-IP: своя нода через --прокси / INN_CHECK_PROXY / HTTPS_PROXY",
     "dns": "хост не резолвится — проверьте DNS/сеть (у прокси DNS свой, удалённый)",
     "капча": "источник отдаёт капчу — сбор только через браузер",
+    "антибот": "сайт отказал автоматическому клиенту (обход не делаем) — проверка "
+               "вручную в браузере",
 }
 
 # Сервисы определения страны исполнения (лёгкий GET, первый ответивший).
@@ -148,11 +150,14 @@ def make_requester(ctx=None, прокси_url=None):
         proxy.handler(прокси_url),
         urllib.request.HTTPSHandler(context=ctx), _NoRedirect())
 
-    def requester(url, method, timeout):
-        req = urllib.request.Request(url, method=method, headers={
-            "User-Agent": UA, "Accept": "application/json, text/html, */*",
-            "Accept-Language": "ru-RU,ru;q=0.9",
-        })
+    def requester(url, method, timeout, referer=None, ua=None):
+        headers = {"User-Agent": ua or UA, "Accept": "application/json, text/html, */*",
+                   "Accept-Language": "ru-RU,ru;q=0.9"}
+        if referer:
+            # Источник с политикой «Referer как у страницы сайта» (ЕФРСБ):
+            # без него probe получил бы 403 и записал бы «гео» про открытый JSON.
+            headers["Referer"] = referer
+        req = urllib.request.Request(url, method=method, headers=headers)
         try:
             with opener.open(req, timeout=timeout) as resp:
                 body = resp.read(BODY_LIMIT)
@@ -171,8 +176,12 @@ def make_requester(ctx=None, прокси_url=None):
 def probe_targets():
     """Список целей из реестра: SOURCES[*].probe + TLS_MINCIFRY_PROBES (ok_http [200])."""
     out = []
+    без_referer = os.environ.get("INN_CHECK_BEZ_REFERER") == "1"
     for sid, d in sources.SOURCES.items():
         p = d.get("probe") or {}
+        if без_referer and p.get("referer"):
+            # сбор такой источник не запрашивает — и probe не должен
+            continue
         out.append({
             "id": sid,
             "url": p.get("url"),
@@ -180,6 +189,9 @@ def probe_targets():
             "ok_http": list(p.get("ok_http") or [200]),
             "ожидаем": p.get("ожидаем") or "html",
             "группа": "источник",
+            "referer": p.get("referer"),
+            # политика JSON сайтов: вместе с Referer — честный UA проекта, как в сборе
+            "ua": sources.UA_ПРОЕКТА if p.get("referer") else None,
         })
     for sid, url in sources.TLS_MINCIFRY_PROBES.items():
         out.append({"id": sid, "url": url, "method": "GET", "ok_http": [200],
@@ -237,6 +249,16 @@ def has_captcha(body, ожидаем):
 
 def classify_response(status, body, target):
     """HTTP-ответ -> (состояние, причина)."""
+    if target.get("referer"):
+        # Источник с политикой JSON сайтов: отказ — антибот, а не гео (ЕФРСБ отвечает
+        # 403 без Referer из любой страны); 200 без JSON — челлендж или смена схемы.
+        if status in (401, 403, 429):
+            return "антибот", "антибот: HTTP %d" % status
+        if status in target["ok_http"] and target.get("ожидаем") == "json":
+            try:
+                json.loads(body or "")
+            except ValueError:
+                return "антибот", "антибот: HTTP %d без JSON" % status
     if status in target["ok_http"]:
         if has_captcha(body, target.get("ожидаем")):
             return "капча", "капча: HTTP %d с маркером капчи в теле" % status
@@ -250,7 +272,11 @@ def probe_one(target, requester, timeout=TIMEOUT):
     """Один probe: {"состояние", "http", "мс", "причина"} — строка кэша §4."""
     t0 = time.monotonic()
     try:
-        status, body = requester(target["url"], target.get("method", "GET"), timeout)
+        if target.get("referer"):
+            status, body = requester(target["url"], target.get("method", "GET"), timeout,
+                                     referer=target["referer"], ua=target.get("ua"))
+        else:
+            status, body = requester(target["url"], target.get("method", "GET"), timeout)
     except Exception as e:
         state, reason = classify_exception(e)
         status = None

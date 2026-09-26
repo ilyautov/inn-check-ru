@@ -260,7 +260,7 @@ def case_штамп_чужой_и_отказ(tmp):
     # Секреты в URL TSA не попадают в итог.
     # URL собирается из частей: литерал «логин:пароль@» в исходнике справедливо
     # ловит сканер секретов CI (TruffleHog), хотя значения синтетические.
-    с_секретом = "https://" + ":".join(("user", "pass")) + "@tsa.example:8443/ts?api_key=S"
+    с_секретом = "https://%s:%s@tsa.example:8443/ts?api_key=S" % ("user", "pass")
     итог = ep.поставить_штамп(каталог2, с_секретом, post=недоступен)
     check(e, "pass" not in итог and "api_key" not in итог and "tsa.example:8443/ts" in итог,
           "секрет URL TSA в выводе: %s" % итог)
