@@ -2235,6 +2235,7 @@ def fetch_contracts(opener, inn):
 # членом», «2» — «Исключен». Статус права живьём видели только «Действует»;
 # иной текст показывается как есть, сигнал по нему не поднимается (None).
 НОСТРОЙ_ЧЛЕН = "1"
+НОСТРОЙ_КОДЫ_ЧЛЕНСТВА = ("1", "2")
 НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ = "Действует"
 НОСТРОЙ_КАРТОЧЕК = 3   # действующих членств больше трёх не бывает на практике
 НОПРИЗ = "https://reestr.nopriz.ru"
@@ -2288,7 +2289,11 @@ def _титул(v):
 
 
 def _код(v):
-    return str(v.get("code")) if isinstance(v, dict) and v.get("code") is not None else None
+    """Код справочника строкой; {}, [], true и прочие формы — None (дрейф схемы)."""
+    к = v.get("code") if isinstance(v, dict) else None
+    if isinstance(к, bool) or not isinstance(к, (str, int)):
+        return None
+    return str(к)
 
 
 def parse_sro(raw, inn, блок="сро", реестр=None):
@@ -2323,7 +2328,9 @@ def parse_sro(raw, inn, блок="сро", реестр=None):
     missing = next((m for m in (_schema_missing(блок, inn, r) for r in свои) if m), None)
     if missing:
         return _not_checked(блок, "схема: не найдено поле %s" % missing)
-    if not all(_код(r["member_status"]) and _титул(r["member_status"])
+    # коды статуса членства — только из справочника, виденного живьём («1», «2»):
+    # незнакомый код не превращаем в «не член»
+    if not all(_код(r["member_status"]) in НОСТРОЙ_КОДЫ_ЧЛЕНСТВА and _титул(r["member_status"])
                and isinstance(r["sro"], dict) for r in свои):
         return _not_checked(блок, "схема: не найдено поле member_status/sro членства")
     карточки = raw.get("карточки") if isinstance(raw.get("карточки"), dict) else {}
