@@ -69,7 +69,7 @@ function полеФормы(п) {
   } else {
     вход = document.createElement("input");
     вход.type = "text";
-    вход.inputMode = "decimal";
+    вход.inputMode = п.тип === "целое" ? "numeric" : "decimal";
   }
   вход.id = id;
   вход.dataset.имя = п.имя;
