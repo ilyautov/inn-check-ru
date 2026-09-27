@@ -109,6 +109,9 @@ jobs:
       - name: "MCP без FastMCP: mcp 2.x и сломанный 1.x — версия и совет"
         run: python3 eval/run_mcp_sdk_eval.py
 
+      - name: "домен: WHOIS .ru/.рф — тип регистранта без имени, зона, ввод"
+        run: python3 eval/run_domain_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |

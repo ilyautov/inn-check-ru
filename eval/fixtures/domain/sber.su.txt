@@ -1,0 +1,15 @@
+% TCI Whois Service. Terms of use:
+% https://tcinet.ru/documents/whois_ru_rf.pdf (in Russian)
+% https://tcinet.ru/documents/whois_su.pdf (in Russian)
+
+domain:        SBER.SU
+state:         REGISTERED, NOT DELEGATED
+org:           
+registrar:     RUCENTER-SU
+created:       2010-11-22T14:26:35Z
+paid-till:     2026-11-22T14:26:35Z
+free-date:     2026-12-25
+source:        TCI
+
+Last updated on 2026-09-27T18:58:01Z
+

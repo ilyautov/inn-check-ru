@@ -1,0 +1,21 @@
+% TCI Whois Service. Terms of use:
+% https://tcinet.ru/documents/whois_ru_rf.pdf (in Russian)
+% https://tcinet.ru/documents/whois_su.pdf (in Russian)
+
+domain:        KONTUR.RU
+nserver:       a2.ns.ix.ru.
+nserver:       b2.ns.ix.ru.
+nserver:       ns4-l2.nic.ru.
+nserver:       ns8-l2.nic.ru.
+state:         REGISTERED, DELEGATED, VERIFIED
+org:           
+taxpayer-id:   
+registrar:     RU-CENTER-RU
+admin-contact: https://www.nic.ru/whois
+created:       1997-10-08T12:23:53Z
+paid-till:     2026-10-31T21:00:00Z
+free-date:     2026-12-02
+source:        TCI
+
+Last updated on 2026-09-27T18:53:01Z
+

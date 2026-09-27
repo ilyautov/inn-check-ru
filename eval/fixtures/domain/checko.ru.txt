@@ -1,0 +1,18 @@
+% TCI Whois Service. Terms of use:
+% https://tcinet.ru/documents/whois_ru_rf.pdf (in Russian)
+% https://tcinet.ru/documents/whois_su.pdf (in Russian)
+
+domain:        CHECKO.RU
+nserver:       ns1.reg.ru.
+nserver:       ns2.reg.ru.
+state:         REGISTERED, DELEGATED, VERIFIED
+person:        Private Person
+registrar:     REGRU-RU
+admin-contact: http://www.reg.ru/whois/admin_contact
+created:       2019-11-07T13:14:30Z
+paid-till:     2027-11-07T13:14:30Z
+free-date:     2027-12-08
+source:        TCI
+
+Last updated on 2026-09-27T18:53:01Z
+
