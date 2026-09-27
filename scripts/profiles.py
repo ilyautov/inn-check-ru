@@ -316,6 +316,23 @@ def _поля_сигналов(block):
     return list(_ПОЛЯ_СИГНАЛОВ.get(block, []))
 
 
+def _норм_состояние(av):
+    """Состояние из `_доступность.<id>`: словарь §1.1 — как есть, строка —
+    нормализуется («проверено…» -> ok, «пусто…» -> пусто, прочее -> не проверено),
+    иначе None. Одна нормализация для _состояние_блока и _ручной_блок: иначе
+    строковый формат давал разный 🟢 живьём и после снимка (ревью Codex)."""
+    if isinstance(av, dict):
+        return av.get("состояние")
+    if isinstance(av, str):
+        s = av.strip().lower()
+        if s.startswith(("ok", "проверено")) or s in ("собрано", "ок"):
+            return "ok"
+        if s.startswith("пусто"):
+            return "пусто"
+        return "не проверено"
+    return None
+
+
 def _ручной_блок(fetch, block):
     """Блок заполнен вручную: браузерный источник, «ввод: браузер» или свой
     статус «проверено» поверх молчавшего скрипта (как в _состояние_блока)."""
@@ -331,8 +348,7 @@ def _ручной_блок(fetch, block):
                      str(av.get("ввод") or "") if isinstance(av, dict) else ""):
         return True
     own = str(blk.get("статус") or "").strip().lower()
-    state = av.get("состояние") if isinstance(av, dict) else av
-    return own in ("проверено", "ok", "ок", "собрано") and state != "ok"
+    return own in ("проверено", "ok", "ок", "собрано") and _норм_состояние(av) != "ok"
 
 
 def _состояние_блока(fetch, block):
@@ -348,13 +364,8 @@ def _состояние_блока(fetch, block):
         reason = av.get("причина")
         date = av.get("дата")
     elif isinstance(av, str):
-        s = av.strip().lower()
-        if s.startswith(("ok", "проверено")) or s in ("собрано", "ок"):
-            state = "ok"
-        elif s.startswith("пусто"):
-            state = "пусто"
-        else:
-            state, reason = "не проверено", av
+        state = _норм_состояние(av)
+        reason = av if state == "не проверено" else None
     if isinstance(blk, dict):
         own = str(blk.get("статус") or "").strip().lower()
         заявлено = own in ("проверено", "ok", "ок", "собрано")
