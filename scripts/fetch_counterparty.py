@@ -2097,6 +2097,113 @@ def fetch_fedresurs(opener, inn):
     return parse_fedresurs(raw_fedresurs(opener, inn), inn)
 
 
+ГОСЗАТРАТЫ = "https://clearspending.ru"
+# Итоги карточки поставщика (живьём 27.09.2026): число и сумма контрактов по
+# 44-ФЗ, 223-ФЗ и всего. Список контрактов даёт count не больше 500 — итог берём
+# отсюда, а не из длины выдачи.
+ГОСЗАТРАТЫ_ИТОГИ = ("contracts44_count", "contracts44_sum", "contracts223_count",
+                    "contracts223_sum", "contracts_count", "contracts_sum")
+
+
+def _rec_contracts(raw, inn):
+    rec = raw.get("поставщик") if isinstance(raw, dict) else None
+    return rec if isinstance(rec, dict) and str(rec.get("inn") or "") == str(inn) else None
+
+
+def _число(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _контракт_ок(c, inn):
+    return (isinstance(c, dict) and isinstance(c.get("sign_date"), str)
+            and bool(_ДАТА_ISO_ПРЕФИКС.match(c["sign_date"]))
+            and isinstance(c.get("supplier_inns"), list) and str(inn) in c["supplier_inns"]
+            and (c.get("amount_rur") is None or _число(c.get("amount_rur"))))
+
+
+def parse_contracts(raw, inn):
+    """{поставщик: карточка | None (404), контракты: первая страница по дате} ->
+    блок «контракты». Госзатраты — зеркало ЕИС (zakupki.gov.ru с не-РФ сети не
+    открывается), а не первоисточник: свежесть — дата последнего контракта в выдаче.
+    Факт без цвета: контракты — противовес «пустышке», их отсутствие не стоп.
+    is_unfair показывается как есть и сигналом не считается: true живьём не видели."""
+    if not isinstance(raw, dict) or "поставщик" not in raw:
+        return _not_checked("контракты", "схема: нет карточки поставщика")
+    if raw["поставщик"] is None:
+        return None, _av("контракты", "пусто",
+                         "в Госзатратах (зеркало ЕИС) нет поставщика с этим ИНН: контрактов "
+                         "по 44-ФЗ и 223-ФЗ как поставщик не найдено")
+    rec = _rec_contracts(raw, inn)
+    if rec is None:
+        return _not_checked("контракты", "схема: не найдено поле inn карточки поставщика")
+    missing = _schema_missing("контракты", inn, rec)
+    if missing:
+        return _not_checked("контракты", "схема: не найдено поле %s" % missing)
+    итоги = rec["totals"]
+    if not isinstance(итоги, dict) or not all(_число(итоги.get(k)) for k in ГОСЗАТРАТЫ_ИТОГИ):
+        return _not_checked("контракты", "схема: не найдено поле totals с числами контрактов")
+    выдача = _g(raw, "контракты", "data")
+    if not isinstance(выдача, list) or not all(_контракт_ок(c, inn) for c in выдача):
+        return _not_checked("контракты", "схема: контракт без sign_date/supplier_inns с этим "
+                                         "ИНН/amount_rur")
+    unfair = rec.get("is_unfair")
+    данные = {
+        "контрактов_всего": int(итоги["contracts_count"]),
+        "сумма_всего_руб": итоги["contracts_sum"],
+        "контрактов_44фз": int(итоги["contracts44_count"]),
+        "сумма_44фз_руб": итоги["contracts44_sum"],
+        "контрактов_223фз": int(итоги["contracts223_count"]),
+        "сумма_223фз_руб": итоги["contracts223_sum"],
+        "рнп_по_госзатратам": unfair if isinstance(unfair, bool) else None,
+        "последний_контракт": None,
+        "карточка": "%s/suppliers/%s" % (ГОСЗАТРАТЫ, inn),
+        "источник": "Госзатраты (clearspending.ru) — зеркало ЕИС; zakupki.gov.ru с "
+                    "не-РФ сети недоступен",
+    }
+    if выдача:
+        c = выдача[0]
+        данные["последний_контракт"] = {
+            "дата": c["sign_date"][:10], "заказчик": c.get("customer_name"),
+            "инн_заказчика": c.get("customer_inn"), "сумма_руб": c.get("amount_rur"),
+            "закон": c.get("fz"), "реестровый_номер": c.get("regnum")}
+    elif данные["контрактов_всего"]:
+        данные["примечание"] = "итоги есть, а список контрактов пуст — последний не показан"
+    return данные, _av("контракты", "ok")
+
+
+def raw_contracts(opener, inn):
+    """Два GET, которые делает страница поставщика Госзатрат: карточка (404 —
+    поставщика нет) и контракты с сортировкой «по дате заключения»."""
+    opener = _make_opener(редиректы=False)
+    q = urllib.parse.quote(str(inn))
+    стр = "%s/suppliers/%s" % (ГОСЗАТРАТЫ, q)
+    try:
+        status, text = _http_get(opener, "%s/api/gw/suppliers/%s?format=json" % (ГОСЗАТРАТЫ, q),
+                                 referer=стр, ua=UA_ПРОЕКТА, повторы=False, xhr=False)
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e))
+    if status == 404:
+        return {"поставщик": None}
+    if status in (401, 403, 429) or 300 <= status < 400:
+        raise SourceUnavailable("антибот: Госзатраты ответили %d на шаге «поставщик» — без "
+                                "обхода, проверьте вручную" % status)
+    if status != 200:
+        raise SourceUnavailable(_http_status_reason(status, "поставщик"))
+    j = _safe_json(text)
+    if j is None:
+        raise SourceUnavailable("антибот: Госзатраты вернули не-JSON на шаге «поставщик»")
+    return {"поставщик": j, "контракты": _json_политика(
+        opener, "%s/api/gw/filtered-contracts/?sort=-sign_date&page=1&supplier_inns=%s"
+        % (ГОСЗАТРАТЫ, q), стр, "Госзатраты", "контракты")}
+
+
+def fetch_contracts(opener, inn):
+    if os.environ.get("INN_CHECK_BEZ_REFERER") == "1":
+        return _not_checked("контракты", "не покрыто: INN_CHECK_BEZ_REFERER=1 — контракты "
+                                         "только браузером (%s)" % ГОСЗАТРАТЫ)
+    return parse_contracts(raw_contracts(opener, inn), inn)
+
+
 FETCHERS = {
     "агрегатор": fetch_aggregator,
     "банкротство": fetch_bankrupt,
@@ -2113,12 +2220,14 @@ FETCHERS = {
     "санкции": fetch_sanctions,
     "дампы_фнс": fetch_opendata_dumps,
     "федресурс": fetch_fedresurs,
+    "контракты": fetch_contracts,
 }
 
 # id источника -> чистый парсер (raw, inn) -> (данные, _доступность); гоняет eval.
 PARSERS = {
     "банкротство": parse_bankrupt,
     "федресурс": parse_fedresurs,
+    "контракты": parse_contracts,
     "егрюл": parse_egrul,
     "риски": parse_risks,
     "финансы": parse_finance,
@@ -2140,6 +2249,7 @@ RAW_RECORD["спецреестры"] = _rec_special
 RAW_RECORD["банкротство"] = _rec_bankrupt
 RAW_RECORD["федресурс"] = _rec_fedresurs
 RAW_RECORD["росстат"] = _rec_rosstat
+RAW_RECORD["контракты"] = _rec_contracts
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка

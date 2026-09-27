@@ -1255,6 +1255,52 @@ def case_rosstat(fc):
     return errors
 
 
+def case_contracts(fc):
+    """Госзатраты: итоги — из карточки, битый контракт или чужой ИНН — «схема:»."""
+    errors = []
+    base = json.loads((FIXTURES / "контракты_7728168971.raw.json").read_text(encoding="utf-8"))
+    inn = "7728168971"
+
+    def разбор(правка):
+        raw = copy.deepcopy(base)
+        правка(raw)
+        return fc.parse_contracts(raw, inn)
+    д, av = разбор(lambda r: None)
+    check(errors, av["состояние"] == "ok" and д["контрактов_всего"] == 881
+          and д["последний_контракт"]["дата"] == "2026-09-22",
+          "итог не из totals карточки или последний не первый по дате: %r" % д)
+    for имя, правка in (
+            ("сумма строкой", lambda r: r["поставщик"]["totals"].__setitem__(
+                "contracts_sum", "1")),
+            ("число контрактов bool", lambda r: r["поставщик"]["totals"].__setitem__(
+                "contracts44_count", True)),
+            ("totals списком", lambda r: r["поставщик"].__setitem__("totals", [])),
+            ("чужой ИНН в контракте", lambda r: r["контракты"]["data"][0].__setitem__(
+                "supplier_inns", ["7707083893"])),
+            ("дата не ISO", lambda r: r["контракты"]["data"][0].__setitem__(
+                "sign_date", "22.09.2026")),
+            ("сумма контракта строкой", lambda r: r["контракты"]["data"][1].__setitem__(
+                "amount_rur", "82000000")),
+            ("data не список", lambda r: r["контракты"].__setitem__("data", {})),
+            ("нет страницы контрактов", lambda r: r.pop("контракты")),
+            ("карточка чужого ИНН", lambda r: r["поставщик"].__setitem__("inn", "1"))):
+        д, av = разбор(правка)
+        check(errors, av["состояние"] == "не проверено" and д is None
+              and str(av["причина"]).startswith("схема:"), "%s: %r %r" % (имя, av, д))
+    д, av = разбор(lambda r: r["поставщик"].__setitem__("is_unfair", "да"))
+    check(errors, av["состояние"] == "ok" and д["рнп_по_госзатратам"] is None,
+          "is_unfair не bool принят как есть: %r" % д)
+    д, av = разбор(lambda r: r["контракты"].__setitem__("data", []))
+    check(errors, д["последний_контракт"] is None and "примечание" in д,
+          "итоги есть, список пуст — без примечания: %r" % д)
+    д, av = fc.parse_contracts({"поставщик": None}, inn)
+    check(errors, av["состояние"] == "пусто" and д is None, "404 не «пусто»: %r" % av)
+    for битое in (None, [], {"контракты": {}}):
+        д, av = fc.parse_contracts(битое, inn)
+        check(errors, av["состояние"] == "не проверено", "сырое %r: %r" % (битое, av))
+    return errors
+
+
 def _checko(**изм):
     """Ответ Checko v2/company в форме документации (checko.ru/integration/api/
     company, 26.09.2026) — живьём без ключа не снят; ИНН — Сбербанк."""
@@ -1469,6 +1515,7 @@ def main():
         "ефрсб-банкротство": case_bankrupt(fc),
         "федресурс-роли": case_fedresurs(fc),
         "росстат-подразделения": case_rosstat(fc),
+        "госконтракты: итоги карточки и схема": case_contracts(fc),
         "агрегатор-по-ключу": case_aggregator(fc),
         "агрегатор: живые ответы Checko и DaData": case_aggregator_live(fc),
     }

@@ -1,0 +1,53 @@
+{
+ "поставщик": {
+  "fz": "44",
+  "inn": "7728168971",
+  "kpp": "783502001",
+  "okpo": null,
+  "region_code": "77",
+  "region_name": "Москва",
+  "okopf": {
+   "code": "12267",
+   "name": "Непубличные акционерные общества"
+  },
+  "is_unfair": false,
+  "totals": {
+   "contracts223_count": 333,
+   "contracts223_sum": 188099262058.68,
+   "contracts44_count": 548,
+   "contracts44_sum": 29829480866.7,
+   "contracts_count": 881,
+   "contracts_sum": 217928742925.38
+  }
+ },
+ "контракты": {
+  "count": 500,
+  "page_size": 20,
+  "total_pages": 25,
+  "page": 1,
+  "data": [
+   {
+    "sign_date": "2026-09-22",
+    "supplier_inns": [
+     "7728168971"
+    ],
+    "amount_rur": 82000000.0,
+    "customer_name": "АДМИНИСТРАЦИЯ МУНИЦИПАЛЬНОГО ОБРАЗОВАНИЯ ГОРОД ТУЛА",
+    "customer_inn": "7107030032",
+    "fz": "44",
+    "regnum": "3710703003226000060"
+   },
+   {
+    "sign_date": "2026-09-22",
+    "supplier_inns": [
+     "7728168971"
+    ],
+    "amount_rur": 32800000.0,
+    "customer_name": "АДМИНИСТРАЦИЯ МУНИЦИПАЛЬНОГО ОБРАЗОВАНИЯ ГОРОД ТУЛА",
+    "customer_inn": "7107030032",
+    "fz": "44",
+    "regnum": "3710703003226000059"
+   }
+  ]
+ }
+}
