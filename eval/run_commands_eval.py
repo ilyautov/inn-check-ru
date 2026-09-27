@@ -92,7 +92,8 @@ def main():
                          "`paper_vat.py --сум` `watchlist.py` `--прогонн`\n", encoding="utf-8")
         ош = ошибки_команды(проба, профили)
         ждём = ("фронтматтер", "$ARGUMENTS", "--нет-такого", "нет_скрипта.py",
-                "выдуманный", "references/нет.md", "--сум ", "--прогонн")
+                "выдуманный", "references/нет.md", "paper_vat.py: флага --сум ",
+                "watchlist.py: флага --прогонн")
         cases["проверка ловит расхождения"] = [
             "не поймано: %s" % ж for ж in ждём if not any(ж in e for e in ош)]
     finally:
