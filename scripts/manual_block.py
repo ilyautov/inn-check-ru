@@ -157,7 +157,11 @@ def вклеить(fetch, блоки):
     # итог сбора пересчитывается по новым состояниям: старое «проверка не
     # состоялась» живьём давало null, а ретро — 🟡 (ревью Codex, P2)
     import fetch_counterparty
-    новый["_итог_проверки"] = fetch_counterparty.build_summary(доступность)
+    # build_summary ждёт словари §1.1, а у ручного fetch бывает и строка
+    # («проверено»): состояние нормализуется тем же кодом, что у резолвера
+    новый["_итог_проверки"] = fetch_counterparty.build_summary({
+        k: v if isinstance(v, dict) else {"состояние": profiles._норм_состояние(v)}
+        for k, v in доступность.items()})
     return новый, итоги
 
 
