@@ -1,0 +1,26 @@
+{
+  "exit_code": 0,
+  "timed_out": false,
+  "started_at": "2026-09-27T22:56:07.068948+00:00",
+  "finished_at": "2026-09-27T22:56:15.428544+00:00",
+  "elapsed_seconds": 8.36,
+  "commit": "b741b0ae98faeb864ee7badcf2426acc33271d42",
+  "inn": "7707083893",
+  "python": "3.12.11 (main, Aug 18 2025, 19:02:39) [Clang 20.1.4 ]",
+  "mode": "всё",
+  "credentials": "none",
+  "cache": "isolated_empty",
+  "tls": "default_verified",
+  "raw_cli_sha256": "a27e921cb4e74becc903814459091af105e409850188e4f41dfe4321469ea556",
+  "public_result_sha256": "ac0975c26231d73accb4bd478164f7f9aadf359f4503c7e471e34360f0f3e691",
+  "redactions": {
+    "removed_fields": [
+      "/риски/_token_pb"
+    ],
+    "local_cache_paths": "<ISOLATED_CACHE>",
+    "masked_fields": [
+      "/егрюл/руководитель (ФИО физлица)"
+    ]
+  },
+  "interpretation": "One observed CLI run, not a full agent/MCP end-to-end test or independent validation of registry responses."
+}

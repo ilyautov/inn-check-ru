@@ -1,0 +1,15 @@
+{
+  "name": "inn-check-ru-landing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild main.ts --outfile=../docs/app.js --format=esm --target=es2022",
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "python3 -m http.server 4186 --bind 127.0.0.1 --directory ../docs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

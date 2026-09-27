@@ -1,26 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Проверка контрагента по ИНН — светофор риска в AI-агенте | inn-check-ru</title>
-<meta name="description" content="Открытый AI-скилл: по одному ИНН собирает 18 открытых реестров (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU) и выдаёт светофор риска 🟢/🟡/🔴 с рекомендацией. 22 сигнала считаются кодом, каждая цифра — с источником и датой. Apache-2.0.">
-<meta property="og:title" content="Проверка контрагента по ИНН — светофор риска в вашем AI-агенте">
-<meta property="og:description" content="18 реестров, 22 сигнала риска кодом, санкции офлайн, граф связей и признаки дробления. Каждая цифра с источником и датой — где данных нет, честное «не проверено».">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111d23">
+<title>inn-check-ru · Сбор данных о компании по ИНН для AI-агента</title>
+<meta name="description" content="Инструмент для AI-агента по сбору данных о компании по ИНН. Статус, финансы, долги, суды, владельцы и связи. Источники, даты и непроверенные сведения.">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://inn-check-ru.aifrontier.tech/">
-<meta property="og:image" content="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
+<meta property="og:title" content="Сбор данных о компании по ИНН для AI-агента">
+<meta property="og:description" content="Инструмент для AI-агента по сбору данных о компании по ИНН. Статус, финансы, долги, суды, владельцы и связи. Источники, даты и непроверенные сведения.">
+<meta property="og:image" content="https://inn-check-ru.aifrontier.tech/assets/og.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:locale" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="canonical" href="https://inn-check-ru.aifrontier.tech/">
-<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ilyautov/inn-check-ru/main/assets/social-preview.png">
-<link rel="stylesheet" href="styles.css">
+<meta name="twitter:image" content="https://inn-check-ru.aifrontier.tech/assets/og.jpg">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "inn-check-ru",
-  "alternateName": "Проверка контрагента по ИНН",
-  "description": "Открытый AI-скилл проверки российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом, мониторинг снимками.",
+  "alternateName": "Сбор данных о компании по ИНН для AI-агента",
+  "description": "Инструмент для AI-агента по сбору данных о компании по ИНН. Статус, финансы, долги, суды, владельцы и связи. Источники, даты и непроверенные сведения.",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "macOS, Windows, Linux",
   "url": "https://inn-check-ru.aifrontier.tech/",
@@ -30,8 +34,16 @@
   "license": "https://opensource.org/licenses/Apache-2.0",
   "isAccessibleForFree": true,
   "inLanguage": "ru",
-  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "RUB"},
-  "author": {"@type": "Person", "name": "Ilya Utov", "url": "https://github.com/ilyautov"}
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "RUB"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "Ilya Utov",
+    "url": "https://github.com/ilyautov"
+  }
 }
 </script>
 <script type="application/ld+json">
@@ -39,202 +51,147 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type":"Question","name":"Как проверить контрагента по ИНН бесплатно?","acceptedAnswer":{"@type":"Answer","text":"Поставьте скилл одной командой npx skills add ilyautov/inn-check-ru и скажите агенту «проверь поставщика по ИНН». За пару минут quick-scan сверит deal-killer-сигналы (ликвидация, банкротство, недостоверность ЕГРЮЛ, дисквалификация, санкции) по открытым реестрам и выдаст светофор с рекомендацией."}},
-    {"@type":"Question","name":"Почему нельзя просто посмотреть один агрегатор?","acceptedAnswer":{"@type":"Answer","text":"В живом тесте одна компания у пяти агрегаторов дала число судебных дел от ~500 до ~1500 — у каждого своя методология подсчёта, а один подмешал чужие банкротные «намерения». Скилл считает фактом только совпадение трёх и более источников, а расхождение показывает как флаг."}},
-    {"@type":"Question","name":"Работает без API-ключей?","acceptedAnswer":{"@type":"Answer","text":"Базовый контур — полностью без ключей: ЕГРЮЛ, риск-флаги ФНС, финансы ГИР БО, Реестр МСП, санкции офлайн. Граф связей просит бесплатный ключ checko (или сбор связей браузером), суды и банкротства глубже — через браузер."}},
-    {"@type":"Question","name":"Чем это отличается от Контур.Фокуса и СПАРК?","acceptedAnswer":{"@type":"Answer","text":"Это не замена, а другая задача: скилл живёт внутри вашего AI-агента, сводит несколько источников и показывает расхождения вместо одной уверенной цифры, а его код и пороги открыты и настраиваемы. Для крупной сделки светофор — рабочий лист для юриста, не последнее слово."}},
-    {"@type":"Question","name":"Куда уходят мои данные?","acceptedAnswer":{"@type":"Answer","text":"Скилл работает там же, где ваш агент. Наружу уходит только проверяемый ИНН (или ФИО для санкционной сверки) в открытые реестры по TLS; санкционные перечни и дампы после скачивания сверяются локально. Телеметрии у проекта нет."}},
-    {"@type":"Question","name":"Это бесплатно?","acceptedAnswer":{"@type":"Answer","text":"Да, открытый код под лицензией Apache-2.0. Берите, форкайте, проверяйте логику — пороги светофора видны и настраиваются."}}
+    {
+      "@type": "Question",
+      "name": "Нужны платные API-ключи?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Базовые источники можно запрашивать без ключей. Для автоматического графа связей нужен ключ Checko. Доступ к реестрам может зависеть от сети; отдельные источники требуют браузерной проверки."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Можно проверить ИП?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Да. Для 12-значного ИНН предусмотрены отдельные проверки ИП, включая ЕГРИП и статус НПД. Закрытые сведения об ИП не восстанавливаются из предположений."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Кто увидит проверяемый ИНН?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Если работаешь через AI-агента, ИНН попадает в контекст его провайдера. Источники и подключённые агрегаторы видят свои запросы, настроенный прокси видит проходящий через него трафик. Загруженные санкционные перечни сверяются локально. Подробнее о данных ↗"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Можно проверить всю базу?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Есть пакетная проверка списка контрагентов и сравнение сохранённых снимков. Для регулярного мониторинга нужно отдельно настроить расписание. Сам по себе лендинг проверки не запускает."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Светофор гарантирует безопасность сделки?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Нет. Это оценка по доступным данным и выбранному профилю сделки. Отчёт помогает определить вопросы для проверки. Он не заменяет изучение договора, подтверждение исполнения и профессиональное заключение."
+      }
+    }
   ]
 }
 </script>
+<link rel="preload" href="assets/fonts/alumni-sans-cyrillic-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="experience.css">
+<script type="module" src="app.js"></script>
 </head>
 <body>
-
-<header>
-  <div class="wrap nav">
-    <a class="brand" href="index.html" aria-label="inn-check-ru, на главную">
-      <span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span>
-      inn-check-ru <small>· AI Frontier</small>
-    </a>
-    <nav class="nav-links" aria-label="Основная навигация">
-      <a href="proverit-kontragenta-po-inn.html">По ИНН</a>
-      <a href="proverka-ip-po-inn.html">ИП</a>
-      <a href="priznaki-odnodnevki.html">Однодневки</a>
-      <a href="droblenie-biznesa.html">Дробление</a>
-      <a href="monitoring-kontragentov.html">Мониторинг</a>
-      <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">GitHub</a>
-    </nav>
-  </div>
+<a class="skip" href="#main">Перейти к содержимому</a>
+<header class="header">
+<a class="brand" href="#top" aria-label="inn-check-ru, начало страницы"><img src="assets/mark.svg" alt="" width="32" height="36"><span>inn-check-ru<small>BY AI FRONTIER</small></span></a>
+<nav aria-label="Основная навигация"><a href="#example">Пример проверки</a><a href="#sources">Источники</a><a class="nav-cta" href="#connect">Подключить <span aria-hidden="true">↗</span></a></nav>
+<a class="github-top" href="https://github.com/ilyautov/inn-check-ru">GitHub <span aria-hidden="true">↗</span></a>
 </header>
-
-<main id="top">
-
-  <section class="hero">
-    <div class="wrap">
-      <div class="kicker">inn-check-ru · Apache-2.0</div>
-      <h1>Проверка контрагента по ИНН — <span class="cta-t">светофор риска</span> в вашем AI-агенте</h1>
-      <p class="sub">Один ИНН на вход — 🟢/🟡/🔴 с рекомендацией на выходе: отсрочка, только предоплата или избегать. 18 открытых реестров, 22 сигнала риска, посчитанных кодом. Каждая цифра — с источником и датой; где данных нет — честное «не проверено», а не правдоподобная выдумка.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru" aria-label="Открыть репозиторий на GitHub">★ Открыть на GitHub</a>
-        <a class="btn btn-ghost" href="#install">Установка одной командой</a>
-      </div>
-      <div class="trust-mini"><span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span><span>Открытый код · 18 реестров · 22 сигнала кодом · санкции РФМ/OFAC/EU офлайн · Claude Code, Cursor, Codex, Gemini, MCP</span></div>
-    </div>
-  </section>
-
-  <section class="s alt" id="demo">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="kicker">как выглядит ответ</div>
-        <h2>Не простыня, а карточка за пару минут</h2>
-        <p>Quick-scan идёт только по deal-killer-сигналам. Нашёлся хоть один — сбор можно останавливать: примерно 70% отсева происходит именно здесь.</p>
-      </div>
-      <div class="card-light">🚦 ООО «Ромашка», ИНН 7700000000 — на 15.06.2026
-
-<span class="red">🔴 Отсрочку не давать. Только 100% предоплата или отказ.</span>
-
-Почему: компания в стадии ликвидации; 4 исп. производства ФССП на 3,1 млн ₽ — больше суммы сделки.
-Уровень поднят сигналами: ликвидация (ЕГРЮЛ) + ФССП 3,1 млн > сумма сделки 1,2 млн.
-Рекомендация: избегать отсрочки; при острой нужде — только предоплата.
-Вердикт сменится, если: ликвидация отменена И производства погашены (🔴→🟡).
-Мониторить: банкротное заявление в ЕФРСБ.
-Что проверено: ЕГРЮЛ ✅, ФССП ✅ (15.06.2026). Что НЕ проверено: суды (kad.arbitr — вручную).</div>
-      <p class="card-note">Пример иллюстративный, данные условные. Формат карточки — единый во всех стеках.</p>
-    </div>
-  </section>
-
-  <section class="proof">
-    <div class="wrap">
-      <div class="kicker">почему не один агрегатор</div>
-      <h2>Одна компания, пять агрегаторов, четыре разных числа</h2>
-      <p class="proof-lead">Живой тест 15.06.2026: прогнали одну компанию через пять бесплатных агрегаторов. Число судебных дел разошлось почти втрое — у каждого своя методология подсчёта:</p>
-      <div class="nums" aria-label="Разные числа судебных дел у разных агрегаторов">
-        <span class="n">~500</span><span class="ne">≠</span>
-        <span class="n">~1000</span><span class="ne">≠</span>
-        <span class="n">~1500</span>
-      </div>
-      <p class="small">Один агрегатор вдобавок подмешал чужие банкротные «намерения». Зато выручка и число исполнительных производств совпали у всех — надёжный сигнал. Цифры намеренно округлены; проверяйте на своих контрагентах сами.</p>
-      <p class="verdict">Отсюда главный принцип: <b>факт — это то, что совпало у трёх и более источников.</b> Расхождение — флаг, а не повод выбрать самую красивую цифру.</p>
-    </div>
-  </section>
-
-  <section class="s" id="what">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="kicker">что проверяет</div>
-        <h2>18 реестров, 22 сигнала — кодом, а не из головы модели</h2>
-        <p>Движок на чистом Python stdlib. Числа не выдумываются моделью — они трассируются к строке реестра; tier-маркеры (✅ подтверждено / ⚠️ один источник / ❌ не подтверждено) едут с каждым фактом.</p>
-      </div>
-      <div class="grid3">
-        <div class="card">
-          <h3>Реестры без ключей</h3>
-          <p>ЕГРЮЛ/ЕГРИП, риск-флаги «Прозрачного бизнеса», ГИР БО, Реестр МСП (✅ верифицирован), статус самозанятого (НПД), ЕРКНМ и РНП по дампам — одна команда, один JSON.</p>
-          <span class="tag">fetch_counterparty.py</span>
-        </div>
-        <div class="card">
-          <h3>Финансовая патология кодом</h3>
-          <p>Чистые активы ниже нуля два года (ст. 30 ФЗ-14 — 🔴 deal-killer), автономия, ликвидность, падение выручки, транзитный профиль. Каждый флаг — с сырой строкой баланса.</p>
-          <span class="tag">fin_scoring.py</span>
-        </div>
-        <div class="card">
-          <h3>Санкции офлайн</h3>
-          <p>Перечни РФМ, OFAC SDN и EU Consolidated качаются один раз в кэш — дальше сверка директора и компании локально, за секунды. По ФИО — честная пометка «проверьте дату рождения».</p>
-          <span class="tag">sanctions_check.py</span>
-        </div>
-        <div class="card">
-          <h3>Граф связей и дробление</h3>
-          <p>Общие директора и учредители, соседи по адресу, правопреемство — граф глубины 2. Признаки дробления по методике ФНС с формулировочной дисциплиной: «N признаков», никогда «это дробление».</p>
-          <span class="tag">affiliates_graph.py</span>
-        </div>
-        <div class="card">
-          <h3>ИП — отдельный светофор</h3>
-          <p>ЕГРИП, НПД-статус, спецрежим, МСП, внесудебное банкротство физлиц, два поиска ФССП. Что закрыто законом (выручка, адрес, налоговый долг ИП) — честно «не проверено».</p>
-          <span class="tag">12-значный ИНН</span>
-        </div>
-        <div class="card">
-          <h3>Мониторинг снимками</h3>
-          <p>Снимок перед каждой крупной отгрузкой, diff показывает, что изменилось: статус 🔴, директор 🟡, недостоверность 🔴 — с датами «было/стало». То, за что сервисы берут деньги, — бесплатно.</p>
-          <span class="tag">diff_counterparty.py</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="s alt" id="install">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="kicker">установка</div>
-        <h2>Одна команда — в любой агент</h2>
-      </div>
-      <div class="steps">
-        <div class="step"><div><h3>skills.sh — Claude Code, Cursor, Codex, Gemini и ещё десятки</h3><p><code>npx skills add ilyautov/inn-check-ru</code> — затем просто скажите агенту: «проверь поставщика по ИНН перед предоплатой».</p></div></div>
-        <div class="step"><div><h3>Плагин Claude Code</h3><p><code>/plugin marketplace add ilyautov/inn-check-ru</code>, затем <code>/plugin install inn-check-ru@inn-check-ru</code>.</p></div></div>
-        <div class="step"><div><h3>MCP-сервер</h3><p><code>claude mcp add inn-check-ru -- python3 mcp/server.py</code> — 6 read-only инструментов в MCP-сессии (счёт из Диадока → проверка до подписи).</p></div></div>
-        <div class="step"><div><h3>ZIP для claude.ai</h3><p>Готовый архив последнего релиза: <a href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip">inn-check-ru.zip</a> → Settings → Capabilities → Skills → Upload.</p></div></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="s" id="limits">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="kicker">честно</div>
-        <h2>Чего скилл не умеет</h2>
-        <p>Полный список — в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">KNOWN_LIMITS.md</a>. Главное:</p>
-      </div>
-      <div class="chips">
-        <span class="chip">суды и банкротства — браузерный слой</span>
-        <span class="chip">у ИП нет публичной отчётности (закон)</span>
-        <span class="chip">учредители — через checko/браузер</span>
-        <span class="chip">пороги эвристические, настраиваемые</span>
-        <span class="chip">светофор — оценка, не приговор</span>
-      </div>
-    </div>
-  </section>
-
-  <section class="s alt" id="faq">
-    <div class="wrap">
-      <div class="sec-head">
-        <div class="kicker">вопросы</div>
-        <h2>Частые вопросы</h2>
-      </div>
-      <div class="faq">
-        <details><summary>Как проверить контрагента по ИНН бесплатно?</summary><p>Поставьте скилл одной командой <code>npx skills add ilyautov/inn-check-ru</code> и скажите агенту «проверь поставщика по ИНН». Quick-scan за пару минут сверит deal-killer-сигналы по открытым реестрам и выдаст светофор с рекомендацией. Подробно — на странице <a href="proverit-kontragenta-po-inn.html">проверки по ИНН</a>.</p></details>
-        <details><summary>Почему нельзя просто посмотреть один агрегатор?</summary><p>Потому что счётчики агрегаторов не совпадают: в живом тесте число судов по одной компании разошлось от ~500 до ~1500. Скилл считает фактом совпадение ≥3 источников, а расхождение показывает как флаг — вместо одной уверенной (и, возможно, чужой) цифры.</p></details>
-        <details><summary>Работает без API-ключей?</summary><p>Базовый контур — полностью без ключей: ЕГРЮЛ, риск-флаги ФНС, финансы ГИР БО, Реестр МСП, санкции офлайн. Граф связей просит бесплатный ключ checko (или сбор связей браузером через --offline-граф), суды и банкротства глубже — через браузер.</p></details>
-        <details><summary>Чем это отличается от Контур.Фокуса и СПАРК?</summary><p>Не замена, а другая задача: скилл живёт внутри вашего AI-агента рядом с остальной работой, сводит несколько источников и показывает расхождения. Код и пороги открыты — логику можно проверить, а не верить чёрному ящику скоринга. Для крупной сделки светофор — рабочий лист для юриста.</p></details>
-        <details><summary>Куда уходят мои данные?</summary><p>Скилл работает там же, где ваш агент. Наружу уходит только проверяемый ИНН (или ФИО для санкционной сверки) в открытые реестры по TLS; санкционные перечни и дампы после скачивания сверяются локально. Телеметрии у проекта нет — подробности в <a href="https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md">PRIVACY_POLICY.md</a>.</p></details>
-        <details><summary>Это бесплатно?</summary><p>Да, открытый код под лицензией Apache-2.0. Берите, форкайте, проверяйте логику — пороги светофора видны и настраиваются.</p></details>
-      </div>
-    </div>
-  </section>
-
-  <section class="s">
-    <div class="wrap">
-      <div class="oss">
-        <div class="kicker">открытый код</div>
-        <h2>Звезда на GitHub — лучший способ сказать спасибо</h2>
-        <p>По ней проект находят другие собственники, которые торгуют в долг вслепую. Багрепорты, расхождения цифр с реестрами и новые источники — в Issues, шаблоны для них уже есть.</p>
-        <div class="cta-row">
-          <a class="btn btn-primary" href="https://github.com/ilyautov/inn-check-ru">★ github.com/ilyautov/inn-check-ru</a>
-          <a class="btn btn-ghost" href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.zip">Скачать ZIP</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
+<main id="main">
+<section class="hero" id="top" aria-labelledby="hero-title">
+<div class="hero-art"><img src="assets/bureau-v3.webp" alt="В аналитическом бюро робот приносит сведения, а Goro сопоставляет документы с картой связей компаний" width="1672" height="941" fetchpriority="high"></div>
+<div class="hero-shade"></div>
+<div class="hero-content wrap">
+<p class="eyebrow"><span class="rule"></span> INN-CHECK-RU / ИНСТРУМЕНТЫ ДЛЯ АГЕНТА</p>
+<h1 id="hero-title"><span>СБОР ДАННЫХ</span><span>О КОМПАНИИ ПО ИНН.</span><em>Для твоего AI-агента.</em></h1>
+<p class="hero-lead">Статус, финансы, долги, судебные дела и связи. Агент собирает сведения из открытых источников в досье компании.</p><p class="hero-data-note">С источниками, датами и отметками о том, что не удалось проверить.</p>
+<div class="hero-actions"><a class="button primary" href="#example">Посмотреть пример <span aria-hidden="true">↓</span></a><a class="underlink" href="#connect">Подключить к агенту <span aria-hidden="true">↗</span></a></div>
+<p class="hero-platforms">Claude · Codex · Cursor · Gemini · MCP</p>
+</div>
+<div class="scene-note"><span class="scene-number">БЮРО ОТКРЫТЫХ ДАННЫХ</span><p>У каждого факта<br>есть источник.</p><span class="scene-coordinate">INN / DATA / DOSSIER</span></div>
+<div class="hero-footer wrap"><span>ОТКРЫТЫЙ КОД / APACHE-2.0</span><a href="https://github.com/ilyautov/inn-check-ru/releases">v1.12.2 <span aria-hidden="true">↗</span></a><span class="hero-footer-note">Решение остаётся за тобой.</span></div>
+</section>
+<div class="route-strip wrap" aria-label="Как проходит проверка"><span><b>01</b> ИНН компании</span><i aria-hidden="true">→</i><span><b>02</b> Открытые источники</span><i aria-hidden="true">→</i><span><b>03</b> Данные для агента</span><a href="#example" aria-label="Перейти к примеру">↓</a></div>
+<section class="bureau-story wrap" id="example" aria-labelledby="example-title">
+<div class="section-heading"><div><p class="eyebrow">01 / ОТ ЗАПРОСА К ФАКТАМ</p><h2 id="example-title">Один ИНН.<br><em>Досье из разных источников.</em></h2></div><p>Проследи путь сведений. Выбери пример и переключай этапы на пульте.</p></div>
+<div class="scenario-buttons" role="group" aria-label="Выберите пример использования данных">
+<button class="scenario selected" data-scenario="profile" aria-pressed="true"><span class="scenario-index">01</span><span><strong>Досье компании</strong><small>Статус, финансы и связи</small></span><span class="scenario-arrow" aria-hidden="true">↗</span></button>
+<button class="scenario" data-scenario="links" aria-pressed="false"><span class="scenario-index">02</span><span><strong>Связи компании</strong><small>Люди и связанные организации</small></span><span class="scenario-arrow" aria-hidden="true">↗</span></button>
+<button class="scenario" data-scenario="changes" aria-pressed="false"><span class="scenario-index">03</span><span><strong>Изменения</strong><small>Что нового в сохранённом досье</small></span><span class="scenario-arrow" aria-hidden="true">↗</span></button>
+</div>
+<div class="story-layout" id="story-layout">
+<div class="story-chapters">
+<article class="chapter active" data-chapter="0"><span class="chapter-number">01 / ЗАПРОС</span><h3>Начни с ИНН.</h3><p>Попроси своего агента собрать сведения о компании. Уточни, что нужно: нейтральное досье или проверка под условия сделки.</p><div class="chapter-sample"><span>ТЫ → AI-АГЕНТ</span><p>«Собери досье компании по ИНН. Укажи источники и пробелы в данных».</p></div></article>
+<article class="chapter" data-chapter="1"><span class="chapter-number">02 / ИСТОЧНИКИ</span><h3>Сведения сходятся<br>в одном месте.</h3><p>Регистрация, отчётность, долги и связи. Для каждого источника видно, что удалось получить и что ещё нужно проверить.</p><p class="chapter-aside">Нет ответа ≠ нет риска.</p></article>
+<article class="chapter" data-chapter="2"><span class="chapter-number">03 / ДОСЬЕ</span><h3>Изучай компанию.<br>Возвращайся к фактам.</h3><p>В досье остаются исходные сведения, основания выводов и непроверенные пункты. Агент помогает их разобрать.</p><a class="underlink" href="#report">Открыть полный образец <span aria-hidden="true">↓</span></a></article>
+</div>
+<div class="terminal-anchor"><div class="terminal" id="terminal" data-stage="0">
+<div class="terminal-hardware"><span>INN-CHECK <small>DATA TERMINAL / 03</small></span><span class="hardware-light" aria-hidden="true"></span></div>
+<div class="terminal-screen">
+<div class="screen-bar"><span>БЮРО / СБОР СВЕДЕНИЙ</span><span>УЧЕБНЫЙ ПРИМЕР</span></div>
+<div class="terminal-scene"><img src="assets/collection-v3.webp" alt="Робот собирает документы на рабочем столе аналитика" width="1672" height="941" loading="lazy"><div class="terminal-scene-caption"><span id="terminal-counter">01 / 03</span><strong id="terminal-heading">Запрос принят к разбору</strong></div></div>
+<div class="terminal-panel" id="stage-input"><div class="inn-ticket"><span>ВХОДНЫЕ ДАННЫЕ</span><strong>ИНН компании</strong><span>+ задача для агента</span></div><p id="terminal-prompt">Собери досье компании по ИНН. Покажи источники и что не удалось проверить.</p><div class="data-route"><span>Твой агент</span><b aria-hidden="true">→</b><span>inn-check-ru</span><b aria-hidden="true">→</b><span>Источники</span></div></div>
+<div class="terminal-panel" id="stage-sources" hidden><div class="terminal-sources" id="terminal-sources"></div><p class="panel-footnote">Отмечаем каждый пробел. Недоступные данные не становятся отрицательным результатом.</p></div>
+<div class="terminal-panel" id="stage-result" hidden><span class="terminal-result-label" id="terminal-result-label">СОБРАННЫЕ СВЕДЕНИЯ</span><h3 id="terminal-verdict">Факты о компании в одном досье</h3><p id="terminal-reason">Статус, отчётность и связи собраны по доступным источникам.</p><a href="#report" class="report-link">Открыть досье <span aria-hidden="true">↗</span></a></div>
+</div>
+<div class="terminal-controls" role="group" aria-label="Этап сбора данных"><button data-stage-button="0" aria-pressed="true"><span>01</span>ИНН</button><button data-stage-button="1" aria-pressed="false"><span>02</span>Источники</button><button data-stage-button="2" aria-pressed="false"><span>03</span>Досье</button></div>
+<div class="terminal-base"><span>INN → SOURCES → DOSSIER</span><span aria-hidden="true">▥ ▥ ▥ ▥ ▥</span></div>
+</div><div class="motion-controls"><button id="motion-toggle" aria-pressed="false">Движение пульта: вкл.</button><button id="scroll-mode" hidden>Связать со скроллом ↗</button></div><p class="simulation-note">Интерактивная иллюстрация. Компания и сведения условные. Запросы в реестры не выполняются.</p></div>
+</div></section>
+<section class="example light report-section" id="report" aria-labelledby="report-title"><div class="wrap report-layout"><div class="report-intro"><p class="eyebrow">02 / РЕЗУЛЬТАТ НА СТОЛЕ</p><h2 id="report-title">Каждый вывод<br>можно разобрать.</h2><p class="report-lead">Читай сведения вместе с источниками и непроверенными пунктами. Полнота данных важнее уверенного тона ответа.</p><div class="prompt-block"><span class="label">ЗАПРОС АГЕНТУ</span><p id="demo-prompt">Собери досье компании по ИНН [ИНН]: статус, финансы, долги, судебные дела, владельцы и связи. Покажи источники, даты и что не удалось проверить.</p><button id="copy-prompt" class="text-button">Скопировать запрос <span aria-hidden="true">↗</span></button></div>
+<p class="demo-note">Учебный образец. Компания, суммы и события условные.</p><a class="underlink" href="#example">Выбрать другой пример ↑</a></div><article class="dossier" id="dossier" aria-labelledby="dossier-title" data-tone="gray">
+<div class="dossier-top"><span>INN-CHECK-RU / ДОСЬЕ</span><span>УЧЕБНЫЙ ПРИМЕР</span></div>
+<div class="dossier-heading"><div><p class="label" id="company-label">КОМПАНИЯ А · УЧЕБНЫЙ ПРИМЕР</p><h3 id="dossier-title">Досье компании</h3></div><span class="document-no" aria-hidden="true">№ 01</span></div>
+<div class="deal-meta"><span><span id="amount-label">Профиль</span> <b id="deal-amount">Нейтральный</b></span><span><span id="terms-label">Режим</span> <b id="deal-terms">Сбор сведений</b></span></div>
+<div class="decision" aria-live="polite" aria-atomic="true"><span class="decision-icon" id="decision-icon" aria-hidden="true">i</span><div><p class="label" id="decision-label">СОБРАННЫЕ СВЕДЕНИЯ</p><h4 id="decision-title">Факты о компании в одном досье</h4><p id="decision-reason">Статус, отчётность и связи собраны по доступным источникам. Без условий сделки итоговая оценка риска не выставляется.</p></div></div>
+<div class="facts" id="demo-facts"><div><span>ЕГРЮЛ</span><p>Компания действует с 2020 года. Указаны директор и учредитель.</p><b>Есть данные</b></div><div><span>ГИР БО</span><p>Выручка за 2025 год: 84 млн ₽. Чистая прибыль: 6 млн ₽.</p><b>Есть данные</b></div><div><span>Связи</span><p>У директора найдена ещё одна компания. Сведения одного источника.</p><b>Нужно сверить</b></div><div><span>Арбитраж</span><p>Сведения о делах не получены.</p><b>Не проверено</b></div></div>
+<div id="relation-demo" class="relation-demo" hidden><p class="label">УЧЕБНАЯ СХЕМА · ВЫБЕРИ УЗЕЛ</p><div class="relation-nodes" role="group" aria-label="Узлы связей"><button data-node="company" aria-pressed="true">Компания А<small>ЕГРЮЛ</small></button><span aria-hidden="true">↔</span><button data-node="director" aria-pressed="false">Руководитель А<small>Директор</small></button><span aria-hidden="true">⇢</span><button data-node="related" aria-pressed="false">Компания Б<small>Нужно сверить</small></button></div><p id="relation-explanation" aria-live="polite">Компания А → руководитель А. В учебном снимке ЕГРЮЛ на 28.09.2026 указан этот директор. Идентификаторы в примере условные.</p></div><a class="underlink report-changes-link" id="report-changes-link" href="#snapshots" hidden>Разобрать изменения по полям ↓</a><div class="next-step"><span class="label">ЧТО ДЕЛАТЬ ДАЛЬШЕ</span><p id="next-step">Изучить исходные сведения, проверить связи и недоступные источники. Для оценки конкретной сделки указать её цель и условия.</p></div>
+<details class="source-details"><summary>Источники и границы примера <span aria-hidden="true">+</span></summary><div id="demo-sources"><p>Все сведения учебные. В примере заданы запись ЕГРЮЛ, строки годовой отчётности и связь по директору из одного источника. Данные арбитражной картотеки не получены.</p><p>В настоящем досье нужно проверить ссылки, даты и принадлежность записей тому же контрагенту.</p></div></details>
+<div class="dossier-footer"><img src="assets/mark.svg" width="18" height="22" alt=""><span>Факт → источник → дата проверки</span></div>
+</article></div></section>
+<section class="evidence wrap" id="evidence" aria-labelledby="evidence-title">
+<div class="evidence-visual"><img src="assets/connections-v3.webp" alt="Goro изучает карту связей компаний на стеклянной панели в аналитическом бюро" width="1536" height="1024" loading="lazy"><div class="image-caption"><span>03 / КАРТА СВЯЗЕЙ</span><span>СОХРАНИ ИСХОДНЫЕ ДАННЫЕ</span></div></div>
+<div class="evidence-copy"><p class="eyebrow">ФАКТЫ, К КОТОРЫМ МОЖНО ВЕРНУТЬСЯ</p><h2 id="evidence-title">За компанией —<br><em>люди и связи.</em></h2><p class="section-lead">Изучай компанию по исходным сведениям. Сохраняй досье и сравнивай данные при следующей проверке.</p><ol class="evidence-list"><li><span>01</span><div><h3>Собери досье</h3><p>Статус компании, финансы, связи и доступные реестры. Пропуски данных идут отдельным списком.</p></div></li><li><span>02</span><div><h3>Изучи связи</h3><p>Директора, учредители и связанные компании. Автоматический граф требует ключ Checko; сведения одного источника нужно сверять.</p></div></li><li><span>03</span><div><h3>Отслеживай изменения</h3><p>Сравни сохранённые снимки: статус, директор, адрес и сигналы. Для регулярных проверок настрой расписание.</p></div></li></ol><a class="underlink" href="https://github.com/ilyautov/inn-check-ru#как-это-работает">Как устроено досье <span aria-hidden="true">↗</span></a></div>
+</section>
+<section class="snapshot-strip wrap" id="snapshots" aria-labelledby="snapshot-title"><div><p class="eyebrow">ДОСЬЕ МОЖНО СОХРАНИТЬ</p><h2 id="snapshot-title">Что изменилось<br>с прошлой проверки?</h2><p>Сравни сохранённые снимки. Для регулярного мониторинга настрой расписание отдельно.</p><div class="diff-controls" role="group" aria-label="Поля сравнения"><button data-diff="all" aria-pressed="true">Все поля</button><button data-diff="changed" aria-pressed="false">Только изменения</button></div><p id="diff-status" aria-live="polite">Показаны 4 поля: 1 изменение, 2 совпадения, 1 пробел.</p></div><div class="snapshot-paper"><div class="snapshot-header"><span>СРАВНЕНИЕ СНИМКОВ</span><span>УЧЕБНЫЙ ПРИМЕР</span></div><div class="snapshot-row snapshot-dates"><span>Поле</span><span>01.09.2026</span><span>28.09.2026</span></div><div class="snapshot-row" data-change="same"><span>Статус</span><span>Действует</span><span>Действует</span></div><div class="snapshot-row changed" data-change="changed"><span>Директор</span><span>Руководитель А</span><span>Руководитель Б <b>изменение</b></span></div><div class="snapshot-row" data-change="same"><span>Адрес</span><span>Адрес А</span><span>Адрес А</span></div><div class="snapshot-row" data-change="unknown"><span>Суды</span><span>Не проверено</span><span>Не проверено</span></div><div class="snapshot-footer">Условные записи ЕГРЮЛ · дата события неизвестна.<br>Отсутствующие сведения не считаются совпадением.</div></div></section>
+<section class="live-run wrap" id="live-run" aria-labelledby="live-title"><div><p class="eyebrow">ЗАПИСАННЫЙ ЗАПУСК · 28.09.2026</p><h2 id="live-title">А что вернул<br><em>реальный запрос?</em></h2><p class="section-lead">ПАО Сбербанк · ИНН 7707083893.<br>Один запуск CLI из Codex, без API-ключей и с пустым локальным кэшем.</p><p>Это сохранённый результат запуска, не онлайн-проверка и не заключение о компании.</p><a class="underlink" href="proof/README.md">Условия запуска и ограничения ↗</a></div><div class="live-paper"><p class="label">28.09.2026 · 01:56 МСК · РЕЖИМ «ВСЁ»</p><div class="run-counts"><div><b>4</b><span>блока с данными</span></div><div><b>6</b><span>пустых результатов</span></div><div><b>10</b><span>не проверено</span></div></div><p>Получены регистрационные сведения, базовый блок ФНС, публикации Федресурса и контракты из зеркала Госзатрат.</p><p>В блоке ФНС детали недоступны; Федресурс вернул только первую страницу. «Есть данные» не означает полное покрытие.</p><p>ФССП и суды требуют браузера; санкционные перечни отсутствуют в кэше. ГИР БО вернул пустой результат: отчётность банка этим запросом не получена.</p><div class="live-downloads"><a class="underlink" href="proof/result.redacted.json" download>Результат CLI · JSON ↓</a><a class="underlink" href="proof/execution.json" download>Метаданные запуска ↓</a></div><small>В JSON удалён служебный токен поиска ФНС, обезличены локальные пути и ФИО руководителя. Значения и статусы источников сохранены.</small></div></section>
+<section class="sources wrap" id="sources" aria-labelledby="sources-title">
+<div class="sources-heading"><p class="eyebrow">04 / ПОКРЫТИЕ ПРОВЕРКИ</p><h2 id="sources-title">Знай, что проверено.<br><em>И что ещё предстоит.</em></h2><p>Доступность зависит от источника, сети и способа подключения. Полнота конкретной проверки видна в отчёте.</p></div>
+<div class="registry-list">
+<div class="registry-row"><span class="registry-index">01</span><h3>Компания и статус</h3><p>ЕГРЮЛ / ЕГРИП · МСП · НПД</p><span class="source-mode">Прямые запросы</span></div>
+<div class="registry-row"><span class="registry-index">02</span><h3>Финансы</h3><p>ГИР БО · открытые данные ФНС</p><span class="source-mode">Отчётность и выгрузки</span></div>
+<div class="registry-row"><span class="registry-index">03</span><h3>Санкционные перечни</h3><p>РФМ · OFAC · EU</p><span class="source-mode">Локальная сверка</span></div>
+<div class="registry-row"><span class="registry-index">04</span><h3>Долги и судебные дела</h3><p>ФССП · картотека арбитража</p><span class="source-mode manual">Через браузер</span></div>
+<div class="registry-row"><span class="registry-index">05</span><h3>Связи компаний</h3><p>Директора · учредители · адреса</p><span class="source-mode manual">Checko / ручной сбор</span></div>
+</div>
+<div class="coverage-note"><span aria-hidden="true">↳</span><p>«Источник не ответил» не означает «нарушений нет». В отчёте смотри на непроверенные пункты вместе с собранными сведениями.</p><a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">Границы проверки ↗</a></div>
+</section>
+<section class="connect light" id="connect" aria-labelledby="connect-title">
+<div class="wrap connect-grid"><div class="connect-copy"><p class="eyebrow">05 / ПОДКЛЮЧЕНИЕ</p><h2 id="connect-title">Твой агент.<br>Теперь с досье.</h2><p>Выбери среду, в которой работаешь.<br>После установки укажи ИНН и попроси<br class="desktop-break"> собрать сведения о компании.</p><p class="license-note">Код открыт по Apache-2.0.<br>Модель и сторонние API могут оплачиваться отдельно.</p><a class="underlink" href="https://github.com/ilyautov/inn-check-ru">Открыть репозиторий <span aria-hidden="true">↗</span></a></div>
+<div class="connect-panel"><div class="install-tabs" role="group" aria-label="Среда подключения"><button data-install="skill" aria-pressed="true" class="selected">Скилл</button><button data-install="desktop" aria-pressed="false">Claude Desktop</button><button data-install="mcp" aria-pressed="false">MCP</button><button data-install="cli" aria-pressed="false">Терминал</button><button data-install="browser" aria-pressed="false">Браузер</button></div>
+<div class="install-content" aria-live="polite" aria-atomic="true"><p class="label" id="install-label">CLAUDE CODE · CODEX · CURSOR · GEMINI CLI</p><h3 id="install-title">Добавь скилл своему агенту</h3><p id="install-description">Выполни команду в терминале и выбери нужного агента в установщике.</p><div class="code-box" id="code-box"><div><span id="code-label">TERMINAL</span><button id="copy-command" aria-label="Скопировать команду установки">Скопировать</button></div><pre><code id="install-code">npx skills add ilyautov/inn-check-ru</code></pre></div><a class="button primary download-link" id="desktop-download" href="https://github.com/ilyautov/inn-check-ru/releases/latest/download/inn-check-ru.mcpb" hidden>Скачать расширение .mcpb <span aria-hidden="true">↓</span></a><ol id="install-steps"><li>Выбери агента при установке.</li><li>Открой новую сессию и попроси проверить контрагента.</li></ol><a id="install-docs" class="underlink" href="https://github.com/ilyautov/inn-check-ru#установка">Подробная инструкция <span aria-hidden="true">↗</span></a></div>
+<div class="first-request"><span class="label">ПЕРВЫЙ ЗАПРОС</span><p>«Собери досье компании по ИНН [ИНН]: статус, финансы, долги, судебные дела, владельцы и связи. Укажи источники и что не удалось проверить».</p></div></div></div>
+</section>
+<section class="questions wrap" aria-labelledby="faq-title"><div><p class="eyebrow">ПЕРЕД ПЕРВОЙ ПРОВЕРКОЙ</p><h2 id="faq-title">По делу.</h2></div><div class="faq-list">
+<details><summary>Нужны платные API-ключи?<span aria-hidden="true">+</span></summary><p>Базовые источники можно запрашивать без ключей. Для автоматического графа связей нужен ключ Checko. Доступ к реестрам может зависеть от сети; отдельные источники требуют браузерной проверки.</p></details>
+<details><summary>Можно проверить ИП?<span aria-hidden="true">+</span></summary><p>Да. Для 12-значного ИНН предусмотрены отдельные проверки ИП, включая ЕГРИП и статус НПД. Закрытые сведения об ИП не восстанавливаются из предположений.</p></details>
+<details><summary>Кто увидит проверяемый ИНН?<span aria-hidden="true">+</span></summary><p>Если работаешь через AI-агента, ИНН попадает в контекст его провайдера. Источники и подключённые агрегаторы видят свои запросы, настроенный прокси видит проходящий через него трафик. Загруженные санкционные перечни сверяются локально. <a href="https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md">Подробнее о данных ↗</a></p></details>
+<details><summary>Можно проверить всю базу?<span aria-hidden="true">+</span></summary><p>Есть пакетная проверка списка контрагентов и сравнение сохранённых снимков. Для регулярного мониторинга нужно отдельно настроить расписание. Сам по себе лендинг проверки не запускает.</p></details>
+<details><summary>Светофор гарантирует безопасность сделки?<span aria-hidden="true">+</span></summary><p>Нет. Это оценка по доступным данным и выбранному профилю сделки. Отчёт помогает определить вопросы для проверки. Он не заменяет изучение договора, подтверждение исполнения и профессиональное заключение.</p></details>
+</div></section>
+<section class="closing wrap"><p class="eyebrow">ДАННЫЕ О КОМПАНИИ В ТВОЁМ АГЕНТЕ</p><h2>Дай агенту ИНН.<br><em>Получи досье.</em></h2><a class="button primary" href="#connect">Подключить inn-check-ru <span aria-hidden="true">↗</span></a><span class="closing-word" aria-hidden="true">INN</span></section>
 </main>
-
-<footer>
-  <div class="wrap foot-grid">
-    <div>
-      <span class="tl" aria-hidden="true"><i class="g"></i><i class="a"></i><i class="r"></i></span>
-      <strong> inn-check-ru</strong> · Apache-2.0 · <a href="https://github.com/ilyautov/inn-check-ru">GitHub</a> · <a href="https://github.com/ilyautov/inn-check-ru/blob/main/KNOWN_LIMITS.md">Ограничения</a> · <a href="https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md">Приватность</a>
-    </div>
-    <div><a href="https://github.com/ilyautov">Илья Утов</a>, лаборатория <a href="https://aifrontier.tech">AI Frontier</a> · <a href="https://ilyautov.github.io/">все проекты</a></div>
-  </div>
-</footer>
-
+<footer class="footer wrap" id="footer"><a class="brand" href="#top"><img src="assets/mark.svg" width="27" height="32" alt=""><span>inn-check-ru<small>BY AI FRONTIER</small></span></a><p class="footer-origin">Проект лаборатории<br><a href="https://aifrontier.tech/">AI Frontier ↗</a></p><div class="footer-links"><a href="https://t.me/gorilla_under_hood">Канал Ильи в Telegram ↗</a><a href="https://github.com/ilyautov/inn-check-ru">GitHub ↗</a><a href="https://github.com/ilyautov/inn-check-ru/blob/main/LICENSE">Apache-2.0 ↗</a></div><nav class="footer-guides" aria-label="Статьи"><a href="proverit-kontragenta-po-inn.html">Как проверить контрагента по ИНН</a><a href="proverka-ip-po-inn.html">Проверка ИП по ИНН</a><a href="priznaki-odnodnevki.html">Признаки однодневки</a><a href="droblenie-biznesa.html">Дробление бизнеса</a><a href="monitoring-kontragentov.html">Мониторинг контрагентов</a></nav></footer>
+<div class="toast" role="status" id="toast" hidden></div>
+<noscript><div class="noscript">Для переключения примеров и инструкций включи JavaScript. Первый пример и команда установки доступны выше.</div></noscript>
 </body>
 </html>
