@@ -106,6 +106,9 @@ jobs:
       - name: "бенчмарк: категории дефектов, эталон без ФИО"
         run: python3 eval/run_benchmark_eval.py
 
+      - name: "MCP без FastMCP: mcp 2.x и сломанный 1.x — версия и совет"
+        run: python3 eval/run_mcp_sdk_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |

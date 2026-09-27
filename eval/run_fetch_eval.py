@@ -1288,7 +1288,11 @@ def case_aggregator_live(fc):
     errors = []
     каталог = ROOT / "eval" / "fixtures" / "aggregator"
     файлы = sorted(каталог.glob("*.json"))
-    check(errors, len(файлы) == 20, "живых фикстур агрегатора не 20: %d" % len(файлы))
+    выборка = {к["инн"] for к in json.loads(
+        (ROOT / "benchmark" / "cohort.json").read_text(encoding="utf-8"))["контрагенты"]}
+    check(errors, {f.stem for f in файлы} == {"%s_%s" % (п, i) for п in ("checko", "dadata")
+                                              for i in выборка},
+          "фикстуры агрегатора не совпадают с выборкой бенчмарка: %d файлов" % len(файлы))
     for f in файлы:
         провайдер, inn = f.stem.split("_")
         raw = json.loads(f.read_text(encoding="utf-8"))

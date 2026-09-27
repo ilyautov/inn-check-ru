@@ -158,6 +158,14 @@ def case_эталон(b):
     return errors
 
 
+def _вердикт(разбор):
+    """То, что фикстура обязана сохранить: состояние, причина и оба признака."""
+    данные, av = разбор
+    данные = данные if isinstance(данные, dict) else {}
+    return (av.get("состояние"), av.get("причина"), данные.get("недостоверность_сведений"),
+            данные.get("дисквалификация_руководителя"))
+
+
 def case_агрегатор_живьём():
     """benchmark/aggregator_live.py без сети: маскирование, страж утечек, контракт,
     ключ не попадает в фикстуру и отчёт."""
@@ -227,8 +235,8 @@ def case_агрегатор_живьём():
     check(errors, "кв. 5" not in текст and "2020-01-01" not in текст and "НаимПолн" not in текст,
           "минимизация оставила лишнее: %s" % текст[:300])
     for имя, raw in (("полный", полный), ("без УпрОрг-отметки", checko)):
-        check(errors, al.fc.parse_checko(al.минимизировать("checko", raw), inn)
-              == al.fc.parse_checko(raw, inn), "минимизация изменила разбор: %s" % имя)
+        check(errors, _вердикт(al.fc.parse_checko(al.минимизировать("checko", raw), inn))
+              == _вердикт(al.fc.parse_checko(raw, inn)), "минимизация изменила разбор: %s" % имя)
     # перебор: разбор после минимизации совпадает с разбором полного ответа
     import itertools
     for упр, недост, дискв, лишнее in itertools.product(
@@ -242,7 +250,12 @@ def case_агрегатор_живьём():
                                         "ДисквДатаОконч": "2027-01-01"})
         if лишнее:
             v["data"]["Учред"]["РосОрг"] = [{"ОГРН": "1027700132195", "Недост": False}]
-        if al.fc.parse_checko(al.минимизировать("checko", v), inn) != al.fc.parse_checko(v, inn):
+        мин_v = al.минимизировать("checko", v)
+        if дискв and "2025-01-01" in json.dumps(мин_v):
+            errors.append("даты дисквалификации физлица попали в фикстуру")
+            break
+        if (_вердикт(al.fc.parse_checko(мин_v, inn))
+                != _вердикт(al.fc.parse_checko(v, inn))):
             errors.append("минимизация изменила разбор: УпрОрг=%r недост=%r дискв=%r"
                           % (упр, недост, дискв))
             break
@@ -258,13 +271,13 @@ def case_агрегатор_живьём():
             pass
     кривой = {"suggestions": [{"data": 1}, "x", dadata["suggestions"][0]]}
     try:
-        check(errors, al.fc.parse_dadata(al.минимизировать("dadata", кривой), inn)
-              == al.fc.parse_dadata(кривой, inn), "dadata: разбор кривого списка изменился")
+        check(errors, _вердикт(al.fc.parse_dadata(al.минимизировать("dadata", кривой), inn))
+              == _вердикт(al.fc.parse_dadata(кривой, inn)), "dadata: разбор кривого списка изменился")
     except Exception as e:
         errors.append("dadata: минимизация упала на записи без data: %r" % e)
     d_мин = al.минимизировать("dadata", dadata)
-    check(errors, "address" not in json.dumps(d_мин) and al.fc.parse_dadata(d_мин, inn)
-          == al.fc.parse_dadata(dadata, inn), "dadata: минимизация: %r" % d_мин)
+    check(errors, "address" not in json.dumps(d_мин) and _вердикт(al.fc.parse_dadata(d_мин, inn))
+          == _вердикт(al.fc.parse_dadata(dadata, inn)), "dadata: минимизация: %r" % d_мин)
 
     # проверить(): отказ парсера не роняет прогон, фикстура пишется только чистая
     import tempfile
@@ -280,6 +293,63 @@ def case_агрегатор_живьём():
                 стр = al.проверить(провайдер, ключ, None, inn)
                 check(errors, стр["движок"]["состояние"] == "не проверено",
                       "%s: отказ парсера: %r" % (провайдер, стр))
+            for битый in ({"meta": ["x"], "data": {"ИНН": inn}},
+                          {"suggestions": "x"}):
+                провайдер = "checko" if "meta" in битый else "dadata"
+                al._сырой = lambda *_a, _б=битый: (200, _б)
+                try:
+                    стр = al.проверить(провайдер, ключ, None, inn)
+                    check(errors, "ошибка" in стр or "не записана" in стр.get("фикстура", ""),
+                          "%s: битый ответ записан фикстурой: %r" % (провайдер, стр))
+                except Exception as e:
+                    errors.append("%s: битый ответ оборвал проверку: %r" % (провайдер, e))
+            # контрпримеры второго ревью Codex: обрезок ключа, свободный текст, type: []
+            длинный = {"meta": {"status": "error", "message": "м" * 180 + ключ + " 771234567890"}}
+            al._сырой = lambda *_a: (200, длинный)
+            стр = al.проверить("checko", ключ, None, inn)
+            текст = json.dumps(стр, ensure_ascii=False)
+            check(errors, ключ[:10] not in текст, "обрезок ключа в отчёте: %s" % текст[:200])
+            короткий = {"meta": {"status": "error", "message": "лимит 771234567890"}}
+            al._сырой = lambda *_a: (200, короткий)
+            текст = json.dumps(al.проверить("checko", ключ, None, inn), ensure_ascii=False)
+            check(errors, "771234567890" not in текст, "message сервиса в отчёте: %s" % текст)
+            кавычка = 'k"e\\y'
+            check(errors, кавычка not in json.dumps(al._без_ключа({"x": "a" + кавычка}, кавычка))
+                  and json.dumps(кавычка)[1:-1] not in json.dumps(
+                      al._без_ключа({"x": "a" + кавычка}, кавычка)),
+                  "ключ со спецсимволами JSON не вычищен")
+            check(errors, al._без_ключа({"x": "abc"}, "") == {"x": "abc"}, "пустой ключ исказил текст")
+            check(errors, al._причина("сеть: checko — любой текст") ==
+                  "сеть: checko — (сообщение сервиса не сохраняется)"
+                  and al._причина("схема: checko — нет объекта data")
+                  == "схема: checko — нет объекта data", "срезка причины")
+            свободный = copy.deepcopy(checko)
+            свободный["data"]["ЮрАдрес"]["НедостОпис"] = "Иванов Иван, род. 01.01.1970"
+            check(errors, "Иванов" not in json.dumps(al.минимизировать("checko", свободный),
+                                                     ensure_ascii=False),
+                  "свободный текст НедостОпис попал в фикстуру")
+            кривой_тип = copy.deepcopy(checko)
+            кривой_тип["data"]["type"] = []
+            al._сырой = lambda *_a: (200, кривой_тип)
+            try:
+                стр = al.проверить("checko", ключ, None, inn)
+                check(errors, str(стр.get("фикстура", "")).endswith(".json"),
+                      "type: [] сломал маскирование: %r" % стр.get("фикстура"))
+            except Exception as e:
+                errors.append("type: [] оборвал проверку: %r" % e)
+            исходный_парсер = al.fc.parse_checko
+            try:
+                def падает(*_a):
+                    raise KeyError("секрет-" + ключ)
+                al.fc.parse_checko = падает
+                al._сырой = lambda *_a: (200, checko)
+                стр = al.проверить("checko", ключ, None, inn)
+                check(errors, стр.get("ошибка") == "разбор: KeyError" and ключ not in str(стр),
+                      "падение парсера: %r" % стр)
+            except Exception as e:
+                errors.append("падение парсера оборвало проверку: %r" % e)
+            finally:
+                al.fc.parse_checko = исходный_парсер
             al._сырой = lambda *_a: (200, checko)
             стр = al.проверить("checko", ключ, None, inn)
             записано = (al.ФИКСТУРЫ / ("checko_%s.json" % inn)).read_text(encoding="utf-8")
@@ -310,9 +380,50 @@ def case_плечи_агрегаторов(b):
     check(errors, с["егрюл"]["дата_регистрации"] == "25.09.2020", "checko: дата %r" % с["егрюл"])
     check(errors, с["егрюл"]["руководитель"] == b.хеш_фио("ГЕНЕРАЛЬНЫЙ ДИРЕКТОР: " + фио),
           "checko: руководитель не в формате g ЕГРЮЛ")
-    check(errors, с["банкротство"]["дело"]["номер"] == "А23-1/2024; А23-2/2024",
-          "checko: номера дел %r" % с["банкротство"])
-    с0 = b.checko_в_поля({"ЕФРСБ": [], "Руковод": []})
+    check(errors, с["банкротство"]["дело"]["номер"] is None
+          and "номер_дела" in с["_не_покрыто"],
+          "checko: несколько номеров дел не «не покрыто»: %r" % с["банкротство"])
+    с1 = b.checko_в_поля({"ОГРН": "1", "НаимПолн": "ООО", "Руковод": [],
+                           "ЕФРСБ": [{"Дело": "А23-1/2024"}, {"Дело": "А23-1/2024"}]})
+    check(errors, с1["банкротство"]["дело"]["номер"] == "А23-1/2024"
+          and "номер_дела" not in с1["_не_покрыто"], "checko: одно дело: %r" % с1)
+    # битая схема -> TypeError/ValueError (прогон ставит «не проверено» этому ИНН), не «ok» с None
+    база_с = {"ОГРН": "1", "НаимПолн": "ООО", "Руковод": [], "ЕФРСБ": []}
+    for имя, правка in (("ДатаРег число", {"ДатаРег": 20200925}),
+                        ("ДатаРег не дата", {"ДатаРег": "плохо"}),
+                        ("ОГРН пропал", {"ОГРН": None}), ("Руковод строка", {"Руковод": "x"})):
+        try:
+            b.checko_в_поля(dict(база_с, **правка))
+            errors.append("checko: %s принято" % имя)
+        except (ValueError, TypeError):
+            pass
+    for имя, правка in (("ФИО списком", {"Руковод": [{"ФИО": ["BROKEN"]}]}),
+                        ("должность числом", {"Руковод": [{"ФИО": "x", "НаимДолжн": 1}]})):
+        try:
+            b.checko_в_поля(dict(база_с, **правка))
+            errors.append("checko: %s принято" % имя)
+        except (ValueError, TypeError):
+            pass
+    с_дело = b.checko_в_поля(dict(база_с, ЕФРСБ=[{"Дело": True}]))
+    check(errors, с_дело["_доступность"]["банкротство"]["состояние"] == "не проверено",
+          "checko: «Дело: true» принято как номер")
+    база_д = {"ogrn": "1", "name": {"full_with_opf": "ООО"}, "state": {}, "management": None}
+    for имя, правка in (("management.name списком", {"management": {"name": ["BROKEN"]}}),):
+        try:
+            b.dadata_в_поля(dict(база_д, **правка))
+            errors.append("dadata: %s принято" % имя)
+        except (ValueError, TypeError):
+            pass
+    for имя, правка in (("state строка", {"state": "BROKEN"}),
+                        ("дата вне диапазона", {"state": {"registration_date": 1e20}}),
+                        ("дата строка", {"state": {"registration_date": "2020"}}),
+                        ("name пропал", {"name": None})):
+        try:
+            b.dadata_в_поля(dict(база_д, **правка))
+            errors.append("dadata: %s принято" % имя)
+        except (ValueError, TypeError):
+            pass
+    с0 = b.checko_в_поля({"ОГРН": "1", "НаимПолн": "ООО", "ЕФРСБ": [], "Руковод": []})
     check(errors, с0["банкротство"] is None and с0["_доступность"]["банкротство"]["состояние"]
           == "пусто", "checko: без сообщений ЕФРСБ не «пусто»")
     д = b.dadata_в_поля({"ogrn": "1", "name": {"full_with_opf": "ООО"},
@@ -332,7 +443,8 @@ def case_плечи_агрегаторов(b):
                       for п in ("банкротство_есть_запись", "номер_дела", "стадия_код")),
           "dadata: банкротство не «не поддерживается»")
     for битое in (None, "x", ["bad"]):
-        б = b.checko_в_поля({"ЕФРСБ": битое} if битое is not None else {})
+        основа = {"ОГРН": "1", "НаимПолн": "ООО", "Руковод": []}
+        б = b.checko_в_поля(dict(основа, ЕФРСБ=битое) if битое is not None else основа)
         check(errors, б["_доступность"]["банкротство"]["состояние"] == "не проверено",
               "checko: битое ЕФРСБ %r принято за «пусто»" % (битое,))
     for провайдер, ответ in (("dadata", ["массив"]), ("dadata", {"suggestions": "x"}),

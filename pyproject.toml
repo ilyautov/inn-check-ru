@@ -31,7 +31,9 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.30,<2"]
+# нижние границы транзитивных — те же, что в mcp/requirements.txt (почему — там):
+# без них установка через extra разрешала бы версии с известными CVE
+mcp = ["mcp>=1.30,<2", "anyio>=4.15.1", "idna>=3.20", "python-multipart>=0.0.32"]
 
 [project.urls]
 Repository = "https://github.com/ilyautov/inn-check-ru"

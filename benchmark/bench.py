@@ -303,18 +303,34 @@ def прогон_наше():
 
 
 def _дата_iso(v):
-    """«2020-09-25» -> «25.09.2020», как в поиске ЕГРЮЛ."""
-    if not isinstance(v, str) or len(v) < 10:
+    """«2020-09-25» -> «25.09.2020», как в поиске ЕГРЮЛ; null -> None.
+    Иной тип — TypeError, формат — ValueError: битая схема, а не «даты нет»."""
+    if v is None:
         return None
-    г, м, д = v[:10].split("-")
-    return "%s.%s.%s" % (д, м, г)
+    if not isinstance(v, str):
+        raise TypeError("дата не строка: %s" % type(v).__name__)
+    return datetime.date.fromisoformat(v[:10]).strftime("%d.%m.%Y")
 
 
 def _дата_мс(v):
-    """Миллисекунды DaData (полночь UTC) -> «ДД.ММ.ГГГГ»."""
-    if not isinstance(v, (int, float)):
+    """Миллисекунды DaData (полночь UTC) -> «ДД.ММ.ГГГГ»; null -> None."""
+    if v is None:
         return None
-    return datetime.datetime.fromtimestamp(v / 1000, datetime.timezone.utc).strftime("%d.%m.%Y")
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise TypeError("дата не число: %s" % type(v).__name__)
+    try:
+        return datetime.datetime.fromtimestamp(v / 1000, datetime.timezone.utc).strftime(
+            "%d.%m.%Y")
+    except (OverflowError, OSError) as e:
+        raise ValueError("дата вне диапазона") from e
+
+
+def _тип(d, ключ, *типы):
+    """Поле обязано быть одного из типов (None — только если он перечислен)."""
+    v = d.get(ключ)
+    if not isinstance(v, типы):
+        raise TypeError("%s: %s" % (ключ, type(v).__name__))
+    return v
 
 
 def _строка_руководителя(должность, фио):
@@ -326,38 +342,61 @@ def _строка_руководителя(должность, фио):
 
 def checko_в_поля(d):
     """Checko v2/company data -> ответ плеча. Номер дела — из сообщений ЕФРСБ:
-    одно дело — оно, несколько разных — все через «; » (плечо не выбирает за
-    пользователя). Стадии дела Checko не отдаёт — «не покрыто»."""
-    рук = [r for r in d.get("Руковод") or [] if isinstance(r, dict)]
+    одно дело во всех сообщениях — оно. Несколько разных — «не покрыто»: рубрика
+    спрашивает номер текущего дела (lastLegalCase), а список сообщений его не
+    выделяет, и сравнивать объединение номеров с одним — сравнивать разное.
+    Стадии дела Checko не отдаёт — «не покрыто». Руковод обязателен списком (во
+    всех живых ответах 27.09 — список, пустой, если руководителя нет): его
+    пропажа — битая схема, как и прочие поля ЕГРЮЛ. Битая схема полей ЕГРЮЛ —
+    TypeError/ValueError (прогон_агрегатор ставит «не проверено» этому ИНН)."""
+    for ключ in ("ОГРН", "НаимПолн"):
+        _тип(d, ключ, str)
+    рук = _тип(d, "Руковод", list)
+    if not all(isinstance(r, dict) for r in рук):
+        raise TypeError("Руковод: не список объектов")
+    for r in рук:
+        _тип(r, "ФИО", str, type(None))
+        _тип(r, "НаимДолжн", str, type(None))
     строка = "; ".join(filter(None, (_строка_руководителя(r.get("НаимДолжн"), r.get("ФИО"))
                                      for r in рук))) or None
     ефрсб = d.get("ЕФРСБ")
-    if not isinstance(ефрсб, list) or not all(isinstance(m, dict) for m in ефрсб):
+    if not isinstance(ефрсб, list) or not all(
+            isinstance(m, dict) and isinstance(m.get("Дело"), (str, type(None))) for m in ефрсб):
         # пропавшее или битое поле — не «банкротства нет»
         сост_б = {"состояние": "не проверено",
-                  "причина": "схема: checko — поле ЕФРСБ не список объектов"}
+                  "причина": "схема: checko — поле ЕФРСБ не список объектов с номером-строкой"}
         сообщения = []
     else:
         сообщения = ефрсб
         сост_б = {"состояние": "ok" if сообщения else "пусто"}
     дела = sorted({m.get("Дело") for m in сообщения if m.get("Дело")})
+    не_покрыто = {"стадия_код": "не покрыто: Checko v2/company отдаёт сообщения "
+                                "ЕФРСБ без стадии дела"}
+    if len(дела) > 1:
+        не_покрыто["номер_дела"] = ("не покрыто: в сообщениях ЕФРСБ у Checko %d разных "
+                                    "номера дел, текущее не выделено" % len(дела))
     return {
         "егрюл": {"огрн": d.get("ОГРН"), "наименование_полное": d.get("НаимПолн"),
                   "дата_регистрации": _дата_iso(d.get("ДатаРег")),
                   "руководитель": хеш_фио(строка),
                   "дата_прекращения": _дата_iso(d.get("ДатаЛикв"))},
-        "банкротство": {"дело": {"номер": "; ".join(дела) or None}} if сообщения else None,
+        "банкротство": {"дело": {"номер": дела[0] if len(дела) == 1 else None}}
+        if сообщения else None,
         "_доступность": {"егрюл": {"состояние": "ok"}, "банкротство": сост_б},
-        "_не_покрыто": {"стадия_код": "не покрыто: Checko v2/company отдаёт сообщения "
-                                      "ЕФРСБ без стадии дела"},
+        "_не_покрыто": не_покрыто,
     }
 
 
 def dadata_в_поля(d):
-    """DaData findById/party (головная запись) -> ответ плеча. ЕФРСБ DaData не отдаёт."""
-    упр = d.get("management") if isinstance(d.get("management"), dict) else {}
-    сост = d.get("state") if isinstance(d.get("state"), dict) else {}
-    имя = d.get("name") if isinstance(d.get("name"), dict) else {}
+    """DaData findById/party (головная запись) -> ответ плеча. ЕФРСБ DaData не отдаёт.
+    Битая схема — TypeError/ValueError, как у checko_в_поля."""
+    _тип(d, "ogrn", str)
+    сост = _тип(d, "state", dict)
+    имя = _тип(d, "name", dict)
+    _тип(имя, "full_with_opf", str)
+    упр = _тип(d, "management", dict, type(None)) or {}
+    _тип(упр, "name", str, type(None))
+    _тип(упр, "post", str, type(None))
     нет = "не покрыто: DaData findById/party не отдаёт сведений ЕФРСБ"
     return {
         "егрюл": {"огрн": d.get("ogrn"), "наименование_полное": имя.get("full_with_opf"),
@@ -410,7 +449,7 @@ def прогон_агрегатор(провайдер):
         try:
             б = адаптировать(провайдер, j, inn)
             причина = "схема: %s — нет записи с этим ИНН" % провайдер
-        except (ValueError, TypeError, AttributeError) as e:
+        except (ValueError, TypeError, AttributeError, OverflowError, OSError) as e:
             б, причина = None, "схема: %s — ответ не разобран (%s)" % (провайдер, type(e).__name__)
         if б is None:
             б = {"_доступность": {с: {"состояние": "не проверено", "причина": причина}
@@ -425,9 +464,14 @@ def прогон_агрегатор(провайдер):
             "ручные_шаги": "нет", "секунд_всего": round(time.monotonic() - начало, 1),
             "примечание": ПРИМЕЧАНИЕ_ПЛЕЧА,
             "адаптер": "даты -> ДД.ММ.ГГГГ; руководитель — «ДОЛЖНОСТЬ: ФИО» как поле g "
-                       "ЕГРЮЛ, под HMAC; поля, которых API не отдаёт, — «не покрыто»",
+                       "ЕГРЮЛ, под HMAC; поля, которых API не отдаёт, и несколько номеров "
+                       "дел без выделенного текущего — «не покрыто»; битая схема — "
+                       "«не проверено» по ИНН",
             "эталон": str(эталон.relative_to(HERE)), "эталон_sha256": _sha(эталон),
             "рубрика_sha256": _sha(РУБРИКА), "ключ_id": ключ_id(),
+            # код адаптера меняется — прогон помнит bench.py целиком (адаптеры,
+            # сравнение); грубо, зато любая правка видна
+            "bench_py_sha256": _sha(Path(__file__)),
             "ответы": ответы}
 
 

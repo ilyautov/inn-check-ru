@@ -21,23 +21,29 @@ import sys
 # при запуске через `python -m` теневал бы пакет SDK (поэтому только скриптом).
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+def _без_sdk(версия, ошибка):
+    """Текст ошибки, когда FastMCP не импортируется: нет пакета, mcp 2.x (FastMCP
+    переименован в MCPServer) или сломанная установка 1.x — у каждого свой совет."""
+    if not версия:
+        return ("Не найден пакет mcp (официальный MCP SDK). Установка: "
+                "pip install mcp — подробности в mcp/README.md\n")
+    мажор = версия.split(".", 1)[0]
+    if not (мажор.isdigit() and int(мажор) == 1):
+        return ("Установлен mcp %s, сервер работает на mcp 1.x (>=1.30,<2). Установка: "
+                "pip install 'mcp>=1.30,<2' — подробности в mcp/README.md\n" % версия)
+    return ("Установлен mcp %s, но FastMCP не импортируется (%s). Переустановка: "
+            "pip install --force-reinstall 'mcp>=1.30,<2'\n" % (версия, ошибка))
+
+
 try:
     from mcp.server.fastmcp import FastMCP
-except ImportError:
+except ImportError as _ошибка:
     try:
         from importlib.metadata import version as _ver
         _sdk = _ver("mcp")
     except Exception:
         _sdk = None
-    if _sdk and not _sdk.startswith("1."):
-        # mcp 2.x переименовал FastMCP в MCPServer — «не найден» тут вводил бы в заблуждение
-        sys.stderr.write(
-            "Установлен mcp %s, сервер работает на mcp 1.x (>=1.30,<2). Установка: "
-            "pip install 'mcp>=1.30,<2' — подробности в mcp/README.md\n" % _sdk)
-    else:
-        sys.stderr.write(
-            "Не найден пакет mcp (официальный MCP SDK). Установка: "
-            "pip install mcp — подробности в mcp/README.md\n")
+    sys.stderr.write(_без_sdk(_sdk, _ошибка))
     sys.exit(1)
 
 try:
