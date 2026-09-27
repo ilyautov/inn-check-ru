@@ -390,10 +390,11 @@ SOURCES = {
         "профили": "*",
         "probe": {"url": "https://checko.ru/integration/api/company", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
-        # Контракт — по документации (checko.ru/integration/api/company,
-        # dadata.ru/api/find-party, 26.09.2026); живьём без ключа не проверен.
+        # Контракт написан по документации (checko.ru/integration/api/company,
+        # dadata.ru/api/find-party, 26.09.2026) и сверен с живыми ответами обоих
+        # 27.09.2026 (10 ИНН выборки бенчмарка, eval/fixtures/aggregator/).
         "контракт": ["ЮрАдрес.Недост", "Руковод[].Недост", "Руковод[].ДисквЛицо"],
-        "контракт_по_документации": True,
+        "контракт_сверен_живьём": "2026-09-27",
         "канарейка": None,
         "при_отказе": "не проверено",
         "документация": "https://checko.ru/integration/api/company",

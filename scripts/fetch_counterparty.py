@@ -1787,9 +1787,8 @@ def _нет_ключа(source_id):
     return None
 
 
-_КОНТРАКТ_АГРЕГАТОРА = ("по документации (checko.ru/integration/api/company, "
-                        "dadata.ru/api/find-party) на 26.09.2026; живьём без ключа "
-                        "не проверен")
+_КОНТРАКТ_АГРЕГАТОРА = ("сверен с живыми ответами Checko v2/company и DaData "
+                        "findById/party 27.09.2026 (10 ИНН)")
 
 
 def parse_checko(raw, inn):

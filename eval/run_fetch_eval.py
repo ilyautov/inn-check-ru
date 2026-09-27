@@ -1282,13 +1282,38 @@ def _checko(**изм):
 _УДАЛИТЬ = object()
 
 
+def case_aggregator_live(fc):
+    """Живые ответы Checko и DaData (27.09.2026, 10 ИНН, замаскированы): парсеры
+    движка на реальной схеме. У DaData invalid = null — не «нет»."""
+    errors = []
+    каталог = ROOT / "eval" / "fixtures" / "aggregator"
+    файлы = sorted(каталог.glob("*.json"))
+    check(errors, len(файлы) == 20, "живых фикстур агрегатора не 20: %d" % len(файлы))
+    for f in файлы:
+        провайдер, inn = f.stem.split("_")
+        raw = json.loads(f.read_text(encoding="utf-8"))
+        д, av = (fc.parse_checko if провайдер == "checko" else fc.parse_dadata)(raw, inn)
+        if av.get("состояние") != "ok":
+            errors.append("%s: %r" % (f.name, av))
+            continue
+        недост, дискв = д.get("недостоверность_сведений"), д.get("дисквалификация_руководителя")
+        if провайдер == "checko":
+            ждём = inn == "4028070799"  # единственный с отметкой (адрес, 27.04.2026)
+            check(errors, недост is ждём and дискв is False,
+                  "%s: недостоверность %r, дисквалификация %r" % (f.name, недост, дискв))
+        else:
+            check(errors, недост is None and дискв is None,
+                  "%s: null DaData стал ответом: %r %r" % (f.name, недост, дискв))
+    return errors
+
+
 def case_aggregator(fc):
     """Агрегатор по ключу: маппинг Checko/DaData, «нет» только по явному false."""
     errors = []
     ИНН = "7707083893"
     д, av = fc.parse_checko(_checko(), ИНН)
     check(errors, av["состояние"] == "ok" and д["недостоверность_сведений"] is False
-          and д["дисквалификация_руководителя"] is False and "по документации" in д["контракт"],
+          and д["дисквалификация_руководителя"] is False and "живыми" in д["контракт"],
           "checko всё false: %r %r" % (д, av))
     д, _ = fc.parse_checko(_checko(**{"data.ЮрАдрес.Недост": True,
                                      "data.ЮрАдрес.НедостОпис": "адрес недостоверен"}), ИНН)
@@ -1441,6 +1466,7 @@ def main():
         "федресурс-роли": case_fedresurs(fc),
         "росстат-подразделения": case_rosstat(fc),
         "агрегатор-по-ключу": case_aggregator(fc),
+        "агрегатор: живые ответы Checko и DaData": case_aggregator_live(fc),
     }
     failed = 0
     for name, errors in cases.items():
