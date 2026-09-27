@@ -1463,8 +1463,17 @@ def case_sro(fc):
               and журнал[0][4]["searchString"] == inn and len(адреса) == len(set(адреса))
               and sorted(raw["карточки"]) == sorted(base["карточки"]),
               "поиск и карточки без дублей: %r" % адреса)
-        check(errors, all(m == "POST" and ref == fc.НОСТРОЙ + "/" and ua == fc.UA_ПРОЕКТА
-                          for _, m, ref, ua, _ in журнал), "POST, Referer, UA: %r" % журнал)
+        # Referer — страница, с которой сайт шлёт запрос: реестр для поиска,
+        # /member/{id} для карточки
+        check(errors, all(m == "POST" and ua == fc.UA_ПРОЕКТА and ref == (
+            fc.НОСТРОЙ + "/" if url.endswith("/member/list")
+            else fc.НОСТРОЙ + "/member/" + url.split("/")[-2])
+            for url, m, ref, ua, _ in журнал), "POST, Referer, UA: %r" % журнал)
+        n = len(журнал)
+        fc.raw_sro(None, inn, "сро_проект")
+        check(errors, [j[0] for j in журнал[n:]][:1] == [fc.НОПРИЗ + "/api/sro/all/member/list"]
+              and all(j[0].startswith(fc.НОПРИЗ + "/") and j[2].startswith(fc.НОПРИЗ + "/")
+                      for j in журнал[n:]), "НОПРИЗ — свой сайт и Referer: %r" % журнал[n:])
         for код, префикс in ((403, "антибот:"), (429, "антибот:"), (500, "сеть:")):
             статус["код"], n = код, len(журнал)
             try:

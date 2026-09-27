@@ -1,0 +1,150 @@
+{
+ "поиск": {
+  "data": {
+   "data": [
+    {
+     "id": 19475438,
+     "member_type": {
+      "id": 1,
+      "code": "1",
+      "title": "ЮЛ"
+     },
+     "member_status": {
+      "id": 1,
+      "code": "1",
+      "title": "Является членом"
+     },
+     "inn": "7724307342",
+     "registry_registration_date": "2020-08-03T00:00:00+03:00",
+     "sro": {
+      "id": 303,
+      "full_description": "Ассоциация «Объединение проектировщиков «УниверсалПроект»",
+      "registration_number": "СРО-П-179-12122012"
+     }
+    }
+   ],
+   "page": 1,
+   "countPages": 1.0,
+   "count": 1
+  },
+  "success": true,
+  "message": ""
+ },
+ "карточки": {
+  "19475438": {
+   "data": {
+    "right": {
+     "id": 24617244,
+     "right_status": {
+      "id": 1,
+      "code": "1",
+      "title": "Действует"
+     },
+     "basis_date": "2020-08-03T00:00:00+03:00",
+     "basis": "Решение Совета Ассоциации без номера",
+     "approved_basis_date": "2020-08-03T00:00:00+03:00",
+     "is_simple": true,
+     "is_extremely_dangerous": false,
+     "is_nuclear": false
+    },
+    "responsibility_level_vv": {
+     "cost_num": 25000000,
+     "cost": "не превышает двадцать пять миллионов рублей",
+     "id": 1,
+     "code": "1",
+     "title": "Первый уровень ответственности"
+    },
+    "id": 19475438,
+    "inn": "7724307342",
+    "checks": [
+     {
+      "id": 84206053,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2026-07-27T00:00:00+03:00"
+     },
+     {
+      "id": 84111918,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2025-07-25T00:00:00+03:00"
+     },
+     {
+      "id": 84021556,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2024-07-25T00:00:00+03:00"
+     },
+     {
+      "id": 83932661,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2023-07-25T00:00:00+03:00"
+     },
+     {
+      "id": 83845640,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2022-07-25T00:00:00+03:00"
+     },
+     {
+      "id": 83507618,
+      "member_check_type": {
+       "id": 1,
+       "code": "1",
+       "title": "Плановая"
+      },
+      "member_check_result": {
+       "id": 1,
+       "code": "1",
+       "title": "Нарушений не имеется"
+      },
+      "check_date": "2021-07-26T00:00:00+03:00"
+     }
+    ]
+   },
+   "success": true,
+   "message": ""
+  }
+ }
+}

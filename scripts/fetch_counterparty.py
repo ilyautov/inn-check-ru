@@ -2237,6 +2237,14 @@ def fetch_contracts(opener, inn):
 НОСТРОЙ_ЧЛЕН = "1"
 НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ = "Действует"
 НОСТРОЙ_КАРТОЧЕК = 3   # действующих членств больше трёх не бывает на практике
+НОПРИЗ = "https://reestr.nopriz.ru"
+# Одна платформа реестров (живьём 27.09.2026: те же api/sro/all/member/list,
+# api/member/{id}/info и коды статусов членства «1»/«2» у обоих сайтов).
+РЕЕСТРЫ_СРО = {
+    "сро": {"база": НОСТРОЙ, "имя": "НОСТРОЙ", "кто": "строительные СРО"},
+    "сро_проект": {"база": НОПРИЗ, "имя": "НОПРИЗ",
+                   "кто": "СРО проектировщиков и изыскателей"},
+}
 
 
 def _json_post_политика(opener, url, payload, referer, имя, шаг):
@@ -2283,39 +2291,41 @@ def _код(v):
     return str(v.get("code")) if isinstance(v, dict) and v.get("code") is not None else None
 
 
-def parse_sro(raw, inn):
+def parse_sro(raw, inn, блок="сро", реестр=None):
     """{поиск: выдача по строке ИНН, карточки: {id: info}} -> блок «сро».
 
     Поиск на сайте — по подстроке ИНН/ОГРН/названия, поэтому засчитываются только
     записи с точным ИНН. Выдача длиннее страницы — «не проверено» (запись могла
     не попасть). По действующим членствам — карточка: статус права, уровни
     ответственности, особо опасные объекты, число проверок СРО. ФИО руководителя,
-    специалисты, адреса и телефоны не берутся."""
+    специалисты, адреса и телефоны не берутся. Та же платформа у НОПРИЗ
+    (проектировщики и изыскатели) — блок «сро_проект»: см. РЕЕСТРЫ_СРО."""
+    реестр = реестр or РЕЕСТРЫ_СРО[блок]
     выдача = _g(raw, "поиск", "data")
     if not isinstance(raw, dict) or _g(raw, "поиск", "success") is not True \
             or not isinstance(выдача, dict) or not isinstance(выдача.get("data"), list):
-        return _not_checked("сро", "схема: не найдено поле data.data поиска НОСТРОЙ")
+        return _not_checked(блок, "схема: не найдено поле data.data поиска %s" % реестр["имя"])
     строки = выдача["data"]
     всего = выдача.get("count")
     if not all(isinstance(r, dict) and isinstance(r.get("inn"), str)
                and re.fullmatch(r"\d{10}|\d{12}", r["inn"].strip()) for r in строки):
         # пустой или битый ИНН в выдаче — не доказательство, что нашего там нет
-        return _not_checked("сро", "схема: не найдено поле inn (10 или 12 цифр) в строке поиска")
+        return _not_checked(блок, "схема: не найдено поле inn (10 или 12 цифр) в строке поиска")
     if not isinstance(всего, int) or isinstance(всего, bool) or всего < len(строки):
-        return _not_checked("сро", "схема: поле count поиска не число")
+        return _not_checked(блок, "схема: поле count поиска не число")
     свои = [r for r in строки if r["inn"].strip() == str(inn)]
     if всего > len(строки):
-        return _not_checked("сро", "схема: выдача поиска усечена (%d из %d) — членство могло "
+        return _not_checked(блок, "схема: выдача поиска усечена (%d из %d) — членство могло "
                                    "не попасть" % (len(строки), всего))
     if not свои:
-        return None, _av("сро", "пусто", "в едином реестре НОСТРОЙ (строительные СРО) "
-                                         "членств с этим ИНН нет")
-    missing = next((m for m in (_schema_missing("сро", inn, r) for r in свои) if m), None)
+        return None, _av(блок, "пусто", "в едином реестре %s (%s) членств с этим ИНН нет"
+                         % (реестр["имя"], реестр["кто"]))
+    missing = next((m for m in (_schema_missing(блок, inn, r) for r in свои) if m), None)
     if missing:
-        return _not_checked("сро", "схема: не найдено поле %s" % missing)
+        return _not_checked(блок, "схема: не найдено поле %s" % missing)
     if not all(_код(r["member_status"]) and _титул(r["member_status"])
                and isinstance(r["sro"], dict) for r in свои):
-        return _not_checked("сро", "схема: не найдено поле member_status/sro членства")
+        return _not_checked(блок, "схема: не найдено поле member_status/sro членства")
     карточки = raw.get("карточки") if isinstance(raw.get("карточки"), dict) else {}
     членства = []
     for r in свои:
@@ -2336,7 +2346,7 @@ def parse_sro(raw, inn):
                     or "right" not in к or not isinstance(к.get("checks"), list) \
                     or not (к["right"] is None or (isinstance(к["right"], dict)
                                                    and _титул(к["right"].get("right_status")))):
-                return _not_checked("сро", "схема: карточка действующего членства (id %s) "
+                return _not_checked(блок, "схема: карточка действующего членства (id %s) "
                                            "не получена или без right/checks" % r.get("id"))
             право = к["right"]
             запись.update({
@@ -2361,25 +2371,26 @@ def parse_sro(raw, inn):
         "право_не_действует": (False if есть_право or not действующие
                                else None if неясно else True),
         "членства": членства,
-        "реестр": НОСТРОЙ + "/",
-        "источник": "единый реестр НОСТРОЙ (строительные СРО); проектировщики и "
-                    "изыскатели (НОПРИЗ) не проверялись",
+        "реестр": реестр["база"] + "/",
+        "источник": "единый реестр %s (%s)" % (реестр["имя"], реестр["кто"]),
     }
     if неясно and not есть_право:
         данные["примечание"] = ("статус права, которого не было в живых ответах, — "
-                                "проверьте вручную: " + НОСТРОЙ + "/")
-    return данные, _av("сро", "ok")
+                                "проверьте вручную: " + реестр["база"] + "/")
+    return данные, _av(блок, "ok")
 
 
-def raw_sro(opener, inn):
-    """Запросы страницы «Реестр членов СРО»: поиск по строке и карточки
-    действующих членств (member/{id}/info)."""
+def raw_sro(opener, inn, блок="сро"):
+    """Запросы страницы «Реестр членов СРО»: поиск по строке (со страницы
+    реестра) и карточки действующих членств (member/{id}/info — со страницы
+    карточки /member/{id}, так их шлёт сайт)."""
     opener = _make_opener(редиректы=False)
-    стр = НОСТРОЙ + "/"
+    реестр = РЕЕСТРЫ_СРО[блок]
+    база, имя = реестр["база"], реестр["имя"]
     raw = {"поиск": _json_post_политика(
-        opener, НОСТРОЙ + "/api/sro/all/member/list",
+        opener, база + "/api/sro/all/member/list",
         {"filters": {}, "page": 1, "pageCount": "20", "sortBy": {}, "searchString": str(inn)},
-        стр, "НОСТРОЙ", "поиск"), "карточки": {}}
+        база + "/", имя, "поиск"), "карточки": {}}
     строки = _g(raw, "поиск", "data", "data")
     for r in (строки if isinstance(строки, list) else []):
         if len(raw["карточки"]) >= НОСТРОЙ_КАРТОЧЕК:
@@ -2390,16 +2401,16 @@ def raw_sro(opener, inn):
                 and _код(r.get("member_status")) == НОСТРОЙ_ЧЛЕН \
                 and isinstance(r.get("id"), int) and not isinstance(r.get("id"), bool):
             raw["карточки"][str(r["id"])] = _json_post_политика(
-                opener, "%s/api/member/%d/info" % (НОСТРОЙ, r["id"]), {}, стр,
-                "НОСТРОЙ", "карточка")
+                opener, "%s/api/member/%d/info" % (база, r["id"]), {},
+                "%s/member/%d" % (база, r["id"]), имя, "карточка")
     return raw
 
 
-def fetch_sro(opener, inn):
+def fetch_sro(opener, inn, блок="сро"):
     if os.environ.get("INN_CHECK_BEZ_REFERER") == "1":
-        return _not_checked("сро", "не покрыто: INN_CHECK_BEZ_REFERER=1 — СРО только "
-                                   "браузером (%s)" % НОСТРОЙ)
-    return parse_sro(raw_sro(opener, inn), inn)
+        return _not_checked(блок, "не покрыто: INN_CHECK_BEZ_REFERER=1 — СРО только "
+                                  "браузером (%s)" % РЕЕСТРЫ_СРО[блок]["база"])
+    return parse_sro(raw_sro(opener, inn, блок), inn, блок)
 
 
 FETCHERS = {
@@ -2420,6 +2431,7 @@ FETCHERS = {
     "федресурс": fetch_fedresurs,
     "контракты": fetch_contracts,
     "сро": fetch_sro,
+    "сро_проект": lambda opener, inn: fetch_sro(opener, inn, "сро_проект"),
 }
 
 # id источника -> чистый парсер (raw, inn) -> (данные, _доступность); гоняет eval.
@@ -2428,6 +2440,7 @@ PARSERS = {
     "федресурс": parse_fedresurs,
     "контракты": parse_contracts,
     "сро": parse_sro,
+    "сро_проект": lambda raw, inn: parse_sro(raw, inn, "сро_проект"),
     "егрюл": parse_egrul,
     "риски": parse_risks,
     "финансы": parse_finance,
@@ -2451,6 +2464,7 @@ RAW_RECORD["федресурс"] = _rec_fedresurs
 RAW_RECORD["росстат"] = _rec_rosstat
 RAW_RECORD["контракты"] = _rec_contracts
 RAW_RECORD["сро"] = _rec_sro
+RAW_RECORD["сро_проект"] = _rec_sro
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка
