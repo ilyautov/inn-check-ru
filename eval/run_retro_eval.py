@@ -389,6 +389,28 @@ def case_j_manual_block(rv, snapshot, td):
                  if isinstance(v, list) else {}}
 
 
+def case_n_manual_object_in_snapshot(rv, snapshot):
+    """Объект ручной проверки в снимке — только нормализованные ИНН: свободный
+    текст параметров (ФИО и дата рождения при поиске ИП в ФССП) не сохраняется,
+    а вердикт ретро совпадает с живым."""
+    errors = []
+    фио = "Тестовая Фамилия Отчество"
+    for параметры, ждём in (("%s, дата рождения 01.01.1980, ИНН %s" % (фио, ИНН), "🟢"),
+                            ("%s, ИНН 7736 050003" % фио, None)):
+        слепок = полный_снимок()
+        слепок["фссп"].update(параметры_поиска=параметры)
+        отпечаток = snapshot.fingerprint(слепок)
+        текст = json.dumps(отпечаток, ensure_ascii=False)
+        check(errors, фио not in текст and "01.01.1980" not in текст,
+              "свободный текст параметров попал в снимок: %r" % параметры)
+        восстановленный, _ = rv.восстановить(отпечаток)
+        живой = rv.profiles.resolve(copy.deepcopy(слепок), None, "отсрочка")["светофор"]
+        ретро = rv.profiles.resolve(восстановленный, None, "отсрочка")["светофор"]
+        check(errors, живой == ретро == ждём, "%r: живой %r, ретро %r, ждали %r"
+              % (параметры, живой, ретро, ждём))
+    return errors
+
+
 def _статус_сигнала(rv, fetch, sid):
     for rec in rv.profiles.extract_signals(copy.deepcopy(fetch)):
         if rec["id"] == sid:
@@ -525,6 +547,7 @@ def main():
             "к-ручной-блок-как-у-живого": case_j_manual_block(rv, snapshot, td),
             "л-каждый-сигнал-переживает-снимок": case_k_every_signal(rv, snapshot),
             "м-финансы-и-запрет-ручного-блока": case_m_fin_signals(rv, snapshot),
+            "н-объект-ручного-блока-в-снимке": case_n_manual_object_in_snapshot(rv, snapshot),
         }
     failed = 0
     for name, errors in cases.items():
