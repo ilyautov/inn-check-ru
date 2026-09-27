@@ -12,14 +12,15 @@
   "cache": "isolated_empty",
   "tls": "default_verified",
   "raw_cli_sha256": "a27e921cb4e74becc903814459091af105e409850188e4f41dfe4321469ea556",
-  "public_result_sha256": "ac0975c26231d73accb4bd478164f7f9aadf359f4503c7e471e34360f0f3e691",
+  "public_result_sha256": "d80ee6b98ab886d83cb4680d10e902e9cd5d971359afabc0efe08d57af067598",
   "redactions": {
     "removed_fields": [
       "/риски/_token_pb"
     ],
     "local_cache_paths": "<ISOLATED_CACHE>",
     "masked_fields": [
-      "/егрюл/руководитель (ФИО физлица)"
+      "/егрюл/руководитель (ФИО физлица)",
+      "/_доступность/спецреестры/причина (ФИО в тексте)"
     ]
   },
   "interpretation": "One observed CLI run, not a full agent/MCP end-to-end test or independent validation of registry responses."
