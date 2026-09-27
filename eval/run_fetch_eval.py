@@ -1301,6 +1301,72 @@ def case_contracts(fc):
     return errors
 
 
+def case_sro(fc):
+    """НОСТРОЙ: точный ИНН, усечение, карточки действующих членств и сигнал права."""
+    errors = []
+    base = json.loads((FIXTURES / "сро_7705552444.raw.json").read_text(encoding="utf-8"))
+    inn = "7705552444"
+
+    def разбор(правка):
+        raw = copy.deepcopy(base)
+        правка(raw)
+        return fc.parse_sro(raw, inn)
+
+    def карточка(raw, id_):
+        return raw["карточки"][id_]["data"]
+    д, av = разбор(lambda r: None)
+    check(errors, av["состояние"] == "ok" and д["право_не_действует"] is False
+          and д["членств_действующих"] == 2 and д["членств_всего"] == 3,
+          "эталон ДомСтрой: %r" % д)
+    check(errors, д["членства"][1]["сро_исключена_из_госреестра"]
+          and д["членства"][1]["право"] == "нет сведений о праве"
+          and д["членства"][0]["сро_исключена_из_госреестра"] is None,
+          "исключённая СРО не показана: %r" % д["членства"])
+    for имя, правка, ждём in (
+            ("право приостановлено", lambda r: карточка(r, "5900384")["right"][
+                "right_status"].__setitem__("title", "Приостановлено"), True),
+            ("нет карточки действующего", lambda r: r["карточки"].pop("5900384"), None),
+            ("право строкой", lambda r: карточка(r, "5900384").__setitem__("right", "x"), None),
+            ("checks пропали", lambda r: карточка(r, "5900384").pop("checks"), None),
+            ("действующее — в исключённой СРО", lambda r: (
+                r["поиск"]["data"]["data"].pop(0), r["поиск"]["data"].__setitem__("count", 2)),
+             True)):
+        д, av = разбор(правка)
+        check(errors, av["состояние"] == "ok" and д["право_не_действует"] is ждём,
+              "%s: право_не_действует %r, ждали %r" % (имя, д and д["право_не_действует"], ждём))
+    for имя, правка in (
+            ("выдача усечена", lambda r: r["поиск"]["data"].__setitem__("count", 40)),
+            ("success false", lambda r: r["поиск"].__setitem__("success", False)),
+            ("count строкой", lambda r: r["поиск"]["data"].__setitem__("count", "3")),
+            ("статус без кода", lambda r: r["поиск"]["data"]["data"][0][
+                "member_status"].pop("code")),
+            ("sro строкой", lambda r: r["поиск"]["data"]["data"][0].__setitem__("sro", "x")),
+            ("inn числом", lambda r: r["поиск"]["data"]["data"][0].__setitem__("inn", 1))):
+        д, av = разбор(правка)
+        check(errors, av["состояние"] == "не проверено" and д is None
+              and str(av["причина"]).startswith("схема:"), "%s: %r" % (имя, av))
+    д, av = разбор(lambda r: [x["member_status"].update(code="2", title="Исключен")
+                              for x in r["поиск"]["data"]["data"]])
+    check(errors, д["право_не_действует"] is False and д["членств_действующих"] == 0,
+          "все членства исключены — не сигнал права: %r" % д)
+    д, av = разбор(lambda r: r["поиск"]["data"]["data"][0]["sro"].__setitem__(
+        "deactivate_message", "  "))
+    check(errors, д["членства"][0]["сро_исключена_из_госреестра"] is None,
+          "пробелы приняты за исключение СРО: %r" % д["членства"][0])
+    # поиск по подстроке: чужой ИНН с тем же началом не засчитывается
+    д, av = разбор(lambda r: [x.__setitem__("inn", inn + "12") for x in r["поиск"]["data"]["data"]])
+    check(errors, av["состояние"] == "пусто", "чужой ИНН по подстроке засчитан: %r" % av)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import profiles
+    for значение, статус in ((True, "найден"), (False, "отсутствует")):
+        fetch = {"сро": {"право_не_действует": значение},
+                 "_доступность": {"сро": {"состояние": "ok"}}}
+        сиг = {x.get("id"): x for x in profiles.extract_signals(fetch)}
+        check(errors, (сиг.get("сро_право_не_действует") or {}).get("статус") == статус,
+              "сигнал при %r: %r" % (значение, сиг.get("сро_право_не_действует")))
+    return errors
+
+
 def _checko(**изм):
     """Ответ Checko v2/company в форме документации (checko.ru/integration/api/
     company, 26.09.2026) — живьём без ключа не снят; ИНН — Сбербанк."""
@@ -1516,6 +1582,7 @@ def main():
         "федресурс-роли": case_fedresurs(fc),
         "росстат-подразделения": case_rosstat(fc),
         "госконтракты: итоги карточки и схема": case_contracts(fc),
+        "СРО НОСТРОЙ: членства, карточки, сигнал права": case_sro(fc),
         "агрегатор-по-ключу": case_aggregator(fc),
         "агрегатор: живые ответы Checko и DaData": case_aggregator_live(fc),
     }

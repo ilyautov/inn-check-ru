@@ -1,0 +1,120 @@
+{
+ "поиск": {
+  "data": {
+   "data": [
+    {
+     "id": 5900384,
+     "inn": "7705552444",
+     "member_status": {
+      "id": 1,
+      "code": "1",
+      "title": "Является членом"
+     },
+     "sro": {
+      "id": 393,
+      "full_description": "Ассоциация по содействию строительным организациям в осуществлении ими профессиональной деятельности «Альянс Строителей Столицы»",
+      "registration_number": "СРО-С-295-18042018",
+      "deactivate_message": ""
+     },
+     "registry_registration_date": "2025-09-19T00:00:00+03:00",
+     "member_type": {
+      "id": 1,
+      "code": "1",
+      "title": "ЮЛ"
+     }
+    },
+    {
+     "id": 533390,
+     "inn": "7705552444",
+     "member_status": {
+      "id": 1,
+      "code": "1",
+      "title": "Является членом"
+     },
+     "sro": {
+      "id": 314,
+      "full_description": "Ассоциация строителей \"Региональный строительный альянс\"",
+      "registration_number": "СРО-С-250-26072012",
+      "deactivate_message": "(Приказ Ростехнадзора от 06.06.2017 № СП-27)"
+     },
+     "registry_registration_date": "2014-03-31T00:00:00+04:00",
+     "member_type": {
+      "id": 1,
+      "code": "1",
+      "title": "ЮЛ"
+     }
+    },
+    {
+     "id": 5839885,
+     "inn": "7705552444",
+     "member_status": {
+      "id": 2,
+      "code": "2",
+      "title": "Исключен"
+     },
+     "sro": {
+      "id": 180,
+      "full_description": "Ассоциация Саморегулируемая организация «Объединенные строители»",
+      "registration_number": "СРО-С-113-15122009",
+      "deactivate_message": "(Приказ Ростехнадзора от 08.08.2025 N° СП-13)"
+     },
+     "registry_registration_date": "2021-10-28T00:00:00+03:00",
+     "member_type": {
+      "id": 1,
+      "code": "1",
+      "title": "ЮЛ"
+     }
+    }
+   ],
+   "page": 1,
+   "countPages": 1.0,
+   "count": 3
+  },
+  "success": true,
+  "message": ""
+ },
+ "карточки": {
+  "5900384": {
+   "data": {
+    "right": {
+     "right_status": {
+      "id": 1,
+      "code": "1",
+      "title": "Действует"
+     },
+     "is_extremely_dangerous": false,
+     "is_nuclear": false,
+     "is_simple": true,
+     "is_odo": false
+    },
+    "responsibility_level_vv": {
+     "cost": "не превышает пятьсот миллионов рублей",
+     "id": 2,
+     "code": "2",
+     "title": "Второй уровень ответственности"
+    },
+    "responsibility_level_odo": null,
+    "checks": [],
+    "id": 5900384,
+    "inn": "7705552444"
+   },
+   "success": true,
+   "message": ""
+  },
+  "533390": {
+   "data": {
+    "right": null,
+    "responsibility_level_vv": null,
+    "responsibility_level_odo": null,
+    "checks": [
+     {},
+     {}
+    ],
+    "id": 533390,
+    "inn": "7705552444"
+   },
+   "success": true,
+   "message": ""
+  }
+ }
+}

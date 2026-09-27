@@ -2204,6 +2204,170 @@ def fetch_contracts(opener, inn):
     return parse_contracts(raw_contracts(opener, inn), inn)
 
 
+НОСТРОЙ = "https://reestr.nostroy.ru"
+# Справочник статусов членства (dictionaries/get, 27.09.2026): «1» — «Является
+# членом», «2» — «Исключен». Статус права живьём видели только «Действует»;
+# иной текст показывается как есть и поднимает «право_не_действует».
+НОСТРОЙ_ЧЛЕН = "1"
+НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ = "Действует"
+НОСТРОЙ_КАРТОЧЕК = 3   # действующих членств больше трёх не бывает на практике
+
+
+def _json_post_политика(opener, url, payload, referer, имя, шаг):
+    """Один POST JSON, как его шлёт страница сайта: без повторов, 401/403/429 —
+    антибот, не-JSON или success≠true — антибот/схема."""
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "User-Agent": UA_ПРОЕКТА, "Content-Type": "application/json",
+        "Accept": "application/json, text/plain, */*", "Referer": referer})
+    left = _time_left()
+    if left <= 0:
+        raise DeadlineExceeded("бюджет времени %.0f с исчерпан" % DEADLINE)
+    try:
+        resp = opener.open(req, timeout=min(TIMEOUT, max(1.0, left)))
+        data = resp.read()
+        _записать("POST", url, resp.status, data, body)
+    except urllib.error.HTTPError as e:
+        _записать("POST", url, e.code, _тело_ошибки(e), body)
+        if e.code in (401, 403, 429) or 300 <= e.code < 400:
+            raise SourceUnavailable("антибот: %s ответил %d на шаге «%s» — без обхода, "
+                                    "проверьте вручную" % (имя, e.code, шаг))
+        raise SourceUnavailable(_http_status_reason(e.code, шаг))
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e))
+    j = _safe_json(data.decode("utf-8", "replace"))
+    if j is None:
+        raise SourceUnavailable("антибот: %s вернул не-JSON на шаге «%s»" % (имя, шаг))
+    return j
+
+
+def _rec_sro(raw, inn):
+    rows = _g(raw, "поиск", "data", "data")
+    for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict) and str(r.get("inn") or "").strip() == str(inn):
+            return r
+    return None
+
+
+def _титул(v):
+    return v.get("title") if isinstance(v, dict) and isinstance(v.get("title"), str) else None
+
+
+def _код(v):
+    return str(v.get("code")) if isinstance(v, dict) and v.get("code") is not None else None
+
+
+def parse_sro(raw, inn):
+    """{поиск: выдача по строке ИНН, карточки: {id: info}} -> блок «сро».
+
+    Поиск на сайте — по подстроке ИНН/ОГРН/названия, поэтому засчитываются только
+    записи с точным ИНН. Выдача длиннее страницы — «не проверено» (запись могла
+    не попасть). По действующим членствам — карточка: статус права, уровни
+    ответственности, особо опасные объекты, число проверок СРО. ФИО руководителя,
+    специалисты, адреса и телефоны не берутся."""
+    выдача = _g(raw, "поиск", "data")
+    if not isinstance(raw, dict) or _g(raw, "поиск", "success") is not True \
+            or not isinstance(выдача, dict) or not isinstance(выдача.get("data"), list):
+        return _not_checked("сро", "схема: не найдено поле data.data поиска НОСТРОЙ")
+    строки = выдача["data"]
+    всего = выдача.get("count")
+    if not all(isinstance(r, dict) and isinstance(r.get("inn"), str) for r in строки):
+        return _not_checked("сро", "схема: не найдено поле inn в строке поиска")
+    if not isinstance(всего, int) or isinstance(всего, bool) or всего < len(строки):
+        return _not_checked("сро", "схема: поле count поиска не число")
+    свои = [r for r in строки if r["inn"].strip() == str(inn)]
+    if всего > len(строки):
+        return _not_checked("сро", "схема: выдача поиска усечена (%d из %d) — членство могло "
+                                   "не попасть" % (len(строки), всего))
+    if not свои:
+        return None, _av("сро", "пусто", "в едином реестре НОСТРОЙ (строительные СРО) "
+                                         "членств с этим ИНН нет")
+    missing = next((m for m in (_schema_missing("сро", inn, r) for r in свои) if m), None)
+    if missing:
+        return _not_checked("сро", "схема: не найдено поле %s" % missing)
+    if not all(_код(r["member_status"]) and _титул(r["member_status"])
+               and isinstance(r["sro"], dict) for r in свои):
+        return _not_checked("сро", "схема: не найдено поле member_status/sro членства")
+    карточки = raw.get("карточки") if isinstance(raw.get("карточки"), dict) else {}
+    членства, не_проверено = [], []
+    for r in свои:
+        исключена = r["sro"].get("deactivate_message")
+        запись = {"сро": r["sro"].get("full_description"),
+                  "рег_номер_сро": r["sro"].get("registration_number"),
+                  "статус": _титул(r["member_status"]),
+                  "дата_вступления": str(r.get("registry_registration_date") or "")[:10] or None,
+                  # непустое — СРО исключена из госреестра СРО (живьём: приказ Ростехнадзора)
+                  "сро_исключена_из_госреестра": исключена if _непустая(исключена) else None}
+        if _код(r["member_status"]) == НОСТРОЙ_ЧЛЕН:
+            к = _g(карточки.get(str(r.get("id"))), "data")
+            право = к.get("right") if isinstance(к, dict) else None
+            право_ок = право is None or (isinstance(право, dict)
+                                         and bool(_титул(право.get("right_status"))))
+            if not isinstance(к, dict) or not isinstance(к.get("checks"), list) \
+                    or not право_ок:
+                не_проверено.append(запись["сро"])
+                запись["право"] = None
+            else:
+                # права в карточке нет (живьём — у членства в исключённой СРО):
+                # это ответ реестра, а не пропуск
+                запись.update({
+                    "право": _титул(право["right_status"]) if право else "нет сведений о праве",
+                    "уровень_ответственности_вв": _титул(к.get("responsibility_level_vv")),
+                    "уровень_ответственности_одо": _титул(к.get("responsibility_level_odo")),
+                    "особо_опасные_объекты": право.get("is_extremely_dangerous") if право else None,
+                    "атомные_объекты": право.get("is_nuclear") if право else None,
+                    "проверок_сро": len(к["checks"]),
+                })
+        членства.append(запись)
+    действующие = [m for m, r in zip(членства, свои) if _код(r["member_status"]) == НОСТРОЙ_ЧЛЕН]
+    есть_право = any(m.get("право") == НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ for m in действующие)
+    данные = {
+        "членств_действующих": len(действующие),
+        "членств_всего": len(свои),
+        # сигнал: действующие членства есть, но ни в одном право не «Действует»;
+        # не получена хоть одна карточка — не знаем (None), если право не нашлось
+        "право_не_действует": (False if есть_право or not действующие
+                               else None if не_проверено else True),
+        "членства": членства,
+        "реестр": НОСТРОЙ + "/",
+        "источник": "единый реестр НОСТРОЙ (строительные СРО); проектировщики и "
+                    "изыскатели (НОПРИЗ) не проверялись",
+    }
+    if не_проверено:
+        данные["примечание"] = ("карточка членства не получена или не разобрана: %s"
+                                % "; ".join(str(x) for x in не_проверено))
+    return данные, _av("сро", "ok")
+
+
+def raw_sro(opener, inn):
+    """Запросы страницы «Реестр членов СРО»: поиск по строке и карточки
+    действующих членств (member/{id}/info)."""
+    opener = _make_opener(редиректы=False)
+    стр = НОСТРОЙ + "/"
+    raw = {"поиск": _json_post_политика(
+        opener, НОСТРОЙ + "/api/sro/all/member/list",
+        {"filters": {}, "page": 1, "pageCount": "20", "sortBy": {}, "searchString": str(inn)},
+        стр, "НОСТРОЙ", "поиск"), "карточки": {}}
+    строки = _g(raw, "поиск", "data", "data")
+    for r in (строки if isinstance(строки, list) else []):
+        if len(raw["карточки"]) >= НОСТРОЙ_КАРТОЧЕК:
+            break
+        if isinstance(r, dict) and str(r.get("inn") or "").strip() == str(inn) \
+                and _код(r.get("member_status")) == НОСТРОЙ_ЧЛЕН \
+                and isinstance(r.get("id"), int) and not isinstance(r.get("id"), bool):
+            raw["карточки"][str(r["id"])] = _json_post_политика(
+                opener, "%s/api/member/%d/info" % (НОСТРОЙ, r["id"]), {}, стр,
+                "НОСТРОЙ", "карточка")
+    return raw
+
+
+def fetch_sro(opener, inn):
+    if os.environ.get("INN_CHECK_BEZ_REFERER") == "1":
+        return _not_checked("сро", "не покрыто: INN_CHECK_BEZ_REFERER=1 — СРО только "
+                                   "браузером (%s)" % НОСТРОЙ)
+    return parse_sro(raw_sro(opener, inn), inn)
+
+
 FETCHERS = {
     "агрегатор": fetch_aggregator,
     "банкротство": fetch_bankrupt,
@@ -2221,6 +2385,7 @@ FETCHERS = {
     "дампы_фнс": fetch_opendata_dumps,
     "федресурс": fetch_fedresurs,
     "контракты": fetch_contracts,
+    "сро": fetch_sro,
 }
 
 # id источника -> чистый парсер (raw, inn) -> (данные, _доступность); гоняет eval.
@@ -2228,6 +2393,7 @@ PARSERS = {
     "банкротство": parse_bankrupt,
     "федресурс": parse_fedresurs,
     "контракты": parse_contracts,
+    "сро": parse_sro,
     "егрюл": parse_egrul,
     "риски": parse_risks,
     "финансы": parse_finance,
@@ -2250,6 +2416,7 @@ RAW_RECORD["банкротство"] = _rec_bankrupt
 RAW_RECORD["федресурс"] = _rec_fedresurs
 RAW_RECORD["росстат"] = _rec_rosstat
 RAW_RECORD["контракты"] = _rec_contracts
+RAW_RECORD["сро"] = _rec_sro
 
 # Кэш канареек в процессе: (id, канареечный ИНН) -> ("ok"|"провал"|"не запускалась", причина)
 # Разделяется потоками параллельного сбора, поэтому ходит под замком: канарейка
