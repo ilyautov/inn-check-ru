@@ -660,9 +660,12 @@ def case_управляющие_символы(tmpdir):
     хвосты = [l for l in текст.splitlines() if "канал связи оборвался" in l]
     if not хвосты:
         ошибки.append("хвост причины после управляющих символов потерян")
+    # причина стоит в строке таблицы или в пункте списка сигналов; обрывок
+    # строки после управляющего символа не начинается ни с «|», ни с «- »
     for l in хвосты:
-        if not (l.startswith("|") and l.rstrip().endswith("|")):
-            ошибки.append("управляющий символ разорвал строку таблицы: %r" % l[:90])
+        if not ((l.startswith("|") and l.rstrip().endswith("|"))
+                or (l.startswith("- ") and "не проверено (финансы:" in l)):
+            ошибки.append("управляющий символ разорвал строку: %r" % l[:90])
     try:
         сырьё = zipfile.ZipFile(docx).read("word/document.xml").decode("utf-8")
     except (OSError, KeyError, zipfile.BadZipFile) as e:
