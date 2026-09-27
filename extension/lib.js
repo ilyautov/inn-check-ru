@@ -62,7 +62,8 @@ export function иннИзТекста(текст) {
 export function источникПоUrl(url) {
   let u;
   try { u = new URL(url); } catch { return null; }
-  if (u.protocol !== "https:" || u.username || u.password) return null;
+  // как хост: только https, без userinfo, порт — стандартный
+  if (u.protocol !== "https:" || u.username || u.password || u.port !== "") return null;
   const хост = u.hostname.toLowerCase();
   for (const [ист, хосты] of Object.entries(ХОСТЫ)) {
     if (хосты.some((х) => хост === х || хост.endsWith("." + х))) return ист;

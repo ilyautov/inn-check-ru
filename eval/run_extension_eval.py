@@ -75,8 +75,15 @@ def case_манифест():
     захват = pj.find("captureVisibleTab(")
     check(errors, захват > 0 and "таЖеСтраница(" in pj[захват:],
           "popup.js не сверяет страницу после снимка")
-    check(errors, "sendNativeMessage" not in pj, "окно пишет в хост само — запись оборвётся "
+    check(errors, "chrome.runtime.sendNativeMessage" not in pj
+          and "connectNative" not in pj, "окно пишет в хост само — запись оборвётся "
           "при закрытии окна")
+    check(errors, "chrome.runtime.connectNative(" in bg
+          and "chrome.runtime.sendNativeMessage" not in bg,
+          "фоновый процесс без порта connectNative: Chrome погасит его через 30 с")
+    присвоений = pj.count('$("инн").value = последнийИнн')
+    check(errors, присвоений == pj.count('() => { $("инн").value = последнийИнн'),
+          "ИНН последней проверки подставляется в форму без клика")
     for js in EXT.glob("*.js"):
         код = js.read_text(encoding="utf-8")
         for плохо in (r"\beval\(", r"new Function\(", r"https?://[^\s\"'`]+\.js",
@@ -134,7 +141,8 @@ ok(m.источникПоUrl("https://fssp.gov.ru/iss/ip") === "фссп", "fssp
 ok(m.источникПоUrl("https://www.fssp.gov.ru/") === "фссп", "поддомен");
 for (const u of ["http://kad.arbitr.ru/", "https://kad.arbitr.ru.evil.ru/",
                  "https://evil.ru/?kad.arbitr.ru", "https://kad.arbitr.ru@evil.ru/",
-                 "https://u:p@kad.arbitr.ru/", "javascript:alert(1)", "мусор"]) {
+                 "https://u:p@kad.arbitr.ru/", "javascript:alert(1)", "мусор",
+                 "https://kad.arbitr.ru:8443/"]) {
   ok(m.источникПоUrl(u) === null, "не источник: " + u);
 }
 ok(m.сегодня(new Date(2026, 8, 3)) === "2026-09-03", "дата");

@@ -14,20 +14,36 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// connectNative, а не sendNativeMessage: открытый порт держит service worker
+// живым (Chrome 105+), а проверка идёт до 150 с — дольше 30 с простоя, после
+// которых Chrome гасит worker вместе с хостом (ревью Kimi).
 function спроситьХост(сообщение) {
   return new Promise((resolve) => {
-    const таймер = setTimeout(
-      () => resolve({ ok: false, ошибка: "хост не ответил за 120 с" }), ТАЙМАУТ_МС);
-    chrome.runtime.sendNativeMessage(ХОСТ, сообщение, (ответ) => {
+    let порт;
+    let готово = false;
+    const закончить = (ответ) => {
+      if (готово) return;
+      готово = true;
       clearTimeout(таймер);
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, ошибка: "хост не установлен или не отвечает: "
-          + chrome.runtime.lastError.message
-          + ". Установите: python3 scripts/install_native_host.py --id " + chrome.runtime.id });
-      } else {
-        resolve(ответ || { ok: false, ошибка: "пустой ответ хоста" });
-      }
-    });
+      try { порт?.disconnect(); } catch { /* уже закрыт */ }
+      resolve(ответ);
+    };
+    const таймер = setTimeout(
+      () => закончить({ ok: false, ошибка: "хост не ответил за 120 с" }), ТАЙМАУТ_МС);
+    try {
+      порт = chrome.runtime.connectNative(ХОСТ);
+    } catch (e) {
+      закончить({ ok: false, ошибка: "хост не подключается: " + e.message });
+      return;
+    }
+    порт.onMessage.addListener((ответ) => закончить(ответ || { ok: false, ошибка: "пустой ответ хоста" }));
+    порт.onDisconnect.addListener(() => закончить({
+      ok: false,
+      ошибка: "хост не установлен или завершился: "
+        + (chrome.runtime.lastError?.message || "соединение закрыто")
+        + ". Установите: python3 scripts/install_native_host.py --id " + chrome.runtime.id,
+    }));
+    порт.postMessage(сообщение);
   });
 }
 

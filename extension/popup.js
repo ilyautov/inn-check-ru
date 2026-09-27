@@ -33,7 +33,8 @@ async function показатьПоследнюю() {
   const свет = document.createElement("span");
   свет.className = "свет";
   свет.textContent = р.светофор || "—";
-  голова.append(свет, `${р.название ? р.название + ", " : ""}ИНН ${запись.инн}, профиль «${запись.профиль}»`);
+  голова.append(свет, `${р.название ? р.название + ", " : ""}ИНН ${запись.инн}, профиль «${запись.профиль}»`
+    + (запись.когда ? `, ${new Date(запись.когда).toLocaleString("ru-RU")}` : ""));
   el.append(голова);
   const пояснение = document.createElement("div");
   пояснение.className = "тише";
@@ -171,7 +172,16 @@ async function main() {
   $("заголовок-формы").textContent = блок === "фссп" ? "Ручной блок: ФССП" : "Ручной блок: арбитражные суды";
   $("страница").textContent = new URL(вкладка.url).hostname;
   $("дата").value = сегодня();
-  if (последнийИнн) $("инн").value = последнийИнн;
+  // ИНН не подставляется сам: последняя проверка могла быть о другой компании,
+  // и блок этой страницы лёг бы под чужой ИНН (ревью Kimi). Только по кнопке.
+  if (последнийИнн) {
+    const кнопка = document.createElement("button");
+    кнопка.type = "button";
+    кнопка.className = "вторая";
+    кнопка.textContent = `Подставить ИНН последней проверки: ${последнийИнн}`;
+    кнопка.addEventListener("click", () => { $("инн").value = последнийИнн; });
+    $("инн").after(кнопка);
+  }
   for (const п of ПОЛЯ[блок]) $("поля").append(полеФормы(п));
   for (const r of document.querySelectorAll("input[name=итог]")) {
     r.addEventListener("change", () => {
