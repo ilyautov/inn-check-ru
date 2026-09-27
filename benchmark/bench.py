@@ -5,6 +5,7 @@ bench.py — бенчмарк волны 5 (блок G): перечень деф
     python3 benchmark/bench.py выборка   # benchmark/cohort.json (seed, из калибровочной когорты)
     python3 benchmark/bench.py эталон    # benchmark/etalon/: сырые ответы первоисточников + etalon.json
     python3 benchmark/bench.py прогон    # benchmark/runs/<дата>_наше.json — плечо inn-check-ru
+    python3 benchmark/bench.py прогон checko|dadata   # плечо агрегатора (CHECKO_API_KEY/DADATA_API_KEY)
     python3 benchmark/bench.py отчёт <прогон.json>   # перечень дефектов (markdown)
 
 Порядок и правила (спека волны 5, раздел G):
@@ -292,6 +293,144 @@ def прогон_наше():
             "ответы": ответы}
 
 
+# ---------------------------------------------------------------------------
+# Плечи агрегаторов: ответ API -> поля рубрики в формате ЕГРЮЛ/ЕФРСБ
+# ---------------------------------------------------------------------------
+
+ПРИМЕЧАНИЕ_ПЛЕЧА = ("в рубрике от 2026-09-26 плечо вычеркнуто до прогона: ключа не было; "
+                    "ключ получен 2026-09-27. Поля, правила сравнения и эталон не менялись "
+                    "(sha256 рубрики и эталона — в прогоне)")
+
+
+def _дата_iso(v):
+    """«2020-09-25» -> «25.09.2020», как в поиске ЕГРЮЛ."""
+    if not isinstance(v, str) or len(v) < 10:
+        return None
+    г, м, д = v[:10].split("-")
+    return "%s.%s.%s" % (д, м, г)
+
+
+def _дата_мс(v):
+    """Миллисекунды DaData (полночь UTC) -> «ДД.ММ.ГГГГ»."""
+    if not isinstance(v, (int, float)):
+        return None
+    return datetime.datetime.fromtimestamp(v / 1000, datetime.timezone.utc).strftime("%d.%m.%Y")
+
+
+def _строка_руководителя(должность, фио):
+    """Как поле g поиска ЕГРЮЛ: «ДОЛЖНОСТЬ: Фамилия Имя Отчество»."""
+    if not фио:
+        return None
+    return "%s: %s" % (должность, фио) if должность else str(фио)
+
+
+def checko_в_поля(d):
+    """Checko v2/company data -> ответ плеча. Номер дела — из сообщений ЕФРСБ:
+    одно дело — оно, несколько разных — все через «; » (плечо не выбирает за
+    пользователя). Стадии дела Checko не отдаёт — «не покрыто»."""
+    рук = [r for r in d.get("Руковод") or [] if isinstance(r, dict)]
+    строка = "; ".join(filter(None, (_строка_руководителя(r.get("НаимДолжн"), r.get("ФИО"))
+                                     for r in рук))) or None
+    ефрсб = d.get("ЕФРСБ")
+    if not isinstance(ефрсб, list) or not all(isinstance(m, dict) for m in ефрсб):
+        # пропавшее или битое поле — не «банкротства нет»
+        сост_б = {"состояние": "не проверено",
+                  "причина": "схема: checko — поле ЕФРСБ не список объектов"}
+        сообщения = []
+    else:
+        сообщения = ефрсб
+        сост_б = {"состояние": "ok" if сообщения else "пусто"}
+    дела = sorted({m.get("Дело") for m in сообщения if m.get("Дело")})
+    return {
+        "егрюл": {"огрн": d.get("ОГРН"), "наименование_полное": d.get("НаимПолн"),
+                  "дата_регистрации": _дата_iso(d.get("ДатаРег")),
+                  "руководитель": хеш_фио(строка),
+                  "дата_прекращения": _дата_iso(d.get("ДатаЛикв"))},
+        "банкротство": {"дело": {"номер": "; ".join(дела) or None}} if сообщения else None,
+        "_доступность": {"егрюл": {"состояние": "ok"}, "банкротство": сост_б},
+        "_не_покрыто": {"стадия_код": "не покрыто: Checko v2/company отдаёт сообщения "
+                                      "ЕФРСБ без стадии дела"},
+    }
+
+
+def dadata_в_поля(d):
+    """DaData findById/party (головная запись) -> ответ плеча. ЕФРСБ DaData не отдаёт."""
+    упр = d.get("management") if isinstance(d.get("management"), dict) else {}
+    сост = d.get("state") if isinstance(d.get("state"), dict) else {}
+    имя = d.get("name") if isinstance(d.get("name"), dict) else {}
+    нет = "не покрыто: DaData findById/party не отдаёт сведений ЕФРСБ"
+    return {
+        "егрюл": {"огрн": d.get("ogrn"), "наименование_полное": имя.get("full_with_opf"),
+                  "дата_регистрации": _дата_мс(сост.get("registration_date")),
+                  "руководитель": хеш_фио(_строка_руководителя(упр.get("post"), упр.get("name"))),
+                  "дата_прекращения": _дата_мс(сост.get("liquidation_date"))},
+        "банкротство": None,
+        "_доступность": {"егрюл": {"состояние": "ok"},
+                         "банкротство": {"состояние": "не проверено", "причина": нет}},
+    }
+
+
+def адаптировать(провайдер, j, inn):
+    """Ответ API -> блок плеча или None (нет записи с этим ИНН). Ошибка схемы —
+    исключение, прогон_агрегатор ловит его на уровне одного ИНН."""
+    if not isinstance(j, dict):
+        return None
+    if провайдер == "checko":
+        d = j.get("data")
+        return checko_в_поля(d) if isinstance(d, dict) and str(d.get("ИНН")) == inn else None
+    s = j.get("suggestions")
+    головные = [x["data"] for x in s if isinstance(x, dict) and isinstance(x.get("data"), dict)
+                and str(x["data"].get("inn")) == inn
+                and x["data"].get("branch_type") in ("MAIN", None)] if isinstance(s, list) else []
+    return dadata_в_поля(головные[0]) if len(головные) == 1 else None
+
+
+def прогон_агрегатор(провайдер):
+    эталон = последний_эталон()
+    sys.path.insert(0, str(ROOT / "scripts"))
+    sys.path.insert(0, str(HERE))
+    import aggregator_live as al
+    имя = dict(al.ПРОВАЙДЕРЫ)[провайдер]
+    ключ = (os.environ.get(имя) or "").strip()
+    if not ключ:
+        raise SystemExit("нет ключа: %s" % имя)
+    opener = al.fc._make_opener()
+    выбор = json.loads(ВЫБОРКА.read_text(encoding="utf-8"))
+    ответы = {}
+    начало = time.monotonic()
+    for к in выбор["контрагенты"]:
+        inn, т = к["инн"], time.monotonic()
+        try:
+            _, j = al._сырой(провайдер, ключ, opener, inn)
+        except Exception as e:  # сбой сети — «источник недоступен» по всем полям
+            причина = "сеть: %s" % str(e).replace(ключ, "КЛЮЧ УБРАН")[:200]
+            ответы[inn] = {"_доступность": {с: {"состояние": "не проверено", "причина": причина}
+                                            for с in ("егрюл", "банкротство")}}
+            continue
+        try:
+            б = адаптировать(провайдер, j, inn)
+            причина = "схема: %s — нет записи с этим ИНН" % провайдер
+        except (ValueError, TypeError, AttributeError) as e:
+            б, причина = None, "схема: %s — ответ не разобран (%s)" % (провайдер, type(e).__name__)
+        if б is None:
+            б = {"_доступность": {с: {"состояние": "не проверено", "причина": причина}
+                                  for с in ("егрюл", "банкротство")}}
+        б["секунд"] = round(time.monotonic() - т, 1)
+        ответы[inn] = б
+    return {"плечо": {"checko": "Checko API v2/company",
+                      "dadata": "DaData API findById/party"}[провайдер],
+            "версия": "адаптер benchmark/bench.py (%s_в_поля)" % провайдер,
+            "дата_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "сеть": "не-РФ IP, без прокси", "тариф": "ключ пользователя (тариф не проверялся)",
+            "ручные_шаги": "нет", "секунд_всего": round(time.monotonic() - начало, 1),
+            "примечание": ПРИМЕЧАНИЕ_ПЛЕЧА,
+            "адаптер": "даты -> ДД.ММ.ГГГГ; руководитель — «ДОЛЖНОСТЬ: ФИО» как поле g "
+                       "ЕГРЮЛ, под HMAC; поля, которых API не отдаёт, — «не покрыто»",
+            "эталон": str(эталон.relative_to(HERE)), "эталон_sha256": _sha(эталон),
+            "рубрика_sha256": _sha(РУБРИКА), "ключ_id": ключ_id(),
+            "ответы": ответы}
+
+
 # Поле рубрики -> (раздел эталона, ключ эталона, извлечь значение из блока плеча)
 ПОЛЯ = {
     "огрн": ("егрюл", "огрн", lambda б: (б.get("егрюл") or {}).get("огрн")),
@@ -333,8 +472,13 @@ def сравнить(эталон, прогон):
             плечо = извлечь(б)
             if поле == "банкротство_есть_запись" and сост == "пусто":
                 плечо = False
+            не_покрыто = (б.get("_не_покрыто") or {}).get(поле)
             if эт is None:
                 вердикт = "эталон не собран"
+            elif не_покрыто and сост in ("ok", "пусто"):
+                # поле, которого плечо не отдаёт при живом источнике
+                вердикт = "функция не поддерживается"
+                av = dict(av, причина=не_покрыто)
             elif сост == "не проверено":
                 вердикт = ("функция не поддерживается"
                            if str(av.get("причина", "")).startswith("не покрыто:")
@@ -385,9 +529,13 @@ def main(argv):
         print(json.dumps({k: v["http"] for k, v in м["сырые"].items()}, ensure_ascii=False))
         return 0
     if argv[1:2] == ["прогон"]:
-        п = прогон_наше()
+        плечо = argv[2] if len(argv) > 2 else "наше"
+        if плечо not in ("наше", "checko", "dadata"):
+            sys.stderr.write(__doc__)
+            return 2
+        п = прогон_наше() if плечо == "наше" else прогон_агрегатор(плечо)
         ПРОГОНЫ.mkdir(exist_ok=True)
-        путь = ПРОГОНЫ / ("%s_наше.json" % п["дата_utc"][:10])
+        путь = ПРОГОНЫ / ("%s_%s.json" % (п["дата_utc"][:10], плечо))
         путь.write_text(json.dumps(п, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
         print(путь)
         return 0
