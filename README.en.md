@@ -1,8 +1,14 @@
-# inn-check-ru: Russian counterparty due-diligence by INN, inside your AI agent
+# inn-check-ru: company data by Russian INN for your AI agent
 
 > 🇷🇺 [Русская версия](README.md)
 
-> **Don't ship on credit blind.** An open AI skill that takes a Russian company tax ID (INN) and compiles open registries (EGRUL company registry, bailiffs FSSP, arbitration courts, bankruptcy register, financial statements) into a **risk traffic light 🟢/🟡/🔴** with a recommendation: credit terms, prepayment only, or walk away. For Claude Code, Cursor, Codex, ChatGPT and Gemini. Free, Apache-2.0, data from real registries — not from the model's imagination.
+<p align="center">
+  <a href="https://inn-check-ru.aifrontier.tech/">
+    <img src="assets/readme-banner.jpg" alt="inn-check-ru: company data by INN for an AI agent" width="720">
+  </a>
+</p>
+
+> **Give your agent an INN — get a company dossier.** inn-check-ru connects tools that collect facts about a Russian company from open sources: status, financials, debts, court cases, owners and connections. The dossier helps you study a company, check its connections and compare saved snapshots. Unchecked sources stay visible. A deal check (risk traffic light 🟢/🟡/🔴 for given terms) is an extra mode. Open source, Apache-2.0; the model and third-party APIs may be billed separately.
 
 **Quick start:**
 
