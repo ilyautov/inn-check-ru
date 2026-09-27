@@ -112,6 +112,9 @@ jobs:
       - name: "домен: WHOIS .ru/.рф — тип регистранта без имени, зона, ввод"
         run: python3 eval/run_domain_eval.py
 
+      - name: "слэш-команды плагина: скрипты, флаги и профили существуют"
+        run: python3 eval/run_commands_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |
