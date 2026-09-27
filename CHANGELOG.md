@@ -5,6 +5,12 @@
 ## [Unreleased]
 
 ### Added
+- **Native-хост расширения на Windows.** `install_native_host.py` пишет манифест и
+  запускатель `.bat` (в OEM-кодировке консоли) в `%LOCALAPPDATA%\inn-check-ru` и путь к
+  манифесту — в `HKCU\Software\<браузер>\NativeMessagingHosts`; путь с символами,
+  опасными для `.bat`, — отказ; `--удалить` снимает и ключ. Eval: подменённый реестр в
+  `run_native_host_eval.py`, живая установка и запуск через `cmd.exe` с двоичными
+  кадрами — `run_native_host_windows.py` в CI на `windows-latest`.
 - **Браузерное расширение (`extension/`, MV3) и native-хост.** Пункт контекстного меню
   «Проверить ИНН» — быстрая проверка через локальный движок, итог на значке; окно на
   fssp.gov.ru и kad.arbitr.ru — форма ручного блока с полями сигналов и снимок в пакет
@@ -12,7 +18,7 @@
   доступа ко всем сайтам. `scripts/native_host.py`: белый список команд и полей, ИНН с
   контрольной суммой, URL только сайта источника, без путей из сообщения, повтор
   операции без дубля. `scripts/install_native_host.py` — манифест хоста только для
-  своего расширения (macOS, Linux). Eval: `run_native_host_eval.py`,
+  своего расширения (macOS, Linux; Windows — ниже). Eval: `run_native_host_eval.py`,
   `run_extension_eval.py` (lib.js — в Node).
   По ревью Codex: запись блока и снимка ведёт фоновый процесс (закрытие окна её не
   обрывает), страница сверяется и после снимка, противоречие ИНН и параметров

@@ -348,6 +348,12 @@ def обработать(сообщение, корень=None, запуск=Non
 
 
 def main():
+    if sys.platform == "win32":
+        # кадры двоичные: 0A/0D/1A в длине не должны превращаться в перевод строки
+        # или EOF. CPython 3 уже ставит O_BINARY сам — это страховка.
+        import msvcrt
+        for f in (sys.stdin, sys.stdout):
+            msvcrt.setmode(f.fileno(), os.O_BINARY)
     вход, выход = sys.stdin.buffer, sys.stdout.buffer
     while True:
         try:

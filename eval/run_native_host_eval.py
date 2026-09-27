@@ -235,7 +235,8 @@ def case_процесс(корень):
 
 def case_установка(корень):
     """Установщик: манифест только для своего расширения, запускатель с
-    абсолютными путями реально поднимает хост; Windows и чужой ID — отказ."""
+    абсолютными путями реально поднимает хост; Windows — .bat и ключ HKCU
+    (реестр подменён); чужая платформа, чужой ID, опасный для .bat путь — отказ."""
     errors = []
     spec = importlib.util.spec_from_file_location(
         "install_native_host", ROOT / "scripts" / "install_native_host.py")
@@ -243,7 +244,7 @@ def case_установка(корень):
     spec.loader.exec_module(inst)
     id_ = "a" * 32
     for плохо, kw in (("ID", {"id_расширения": "x" * 32}),
-                      ("платформа", {"id_расширения": id_, "платформа": "win32"}),
+                      ("платформа", {"id_расширения": id_, "платформа": "sunos5"}),
                       ("браузер", {"id_расширения": id_, "браузер": "firefox"})):
         try:
             inst.установить(дом=корень, платформа=kw.pop("платформа", "linux"), **kw)
@@ -264,6 +265,56 @@ def case_установка(корень):
     ответ = json.loads(proc.stdout[4:].decode("utf-8")) if len(proc.stdout) > 4 else {}
     check(errors, ответ.get("ok") is False and "не поддерживается" in ответ.get("ошибка", ""),
           "запускатель не поднял хост: %r %r" % (ответ, proc.stderr[:200]))
+    class Реестр(dict):
+        def записать(self, ключ, значение):
+            self[ключ] = значение
+
+        def удалить(self, ключ):
+            return self.pop(ключ, None) is not None
+
+    реестр = Реестр()
+    win = корень / "win"
+    манифест_w, bat = inst.установить(id_, "edge", дом=win, платформа="win32",
+                                      python=r"C:\Python312\python.exe", реестр=реестр)
+    ключ = r"Software\Microsoft\Edge\NativeMessagingHosts\ru.inn_check_ru.host"
+    данные = json.loads(манифест_w.read_text(encoding="utf-8"))
+    check(errors, реестр == {ключ: str(манифест_w)} and данные["path"] == str(bat)
+          and данные["allowed_origins"] == ["chrome-extension://%s/" % id_],
+          "win32: реестр %r, манифест %r" % (dict(реестр), данные))
+    текст_bat = bat.read_bytes().decode("utf-8")
+    check(errors, bat.suffix == ".bat"
+          and текст_bat == '@echo off\r\nset "PYTHONUTF8=1"\r\n'
+          '"C:\\Python312\\python.exe" "%s" %%*\r\n' % inst.ХОСТ,
+          "win32: .bat %r" % текст_bat)
+    # опасный символ в пути самого .bat (профиль с %) и отказ реестра: ничего
+    # не остаётся на диске
+    class Отказной(Реестр):
+        def записать(self, ключ, значение):
+            raise PermissionError("доступ запрещён")
+
+    for дом_w, реестр_w, что in ((win / "qa%OS%", реестр, "процент в пути .bat"),
+                                 (win / "отказ", Отказной(), "отказ реестра")):
+        try:
+            inst.установить(id_, дом=дом_w, платформа="win32",
+                            python=r"C:\Python312\python.exe", реестр=реестр_w)
+            errors.append("win32: %s — установлено" % что)
+        except ValueError:
+            pass
+        check(errors, not any(дом_w.rglob("*.*")), "win32: %s — файлы остались" % что)
+    for плохой in (r"C:\100%\python.exe", 'C:\\a"b\\python.exe', r"C:\a&b\python.exe"):
+        try:
+            inst.установить(id_, дом=win / "плохо", платформа="win32", python=плохой,
+                            реестр=реестр)
+            errors.append("win32: путь %r записан в .bat" % плохой)
+        except ValueError:
+            pass
+    check(errors, len(реестр) == 1, "win32: ключ записан при отказе: %r" % dict(реестр))
+    хром, _ = inst.установить(id_, дом=win, платформа="win32",
+                              python=r"C:\Python312\python.exe", реестр=реестр)
+    удалено = inst.удалить("edge", дом=win, платформа="win32", реестр=реестр)
+    check(errors, list(реестр.values()) == [str(хром)] and len(удалено) == 3
+          and not bat.exists() and хром.exists(),
+          "win32: удаление Edge %r задело Chrome, реестр %r" % (удалено, dict(реестр)))
     _, brave = inst.установить(id_, "brave", дом=корень / "linux", платформа="linux")
     удалено = inst.удалить(дом=корень / "linux", платформа="linux")
     check(errors, len(удалено) == 2 and not манифест.exists(), "удаление: %r" % удалено)

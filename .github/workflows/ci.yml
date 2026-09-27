@@ -224,3 +224,15 @@ jobs:
         run: |
           pip install -r mcp/requirements.txt
           python3 mcp/test_server.py
+
+  windows-host:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: "native-хост на Windows: ключ HKCU, .bat через cmd, двоичные кадры"
+        run: python eval/run_native_host_windows.py
