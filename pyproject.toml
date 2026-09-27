@@ -70,6 +70,7 @@ py-modules = [
   "evidence_pack",
   "extract_inn",
   "domain_check",
+  "manual_block",
 ]
 packages = ["inn_check_ru_mcp", "inn_check_ru_data"]
 
