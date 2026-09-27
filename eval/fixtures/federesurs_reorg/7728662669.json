@@ -1,0 +1,185 @@
+{
+ "компании": {
+  "pageData": [
+   {
+    "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+    "ogrn": "1087760000019",
+    "inn": "7728662669",
+    "name": "ПАО \"РОССЕТИ\"",
+    "status": "Прекращение деятельности юридического лица путем реорганизации в форме присоединения",
+    "okvedName": "Деятельность по управлению холдинг-компаниями",
+    "isActive": false
+   }
+  ],
+  "found": 1
+ },
+ "публикации": {
+  "pageData": [
+   {
+    "publicationType": "SfactMessage",
+    "guid": "4de7c747-4972-4b25-8941-b95bb52fe045",
+    "number": "13299451",
+    "datePublish": "2022-09-22T09:46:26.773",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Реорганизация юридического лица",
+    "publisher": {
+     "name": "ОАО \"ТОМСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+     "guid": "ab2223b5-af6b-45df-8433-23975a5383ec",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "a79b685b-6c8a-4f57-8893-111103b6ae0c",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"КУБАНСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "3126cf11-fcc9-40fa-85a4-7d061d0f6beb",
+      "type": "Company"
+     },
+     {
+      "name": "ОАО \"ТОМСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "ab2223b5-af6b-45df-8433-23975a5383ec",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"ДВЭУК - ЕНЭС\"",
+      "guid": "b954741d-7518-4efb-aa77-e5a4259b71da",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "e35ce952-3593-4461-8c1a-14560147a5e6",
+    "number": "13289683",
+    "datePublish": "2022-09-19T15:09:20.51",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Реорганизация юридического лица",
+    "publisher": {
+     "name": "ПАО \"РОССЕТИ\"",
+     "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "a79b685b-6c8a-4f57-8893-111103b6ae0c",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"КУБАНСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "3126cf11-fcc9-40fa-85a4-7d061d0f6beb",
+      "type": "Company"
+     },
+     {
+      "name": "ОАО \"ТОМСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "ab2223b5-af6b-45df-8433-23975a5383ec",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"ДВЭУК - ЕНЭС\"",
+      "guid": "b954741d-7518-4efb-aa77-e5a4259b71da",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "4e5ff37f-2d3d-4f7c-8a7a-20d15736a021",
+    "number": "13274122",
+    "datePublish": "2022-09-16T09:50:48.167",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Реорганизация юридического лица",
+    "publisher": {
+     "name": "ПАО \"РОССЕТИ\"",
+     "guid": "a79b685b-6c8a-4f57-8893-111103b6ae0c",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "a79b685b-6c8a-4f57-8893-111103b6ae0c",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"КУБАНСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "3126cf11-fcc9-40fa-85a4-7d061d0f6beb",
+      "type": "Company"
+     },
+     {
+      "name": "ОАО \"ТОМСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "ab2223b5-af6b-45df-8433-23975a5383ec",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"ДВЭУК - ЕНЭС\"",
+      "guid": "b954741d-7518-4efb-aa77-e5a4259b71da",
+      "type": "Company"
+     }
+    ]
+   },
+   {
+    "publicationType": "SfactMessage",
+    "guid": "0205907d-6a65-410f-918a-06769a96a75e",
+    "number": "13262020",
+    "datePublish": "2022-09-14T16:48:16.147",
+    "isAnnulled": false,
+    "isLocked": false,
+    "type": "Реорганизация юридического лица",
+    "publisher": {
+     "name": "АО \"ДВЭУК - ЕНЭС\"",
+     "guid": "b954741d-7518-4efb-aa77-e5a4259b71da",
+     "type": "Company"
+    },
+    "participants": [
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "000f97cd-7f46-472c-9681-e9f09369dca3",
+      "type": "Company"
+     },
+     {
+      "name": "ПАО \"РОССЕТИ\"",
+      "guid": "a79b685b-6c8a-4f57-8893-111103b6ae0c",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"КУБАНСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "3126cf11-fcc9-40fa-85a4-7d061d0f6beb",
+      "type": "Company"
+     },
+     {
+      "name": "ОАО \"ТОМСКИЕ МАГИСТРАЛЬНЫЕ СЕТИ\"",
+      "guid": "ab2223b5-af6b-45df-8433-23975a5383ec",
+      "type": "Company"
+     },
+     {
+      "name": "АО \"ДВЭУК - ЕНЭС\"",
+      "guid": "b954741d-7518-4efb-aa77-e5a4259b71da",
+      "type": "Company"
+     }
+    ]
+   }
+  ],
+  "found": 4
+ }
+}

@@ -1697,6 +1697,47 @@ def case_aggregator(fc):
     return errors
 
 
+def case_reorg(fc):
+    """Реорганизация на Федресурсе (живые сообщения ПАО «Россети», 7728662669,
+    присоединение 2022): роль любая, сигнал только в окне свежести."""
+    errors = []
+    base = json.loads((ROOT / "eval" / "fixtures" / "federesurs_reorg" / "7728662669.json")
+                      .read_text(encoding="utf-8"))
+    inn = "7728662669"
+    orig = fc._сегодня
+    try:
+        fc._сегодня = lambda: _dt.date(2022, 10, 1)
+        д, av = fc.parse_fedresurs(copy.deepcopy(base), inn)
+        check(errors, av["состояние"] == "ok" and isinstance(д["реорганизация"], str)
+              and д["реорганизация"].count("реорганизация юридического лица") == 4,
+              "свежая реорганизация (публикатор и участник) не найдена: %r" % д)
+        fc._сегодня = lambda: _dt.date(2023, 9, 22)   # 365 дней после последней — ещё в окне
+        д, _ = fc.parse_fedresurs(copy.deepcopy(base), inn)
+        check(errors, isinstance(д["реорганизация"], str), "граница окна: %r" % д["реорганизация"])
+        fc._сегодня = lambda: _dt.date(2026, 9, 28)
+        д, _ = fc.parse_fedresurs(copy.deepcopy(base), inn)
+        check(errors, д["реорганизация"] is False
+              and all(m.get("старше_окна_дней") == 365 for m in д["сообщения"]),
+              "давняя реорганизация подняла сигнал: %r" % д["реорганизация"])
+        # компании нет ни в публикаторе, ни в участниках — не знаем, о ней ли
+        чужое = copy.deepcopy(base)
+        for m in чужое["публикации"]["pageData"]:
+            m["publisher"] = {"type": "Company", "guid": "x", "name": "ООО «Другое»"}
+            m["participants"] = [p for p in m["participants"]
+                                 if p.get("guid") != base["компании"]["pageData"][0]["guid"]]
+        fc._сегодня = lambda: _dt.date(2022, 10, 1)
+        д, _ = fc.parse_fedresurs(чужое, inn)
+        check(errors, д["реорганизация"] is None, "чужая реорганизация: %r" % д["реорганизация"])
+        битое = copy.deepcopy(base)
+        битое["публикации"]["pageData"][0]["datePublish"] = "2022-13-45T00:00:00"
+        д, av = fc.parse_fedresurs(битое, inn)
+        check(errors, av["состояние"] == "не проверено" and str(av["причина"]).startswith("схема:"),
+              "некалендарная дата: %r" % av)
+    finally:
+        fc._сегодня = orig
+    return errors
+
+
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
     fc._http_get_настоящий = fc._http_get  # для теста транспорта на фейковом opener
@@ -1717,6 +1758,7 @@ def main():
         "прокси-и-кэш-доступа": case_proxy(fc),
         "ефрсб-банкротство": case_bankrupt(fc),
         "федресурс-роли": case_fedresurs(fc),
+        "федресурс-реорганизация": case_reorg(fc),
         "росстат-подразделения": case_rosstat(fc),
         "госконтракты: итоги карточки и схема": case_contracts(fc),
         "СРО НОСТРОЙ: членства, карточки, сигнал права": case_sro(fc),
