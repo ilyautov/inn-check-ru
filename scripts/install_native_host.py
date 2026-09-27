@@ -49,7 +49,8 @@ def пути(браузер, дом=None, платформа=None):
         raise ValueError("браузер %r: %s" % (браузер, ", ".join(БРАУЗЕРЫ[платформа])))
     дом = Path(дом or os.path.expanduser("~"))
     манифест = дом / БРАУЗЕРЫ[платформа][браузер] / "NativeMessagingHosts" / (ИМЯ + ".json")
-    запускатель = дом / ".local" / "share" / "inn-check-ru" / "native-host"
+    # свой запускатель у каждого браузера: удаление для Chrome не ломает Brave
+    запускатель = дом / ".local" / "share" / "inn-check-ru" / ("native-host-" + браузер)
     return манифест, запускатель
 
 

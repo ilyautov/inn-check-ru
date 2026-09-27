@@ -67,6 +67,16 @@ def case_манифест():
     check(errors, not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", html),
           "inline <script> в popup.html (CSP MV3)")
     check(errors, not re.search(r"\son[a-z]+\s*=", html), "inline-обработчики в popup.html")
+    # запись и снимок — через фоновый процесс со сверкой отправителя; снимок
+    # сверяется со страницей после захвата (ревью Codex)
+    bg = (EXT / "background.js").read_text(encoding="utf-8")
+    check(errors, "своёОкно(отправитель" in bg, "background.js не сверяет отправителя")
+    pj = (EXT / "popup.js").read_text(encoding="utf-8")
+    захват = pj.find("captureVisibleTab(")
+    check(errors, захват > 0 and "таЖеСтраница(" in pj[захват:],
+          "popup.js не сверяет страницу после снимка")
+    check(errors, "sendNativeMessage" not in pj, "окно пишет в хост само — запись оборвётся "
+          "при закрытии окна")
     for js in EXT.glob("*.js"):
         код = js.read_text(encoding="utf-8")
         for плохо in (r"\beval\(", r"new Function\(", r"https?://[^\s\"'`]+\.js",
@@ -147,6 +157,14 @@ ok(r.ошибки.some((e) => e.includes("страница")), "не сайт и
 ok(m.снимокРазрешён("504110181262", true) !== null, "снимок ИП запрещён");
 ok(m.снимокРазрешён("7707083893", false) !== null, "снимок без подтверждения");
 ok(m.снимокРазрешён("7707083893", true) === null, "снимок юрлица с подтверждением");
+const вкладка = { id: 7, url: "https://kad.arbitr.ru/Card/1" };
+ok(m.таЖеСтраница({ ...вкладка }, вкладка), "та же страница");
+ok(!m.таЖеСтраница({ ...вкладка, url: "https://kad.arbitr.ru/Card/2" }, вкладка), "другая страница");
+ok(!m.таЖеСтраница({ ...вкладка, id: 8 }, вкладка) && !m.таЖеСтраница(undefined, вкладка), "другая вкладка");
+const окно = "chrome-extension://abc/popup.html";
+ok(m.своёОкно({ id: "abc", url: окно }, "abc", окно), "своё окно");
+ok(!m.своёОкно({ id: "xyz", url: окно }, "abc", окно), "чужое расширение");
+ok(!m.своёОкно({ id: "abc", url: "https://kad.arbitr.ru/" }, "abc", окно), "не окно");
 console.log(JSON.stringify(ош));
 """
 

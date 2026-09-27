@@ -27,6 +27,7 @@ import re
 import struct
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -198,8 +199,19 @@ def _операция(v):
 def _сайт_источника(блок, url):
     if блок not in ХОСТЫ:
         raise Отказ("блок %r: расширение знает только %s" % (блок, ", ".join(ХОСТЫ)))
-    m = re.match(r"^https://([^/:?#]+)(?::443)?(?:[/?#]|$)", str(url or ""))
-    хост = m.group(1).lower() if m else ""
+    url = str(url or "")
+    хост = ""
+    # обратную косую, пробелы и управляющие символы браузер читает иначе, чем
+    # Python (в «https://evil.example<\>.kad.arbitr.ru/» домен — evil.example): такие
+    # адреса не принимаются вовсе (ревью Codex)
+    if not re.search(r"[\\\s\x00-\x1f\x7f]", url):
+        try:
+            части = urllib.parse.urlsplit(url)
+            if (части.scheme == "https" and not части.username and not части.password
+                    and части.port in (None, 443)):
+                хост = (части.hostname or "").lower()
+        except ValueError:
+            хост = ""
     if not any(хост == х or хост.endswith("." + х) for х in ХОСТЫ[блок]):
         raise Отказ("url не с сайта источника %s (%s)" % (блок, ", ".join(ХОСТЫ[блок])))
 
@@ -277,12 +289,23 @@ def доказательство(сообщение, корень, журнал,
     if not данные.startswith(PNG_ПОДПИСЬ):
         raise Отказ("png: не PNG")
     пакет = корень / инн / "пакет"
-    if пакет.is_symlink() or not (пакет / "manifest.json").is_file():
+    # symlink на любом звене пути (ИНН, пакет) — отказ: пакет только внутри
+    # каталога хоста (ревью Codex: ссылка на месте <ИНН> уводила запись наружу)
+    if (корень / инн).is_symlink() or пакет.is_symlink() or \
+            корень not in пакет.resolve().parents:
+        raise Отказ("на пути к пакету symlink или выход из каталога хоста")
+    if not (пакет / "manifest.json").is_file():
         raise Отказ("пакета доказательств нет: соберите его командой "
                     "`python3 scripts/fetch_counterparty.py %s --пакет %s`" % (инн, пакет))
     if добавить is None:
         import evidence_pack
         добавить = evidence_pack.добавить
+    # Отметка «в процессе» — до добавления: если хост упадёт после записи
+    # версии, повтор той же операции не добавит второе вложение (ревью Codex)
+    журнал.запомнить(операция, {"ok": False, "в_процессе": True,
+                                "ошибка": "операция уже выполнялась и не завершилась — "
+                                          "проверьте пакет: evidence_pack.py --проверить %s"
+                                          % пакет})
     временная = _папка(корень, ".снимки")
     файл = _записать_атомарно(временная, "%s_%s.png" % (операция, блок), данные)
     try:
