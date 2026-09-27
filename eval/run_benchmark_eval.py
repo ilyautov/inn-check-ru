@@ -158,11 +158,102 @@ def case_эталон(b):
     return errors
 
 
+def case_агрегатор_живьём():
+    """benchmark/aggregator_live.py без сети: маскирование, страж утечек, контракт,
+    ключ не попадает в фикстуру и отчёт."""
+    errors = []
+    al = load_module("aggregator_live", ROOT / "benchmark" / "aggregator_live.py")
+    ключ = "k3y-только-для-eval"
+    inn = "7707083893"
+    checko = {"meta": {"status": "ok", "message": "echo " + ключ},
+              "data": {"ИНН": inn, "ЮрАдрес": {"Недост": False},
+                       "Руковод": [{"ФИО": "Иванов Иван Иванович", "ИНН": "771234567890",
+                                    "Недост": False, "ДисквЛицо": False}],
+                       "Учред": {"ФЛ": [{"ФИО": "Петров Пётр", "ИНН": "500100732259",
+                                         "Недост": False}], "РосОрг": [], "ИнОрг": [],
+                                 "ПИФ": [], "РФ": []},
+                       "УпрОрг": None, "Контакты": {"Тел": ["+7 999 000-00-00"]}}}
+    м = al.замаскировать(checko, ключ)
+    текст = json.dumps(м, ensure_ascii=False)
+    for утекло in ("Иванов", "Петров", "771234567890", "500100732259", "999", ключ):
+        check(errors, утекло not in текст, "checko: в фикстуре осталось %r" % утекло)
+    check(errors, м["data"]["ИНН"] == inn, "checko: ИНН компании замаскирован")
+    check(errors, м["data"]["Руковод"][0]["ДисквЛицо"] is False,
+          "checko: флаги пропали при маскировании")
+    check(errors, al.утечки(м, ключ, inn) == [], "checko: страж видит утечку в чистом")
+    check(errors, al.утечки({"x": "echo " + ключ}, ключ, inn) == ["ключ"],
+          "checko: страж не заметил ключ")
+    check(errors, al.утечки({"ИНН": "771234567890"}, ключ, inn) == ["12-значных ИНН: 1"],
+          "checko: страж не заметил ИНН физлица")
+    к = al.контракт_checko(checko)
+    check(errors, к["ЮрАдрес.Недост"] and к["Руковод[].ДисквЛицо"] and к["УпрОрг в ответе"],
+          "checko: контракт %r" % к)
+    check(errors, fc_разбор(al, checko, inn) == (False, False),
+          "checko: движок по полному ответу не дал «нет»")
+    dadata = {"suggestions": [{"value": "ПАО", "data": {
+        "inn": inn, "branch_type": "MAIN", "invalid": None,
+        "name": {"full_with_opf": "ПАО СБЕРБАНК"},
+        "management": {"name": "Греф Герман", "post": "ПРЕЗИДЕНТ", "disqualified": None},
+        "founders": [{"type": "PHYSICAL", "fio": {"surname": "Сидоров"},
+                      "inn": "770000000019", "name": "Сидоров С"},
+                     {"type": "LEGAL", "name": "ЦБ РФ", "inn": "7702235133"}],
+        "phones": [{"value": "+7 495"}], "emails": [{"value": "a@b"}]}}]}
+    м = al.замаскировать(dadata, ключ)
+    текст = json.dumps(м, ensure_ascii=False)
+    for утекло in ("Греф", "Сидоров", "770000000019", "+7 495", "a@b"):
+        check(errors, утекло not in текст, "dadata: в фикстуре осталось %r" % утекло)
+    for осталось in ("ПАО СБЕРБАНК", "ЦБ РФ", "7702235133", "ПРЕЗИДЕНТ"):
+        check(errors, осталось in текст, "dadata: лишне замаскировано %r" % осталось)
+    check(errors, al.контракт_dadata(dadata, inn)["invalid в ответе"] is True, "dadata: контракт")
+    менеджер = al.замаскировать({"managers": [{"type": "EMPLOYEE", "fio": None,
+                                               "name": "Кузнецов К", "inn": "770000000019"}]},
+                                ключ)
+    check(errors, "Кузнецов" not in json.dumps(менеджер, ensure_ascii=False)
+          and al.утечки(менеджер, ключ, inn) == [], "dadata: руководитель EMPLOYEE не замаскирован")
+    ветки = {"suggestions": [{"data": {"inn": inn, "branch_type": "BRANCH", "invalid": None}},
+                             {"data": {"inn": inn, "branch_type": "MAIN", "invalid": True}}]}
+    check(errors, al.контракт_dadata(ветки, inn).get("invalid") is True,
+          "dadata: контракт сверен не на головной записи")
+
+    # проверить(): отказ парсера не роняет прогон, фикстура пишется только чистая
+    import tempfile
+    исходные = (al._сырой, al.ФИКСТУРЫ)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            al.ФИКСТУРЫ = Path(tmp) / "aggregator"
+            al.ФИКСТУРЫ.mkdir()
+            al.ROOT = Path(tmp)
+            for провайдер, ответ in (("dadata", {"suggestions": []}),
+                                     ("checko", {"meta": {"status": "error", "message": "x"}})):
+                al._сырой = lambda *_a, _о=ответ: (200, _о)
+                стр = al.проверить(провайдер, ключ, None, inn)
+                check(errors, стр["движок"]["состояние"] == "не проверено",
+                      "%s: отказ парсера: %r" % (провайдер, стр))
+            al._сырой = lambda *_a: (200, checko)
+            стр = al.проверить("checko", ключ, None, inn)
+            записано = (al.ФИКСТУРЫ / ("checko_%s.json" % inn)).read_text(encoding="utf-8")
+            check(errors, ключ not in записано and "Иванов" not in записано
+                  and стр["движок"]["недостоверность_сведений"] is False,
+                  "checko: фикстура или разбор: %r" % стр)
+    finally:
+        al._сырой, al.ФИКСТУРЫ = исходные
+        al.ROOT = ROOT
+    check(errors, al.годный_инн(inn) and not al.годный_инн("500100732259")
+          and not al.годный_инн("7707083894"), "проверка ИНН: ИП или битый ИНН пропущен")
+    return errors
+
+
+def fc_разбор(al, raw, inn):
+    данные, _ = al.fc.parse_checko(raw, inn)
+    return данные.get("недостоверность_сведений"), данные.get("дисквалификация_руководителя")
+
+
 def main():
     os.environ.setdefault("INN_CHECK_BENCH_KEY", "ключ-только-для-eval")
     b = load_module("bench", ROOT / "benchmark" / "bench.py")
     cases = {"категории дефектов": case_сравнение(b), "эталон и маскирование": case_эталон(b),
-             "привязка отчёта к эталону, рубрике и ключу": case_привязка(b)}
+             "привязка отчёта к эталону, рубрике и ключу": case_привязка(b),
+             "живая сверка агрегатора: маскирование и утечки": case_агрегатор_живьём()}
     failed = 0
     for name, errors in cases.items():
         if errors:
