@@ -37,8 +37,7 @@ def нормализовать(ввод):
     """«https://www.Пример.рф/путь» -> «xn--e1afmkfd.xn--p1ai». ValueError — не домен."""
     v = str(ввод or "").strip().lower()
     v = re.sub(r"^[a-z]+://", "", v).split("/", 1)[0].split("?", 1)[0].rstrip(".")
-    if v.startswith("www."):
-        v = v[4:]
+    v = v.removeprefix("www.")
     try:
         v = v.encode("idna").decode("ascii")
     except UnicodeError as e:
@@ -69,7 +68,7 @@ def _дата(v):
 
 def оценить(домен, текст, сегодня=None, дата_регистрации=None):
     """Разобранный WHOIS -> (данные | None, состояние, причина)."""
-    сегодня = сегодня or datetime.date.today()
+    сегодня = сегодня or datetime.datetime.now(datetime.timezone.utc).astimezone().date()
     if re.search(r"(?im)^no entries found", текст):
         return None, "пусто", "домен %s в реестре не зарегистрирован" % домен
     поля = разобрать(текст)

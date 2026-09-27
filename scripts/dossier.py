@@ -649,7 +649,7 @@ def _подраздел_финансы(fetch, fin):
 def _руб(v):
     if not isinstance(v, (int, float)) or isinstance(v, bool):
         return "—"
-    return "{:,.0f} ₽".format(v).replace(",", " ")
+    return f"{v:,.0f} ₽".replace(",", " ")
 
 
 def _подраздел_контракты(fetch):

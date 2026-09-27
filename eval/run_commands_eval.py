@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def фронтматтер(текст):
     """Простые пары «ключ: "значение"» между «---»; None — если блока нет или
     значение не в кавычках (двоеточие внутри ломает YAML)."""
-    m = re.match(r"---\n(.*?)\n---\n", текст, re.S)
+    m = re.match(r"---\n(.*?)\n---\n", текст, re.DOTALL)
     if not m:
         return None
     поля = {}

@@ -80,6 +80,7 @@ import concurrent.futures
 import datetime as _dt
 import http.cookiejar
 import importlib.util
+import itertools
 import json
 import math
 import os
@@ -1943,7 +1944,8 @@ def fetch_aggregator(opener, inn):
 
 
 def _сегодня():
-    return _dt.date.today()
+    # местная дата пользователя (aware: now с зоной, затем в местную)
+    return _dt.datetime.now(_dt.timezone.utc).astimezone().date()
 
 
 def _rec_fedresurs(raw, inn):
@@ -2215,7 +2217,7 @@ def parse_contracts(raw, inn):
     }
     даты = [_дата_контракта(c["sign_date"]) for c in выдача]
     по_дате = _g(raw, "контракты", "page") == 1 and all(
-        a >= b for a, b in zip(даты, даты[1:]))
+        a >= b for a, b in itertools.pairwise(даты))
     if выдача and not по_дате:
         данные["примечание"] = ("выдача не первая страница или не по убыванию даты — "
                                 "последний контракт не установлен")

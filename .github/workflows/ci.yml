@@ -115,6 +115,9 @@ jobs:
       - name: "слэш-команды плагина: скрипты, флаги и профили существуют"
         run: python3 eval/run_commands_eval.py
 
+      - name: "ручной блок: форма знает поля сигналов, вклейка не трогает пакет"
+        run: python3 eval/run_manual_block_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |
