@@ -41,17 +41,27 @@ def ошибки_команды(путь, профили):
         ош.append("фронтматтер: нужны description и argument-hint в кавычках")
     if "$ARGUMENTS" not in текст:
         ош.append("нет $ARGUMENTS — аргументы команды потеряются")
-    # «скрипт.py … --флаг» в одних обратных кавычках: флаг обязан быть в исходнике
+    # Флаг в обратных кавычках относится к последнему упомянутому до него скрипту
+    # (в том же куске или раньше) и обязан быть в его исходнике целым словом:
+    # «--сум» не засчитывается за «--сумма».
+    текущий = None
     for кусок in re.findall(r"`([^`]+)`", текст):
-        скрипты = re.findall(r"([\w-]+\.py)", кусок)
-        for имя in скрипты:
-            if not (ROOT / "scripts" / имя).exists():
-                ош.append("нет scripts/%s" % имя)
-        if len(скрипты) == 1 and (ROOT / "scripts" / скрипты[0]).exists():
-            исходник = (ROOT / "scripts" / скрипты[0]).read_text(encoding="utf-8")
-            for флаг in re.findall(r"(--[\w-]+)", кусок):
-                if флаг not in исходник:
-                    ош.append("%s: флага %s в скрипте нет" % (скрипты[0], флаг))
+        for часть in re.split(r"(?<![\w-])(?=[\w-]+\.py)", кусок):
+            скрипты = re.findall(r"([\w-]+\.py)", часть)
+            for имя in скрипты:
+                if not (ROOT / "scripts" / имя).exists():
+                    ош.append("нет scripts/%s" % имя)
+                    текущий = None
+                else:
+                    текущий = имя
+            флаги = re.findall(r"(?<![\w-])(--[\w-]+)", часть)
+            if флаги and текущий is None:
+                ош.append("флаги %s без скрипта" % флаги)
+            elif флаги:
+                исходник = (ROOT / "scripts" / текущий).read_text(encoding="utf-8")
+                for флаг in флаги:
+                    if not re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(флаг), исходник):
+                        ош.append("%s: флага %s в скрипте нет" % (текущий, флаг))
         if re.fullmatch(r"[\w.-]+/[\w./-]+\.(md|json)", кусок) and not (ROOT / кусок).exists():
             ош.append("нет файла %s" % кусок)
         for п in re.findall(r"--профиль (\w+)", кусок):
@@ -78,10 +88,11 @@ def main():
     try:
         проба.write_text('---\ndescription: без: кавычек\nargument-hint: "x"\n---\n'
                          "`fetch_counterparty.py --нет-такого` `нет_скрипта.py` "
-                         "`--профиль выдуманный` `references/нет.md`\n", encoding="utf-8")
+                         "`--профиль выдуманный` `references/нет.md` "
+                         "`paper_vat.py --сум` `watchlist.py` `--прогонн`\n", encoding="utf-8")
         ош = ошибки_команды(проба, профили)
         ждём = ("фронтматтер", "$ARGUMENTS", "--нет-такого", "нет_скрипта.py",
-                "выдуманный", "references/нет.md")
+                "выдуманный", "references/нет.md", "--сум ", "--прогонн")
         cases["проверка ловит расхождения"] = [
             "не поймано: %s" % ж for ж in ждём if not any(ж in e for e in ош)]
     finally:
