@@ -1728,6 +1728,12 @@ def case_reorg(fc):
         fc._сегодня = lambda: _dt.date(2022, 10, 1)
         д, _ = fc.parse_fedresurs(чужое, inn)
         check(errors, д["реорганизация"] is None, "чужая реорганизация: %r" % д["реорганизация"])
+        будущее = copy.deepcopy(base)
+        for m in будущее["публикации"]["pageData"]:
+            m["datePublish"] = "2099-09-28T09:46:26.773"
+        д, av = fc.parse_fedresurs(будущее, inn)
+        check(errors, av["состояние"] == "не проверено" and str(av["причина"]).startswith("схема:"),
+              "дата из будущего дала сигнал: %r" % av)
         битое = copy.deepcopy(base)
         битое["публикации"]["pageData"][0]["datePublish"] = "2022-13-45T00:00:00"
         д, av = fc.parse_fedresurs(битое, inn)
