@@ -359,6 +359,30 @@ def case_j_manual_block(rv, snapshot, td):
     return errors
 
 
+def case_k_every_signal(rv, snapshot):
+    """Каждый путь «откуда» каталога сигналов: сигнал, поднявший живой светофор,
+    обязан пережить снимок — иначе ретро того же дня даёт 🟢 вместо 🔴/🟡
+    (так было с Федресурсом, РНП и СРО до 27.09.2026)."""
+    errors = []
+    каталог = rv.profiles.load()
+    for sid, сигнал in каталог["сигналы"].items():
+        for путь in сигнал.get("откуда") or []:
+            блок, _, поле = путь.partition(".")
+            if блок == "fin":
+                continue   # финансовые флаги считаются из «финансы», не из снимка поля
+            слепок = полный_снимок(**{блок: {поле: True}, "_доступность": {блок: _av("ok")}})
+            восстановленный, _ = rv.восстановить(snapshot.fingerprint(слепок))
+            for профиль in каталог["профили"]:
+                живой = rv.profiles.resolve(copy.deepcopy(слепок), None, профиль)["светофор"]
+                if живой in ("🟢", None):
+                    continue
+                ретро = rv.profiles.resolve(copy.deepcopy(восстановленный), None,
+                                            профиль)["светофор"]
+                check(errors, ретро == живой, "%s (%s), профиль %s: живой %s, ретро %s"
+                      % (sid, путь, профиль, живой, ретро))
+    return errors
+
+
 def main():
     rv = load_module("retro_verdict", SCRIPTS / "retro_verdict.py")
     snapshot = load_module("snapshot", SCRIPTS / "snapshot.py")
@@ -374,6 +398,7 @@ def main():
             "з-cli": case_h_cli(snapshot, td),
             "и-молчавший-источник-с-данными": case_i_silent_source(rv, snapshot, td),
             "к-ручной-блок-как-у-живого": case_j_manual_block(rv, snapshot, td),
+            "л-каждый-сигнал-переживает-снимок": case_k_every_signal(rv, snapshot),
         }
     failed = 0
     for name, errors in cases.items():

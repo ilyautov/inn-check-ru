@@ -404,7 +404,7 @@ SOURCES = {
         "требует": "сеть",
         "deal_killer": False,
         "фаза": "досье",
-        "профили": "*",
+        "профили": ["нейтрально", "подрядчик", "тендер"],
         "probe": {"url": "https://reestr.nostroy.ru/", "method": "GET",
                   "ok_http": [200], "ожидаем": "html"},
         "контракт": ["inn", "member_status", "sro"],

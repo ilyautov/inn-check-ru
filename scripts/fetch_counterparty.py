@@ -79,6 +79,7 @@ import datetime as _dt
 import http.cookiejar
 import importlib.util
 import json
+import math
 import os
 import re
 import socket
@@ -2111,12 +2112,27 @@ def _rec_contracts(raw, inn):
 
 
 def _число(v):
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
+    """Конечное неотрицательное число (сумма): 1e400 и -1 — дрейф, а не данные."""
+    return (isinstance(v, (int, float)) and not isinstance(v, bool)
+            and math.isfinite(v) and v >= 0)
+
+
+def _счётчик(v):
+    return _число(v) and float(v).is_integer()
+
+
+def _дата_контракта(v):
+    """«ГГГГ-ММ-ДД» (и хвост времени после T/пробела) с настоящей календарной датой."""
+    if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[T ].*)?", v):
+        return None
+    try:
+        return _dt.date.fromisoformat(v[:10])
+    except ValueError:
+        return None
 
 
 def _контракт_ок(c, inn):
-    return (isinstance(c, dict) and isinstance(c.get("sign_date"), str)
-            and bool(_ДАТА_ISO_ПРЕФИКС.match(c["sign_date"]))
+    return (isinstance(c, dict) and _дата_контракта(c.get("sign_date")) is not None
             and isinstance(c.get("supplier_inns"), list) and str(inn) in c["supplier_inns"]
             and (c.get("amount_rur") is None or _число(c.get("amount_rur"))))
 
@@ -2126,6 +2142,8 @@ def parse_contracts(raw, inn):
     блок «контракты». Госзатраты — зеркало ЕИС (zakupki.gov.ru с не-РФ сети не
     открывается), а не первоисточник: свежесть — дата последнего контракта в выдаче.
     Факт без цвета: контракты — противовес «пустышке», их отсутствие не стоп.
+    «Последний контракт» — последний НАЙДЕННЫЙ в зеркале; свежесть и полнота зеркала
+    не установлены.
     is_unfair показывается как есть и сигналом не считается: true живьём не видели."""
     if not isinstance(raw, dict) or "поставщик" not in raw:
         return _not_checked("контракты", "схема: нет карточки поставщика")
@@ -2140,7 +2158,9 @@ def parse_contracts(raw, inn):
     if missing:
         return _not_checked("контракты", "схема: не найдено поле %s" % missing)
     итоги = rec["totals"]
-    if not isinstance(итоги, dict) or not all(_число(итоги.get(k)) for k in ГОСЗАТРАТЫ_ИТОГИ):
+    if not isinstance(итоги, dict) or not all(
+            (_счётчик if k.endswith("_count") else _число)(итоги.get(k))
+            for k in ГОСЗАТРАТЫ_ИТОГИ):
         return _not_checked("контракты", "схема: не найдено поле totals с числами контрактов")
     выдача = _g(raw, "контракты", "data")
     if not isinstance(выдача, list) or not all(_контракт_ок(c, inn) for c in выдача):
@@ -2160,7 +2180,13 @@ def parse_contracts(raw, inn):
         "источник": "Госзатраты (clearspending.ru) — зеркало ЕИС; zakupki.gov.ru с "
                     "не-РФ сети недоступен",
     }
-    if выдача:
+    даты = [_дата_контракта(c["sign_date"]) for c in выдача]
+    по_дате = _g(raw, "контракты", "page") == 1 and all(
+        a >= b for a, b in zip(даты, даты[1:]))
+    if выдача and not по_дате:
+        данные["примечание"] = ("выдача не первая страница или не по убыванию даты — "
+                                "последний контракт не установлен")
+    elif выдача:
         c = выдача[0]
         данные["последний_контракт"] = {
             "дата": c["sign_date"][:10], "заказчик": c.get("customer_name"),
@@ -2207,7 +2233,7 @@ def fetch_contracts(opener, inn):
 НОСТРОЙ = "https://reestr.nostroy.ru"
 # Справочник статусов членства (dictionaries/get, 27.09.2026): «1» — «Является
 # членом», «2» — «Исключен». Статус права живьём видели только «Действует»;
-# иной текст показывается как есть и поднимает «право_не_действует».
+# иной текст показывается как есть, сигнал по нему не поднимается (None).
 НОСТРОЙ_ЧЛЕН = "1"
 НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ = "Действует"
 НОСТРОЙ_КАРТОЧЕК = 3   # действующих членств больше трёх не бывает на практике
@@ -2215,7 +2241,7 @@ def fetch_contracts(opener, inn):
 
 def _json_post_политика(opener, url, payload, referer, имя, шаг):
     """Один POST JSON, как его шлёт страница сайта: без повторов, 401/403/429 —
-    антибот, не-JSON или success≠true — антибот/схема."""
+    антибот, не-JSON — антибот. success≠true проверяет парсер (схема)."""
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST", headers={
         "User-Agent": UA_ПРОЕКТА, "Content-Type": "application/json",
@@ -2271,8 +2297,10 @@ def parse_sro(raw, inn):
         return _not_checked("сро", "схема: не найдено поле data.data поиска НОСТРОЙ")
     строки = выдача["data"]
     всего = выдача.get("count")
-    if not all(isinstance(r, dict) and isinstance(r.get("inn"), str) for r in строки):
-        return _not_checked("сро", "схема: не найдено поле inn в строке поиска")
+    if not all(isinstance(r, dict) and isinstance(r.get("inn"), str)
+               and re.fullmatch(r"\d{10}|\d{12}", r["inn"].strip()) for r in строки):
+        # пустой или битый ИНН в выдаче — не доказательство, что нашего там нет
+        return _not_checked("сро", "схема: не найдено поле inn (10 или 12 цифр) в строке поиска")
     if not isinstance(всего, int) or isinstance(всего, bool) or всего < len(строки):
         return _not_checked("сро", "схема: поле count поиска не число")
     свои = [r for r in строки if r["inn"].strip() == str(inn)]
@@ -2289,7 +2317,7 @@ def parse_sro(raw, inn):
                and isinstance(r["sro"], dict) for r in свои):
         return _not_checked("сро", "схема: не найдено поле member_status/sro членства")
     карточки = raw.get("карточки") if isinstance(raw.get("карточки"), dict) else {}
-    членства, не_проверено = [], []
+    членства = []
     for r in свои:
         исключена = r["sro"].get("deactivate_message")
         запись = {"сро": r["sro"].get("full_description"),
@@ -2299,43 +2327,47 @@ def parse_sro(raw, inn):
                   # непустое — СРО исключена из госреестра СРО (живьём: приказ Ростехнадзора)
                   "сро_исключена_из_госреестра": исключена if _непустая(исключена) else None}
         if _код(r["member_status"]) == НОСТРОЙ_ЧЛЕН:
-            к = _g(карточки.get(str(r.get("id"))), "data")
-            право = к.get("right") if isinstance(к, dict) else None
-            право_ок = право is None or (isinstance(право, dict)
-                                         and bool(_титул(право.get("right_status"))))
-            if not isinstance(к, dict) or not isinstance(к.get("checks"), list) \
-                    or not право_ок:
-                не_проверено.append(запись["сро"])
-                запись["право"] = None
-            else:
-                # права в карточке нет (живьём — у членства в исключённой СРО):
-                # это ответ реестра, а не пропуск
-                запись.update({
-                    "право": _титул(право["right_status"]) if право else "нет сведений о праве",
-                    "уровень_ответственности_вв": _титул(к.get("responsibility_level_vv")),
-                    "уровень_ответственности_одо": _титул(к.get("responsibility_level_odo")),
-                    "особо_опасные_объекты": право.get("is_extremely_dangerous") if право else None,
-                    "атомные_объекты": право.get("is_nuclear") if право else None,
-                    "проверок_сро": len(к["checks"]),
-                })
+            ответ = карточки.get(str(r.get("id")))
+            к = _g(ответ, "data")
+            # карточка обязана быть успешной, с ключом right (null допустим — так
+            # реестр отвечает по членству в исключённой СРО) и списком проверок;
+            # иначе про право мы ничего не знаем — весь блок «не проверено»
+            if _g(ответ, "success") is not True or not isinstance(к, dict) \
+                    or "right" not in к or not isinstance(к.get("checks"), list) \
+                    or not (к["right"] is None or (isinstance(к["right"], dict)
+                                                   and _титул(к["right"].get("right_status")))):
+                return _not_checked("сро", "схема: карточка действующего членства (id %s) "
+                                           "не получена или без right/checks" % r.get("id"))
+            право = к["right"]
+            запись.update({
+                "право": _титул(право["right_status"]) if право else "нет сведений о праве",
+                "уровень_ответственности_вв": _титул(к.get("responsibility_level_vv")),
+                "уровень_ответственности_одо": _титул(к.get("responsibility_level_odo")),
+                "особо_опасные_объекты": право.get("is_extremely_dangerous") if право else None,
+                "атомные_объекты": право.get("is_nuclear") if право else None,
+                "проверок_сро": len(к["checks"]),
+            })
         членства.append(запись)
     действующие = [m for m, r in zip(членства, свои) if _код(r["member_status"]) == НОСТРОЙ_ЧЛЕН]
-    есть_право = any(m.get("право") == НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ for m in действующие)
+    есть_право = any(m["право"] == НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ for m in действующие)
+    # незнакомый статус права (живьём не видели) — не знаем, действует ли
+    неясно = any(m["право"] not in (НОСТРОЙ_ПРАВО_ДЕЙСТВУЕТ, "нет сведений о праве")
+                 for m in действующие)
     данные = {
         "членств_действующих": len(действующие),
         "членств_всего": len(свои),
-        # сигнал: действующие членства есть, но ни в одном право не «Действует»;
-        # не получена хоть одна карточка — не знаем (None), если право не нашлось
+        # сигнал: действующие членства есть, а права нет ни в одном (реестр явно не
+        # отдал право); незнакомый статус без действующего права — None
         "право_не_действует": (False if есть_право or not действующие
-                               else None if не_проверено else True),
+                               else None if неясно else True),
         "членства": членства,
         "реестр": НОСТРОЙ + "/",
         "источник": "единый реестр НОСТРОЙ (строительные СРО); проектировщики и "
                     "изыскатели (НОПРИЗ) не проверялись",
     }
-    if не_проверено:
-        данные["примечание"] = ("карточка членства не получена или не разобрана: %s"
-                                % "; ".join(str(x) for x in не_проверено))
+    if неясно and not есть_право:
+        данные["примечание"] = ("статус права, которого не было в живых ответах, — "
+                                "проверьте вручную: " + НОСТРОЙ + "/")
     return данные, _av("сро", "ok")
 
 
@@ -2352,6 +2384,8 @@ def raw_sro(opener, inn):
     for r in (строки if isinstance(строки, list) else []):
         if len(raw["карточки"]) >= НОСТРОЙ_КАРТОЧЕК:
             break
+        if isinstance(r, dict) and str(r.get("id")) in raw["карточки"]:
+            continue   # дубль строки — второй POST той же карточки не нужен
         if isinstance(r, dict) and str(r.get("inn") or "").strip() == str(inn) \
                 and _код(r.get("member_status")) == НОСТРОЙ_ЧЛЕН \
                 and isinstance(r.get("id"), int) and not isinstance(r.get("id"), bool):

@@ -29,6 +29,7 @@ import os
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -1267,7 +1268,8 @@ def case_contracts(fc):
         return fc.parse_contracts(raw, inn)
     д, av = разбор(lambda r: None)
     check(errors, av["состояние"] == "ok" and д["контрактов_всего"] == 881
-          and д["последний_контракт"]["дата"] == "2026-09-22",
+          and д["последний_контракт"]["дата"] == "2026-09-22"
+          and д["последний_контракт"]["сумма_руб"] == base["контракты"]["data"][0]["amount_rur"],
           "итог не из totals карточки или последний не первый по дате: %r" % д)
     for имя, правка in (
             ("сумма строкой", lambda r: r["поставщик"]["totals"].__setitem__(
@@ -1283,7 +1285,19 @@ def case_contracts(fc):
                 "amount_rur", "82000000")),
             ("data не список", lambda r: r["контракты"].__setitem__("data", {})),
             ("нет страницы контрактов", lambda r: r.pop("контракты")),
-            ("карточка чужого ИНН", lambda r: r["поставщик"].__setitem__("inn", "1"))):
+            ("карточка чужого ИНН", lambda r: r["поставщик"].__setitem__("inn", "1")),
+            ("число контрактов дробное", lambda r: r["поставщик"]["totals"].__setitem__(
+                "contracts44_count", 0.5)),
+            ("число контрактов отрицательное", lambda r: r["поставщик"]["totals"].__setitem__(
+                "contracts44_count", -881)),
+            ("сумма бесконечная", lambda r: r["поставщик"]["totals"].__setitem__(
+                "contracts_sum", float("inf"))),
+            ("сумма контракта отрицательная", lambda r: r["контракты"]["data"][1].__setitem__(
+                "amount_rur", -1)),
+            ("дата с мусором", lambda r: r["контракты"]["data"][0].__setitem__(
+                "sign_date", "2026-09-22garbage")),
+            ("дата не календарная", lambda r: r["контракты"]["data"][0].__setitem__(
+                "sign_date", "2026-99-99"))):
         д, av = разбор(правка)
         check(errors, av["состояние"] == "не проверено" and д is None
               and str(av["причина"]).startswith("схема:"), "%s: %r %r" % (имя, av, д))
@@ -1293,11 +1307,53 @@ def case_contracts(fc):
     д, av = разбор(lambda r: r["контракты"].__setitem__("data", []))
     check(errors, д["последний_контракт"] is None and "примечание" in д,
           "итоги есть, список пуст — без примечания: %r" % д)
+    for имя, правка in (
+            ("вторая страница", lambda r: r["контракты"].__setitem__("page", 2)),
+            ("нет page", lambda r: r["контракты"].pop("page")),
+            ("не по убыванию даты", lambda r: r["контракты"]["data"][0].__setitem__(
+                "sign_date", "2001-01-01"))):
+        д, av = разбор(правка)
+        check(errors, av["состояние"] == "ok" and д["последний_контракт"] is None
+              and "примечание" in д, "%s — «последний» утверждён: %r" % (имя, д))
     д, av = fc.parse_contracts({"поставщик": None}, inn)
     check(errors, av["состояние"] == "пусто" and д is None, "404 не «пусто»: %r" % av)
     for битое in (None, [], {"контракты": {}}):
         д, av = fc.parse_contracts(битое, inn)
         check(errors, av["состояние"] == "не проверено", "сырое %r: %r" % (битое, av))
+    # транспорт: два GET страницы поставщика, Referer и UA, без повторов и XHR
+    orig_get, журнал, статус = fc._http_get, [], {"поставщик": 200, "контракты": 200}
+
+    def фейк(opener, url, referer=None, accept=None, ua=None, повторы=True, xhr=True):
+        журнал.append((url, referer, ua, повторы, xhr))
+        шаг = "контракты" if "filtered-contracts" in url else "поставщик"
+        return статус[шаг], json.dumps(base[шаг], ensure_ascii=False)
+    fc._http_get = фейк
+    try:
+        д, av = fc.fetch_contracts(None, inn)
+        стр = fc.ГОСЗАТРАТЫ + "/suppliers/" + inn
+        check(errors, av["состояние"] == "ok" and [j[0] for j in журнал] == [
+            fc.ГОСЗАТРАТЫ + "/api/gw/suppliers/%s?format=json" % inn,
+            fc.ГОСЗАТРАТЫ + "/api/gw/filtered-contracts/?sort=-sign_date&page=1"
+                            "&supplier_inns=%s" % inn], "адреса: %r" % журнал)
+        check(errors, all(ref == стр and ua == fc.UA_ПРОЕКТА and not п and not x
+                          for _, ref, ua, п, x in журнал), "Referer/UA/повторы: %r" % журнал)
+        статус["поставщик"], n = 404, len(журнал)
+        д, av = fc.fetch_contracts(None, inn)
+        check(errors, av["состояние"] == "пусто" and len(журнал) == n + 1,
+              "404 — «пусто» одним запросом: %r" % av)
+        for шаг, код, префикс in (("поставщик", 403, "антибот:"), ("поставщик", 500, "сеть:"),
+                                  ("контракты", 429, "антибот:")):
+            статус.update(поставщик=200, контракты=200)
+            статус[шаг], n = код, len(журнал)
+            try:
+                fc.fetch_contracts(None, inn)
+                errors.append("%s %d: ожидалось SourceUnavailable" % (шаг, код))
+            except fc.SourceUnavailable as e:
+                check(errors, str(e).startswith(префикс)
+                      and len(журнал) == n + (1 if шаг == "поставщик" else 2),
+                      "%s %d: %r" % (шаг, код, str(e)))
+    finally:
+        fc._http_get = orig_get
     return errors
 
 
@@ -1323,11 +1379,9 @@ def case_sro(fc):
           and д["членства"][0]["сро_исключена_из_госреестра"] is None,
           "исключённая СРО не показана: %r" % д["членства"])
     for имя, правка, ждём in (
+            # статус, которого живьём не видели, — не сигнал, а «проверьте вручную»
             ("право приостановлено", lambda r: карточка(r, "5900384")["right"][
-                "right_status"].__setitem__("title", "Приостановлено"), True),
-            ("нет карточки действующего", lambda r: r["карточки"].pop("5900384"), None),
-            ("право строкой", lambda r: карточка(r, "5900384").__setitem__("right", "x"), None),
-            ("checks пропали", lambda r: карточка(r, "5900384").pop("checks"), None),
+                "right_status"].__setitem__("title", "Приостановлено"), None),
             ("действующее — в исключённой СРО", lambda r: (
                 r["поиск"]["data"]["data"].pop(0), r["поиск"]["data"].__setitem__("count", 2)),
              True)):
@@ -1341,10 +1395,24 @@ def case_sro(fc):
             ("статус без кода", lambda r: r["поиск"]["data"]["data"][0][
                 "member_status"].pop("code")),
             ("sro строкой", lambda r: r["поиск"]["data"]["data"][0].__setitem__("sro", "x")),
-            ("inn числом", lambda r: r["поиск"]["data"]["data"][0].__setitem__("inn", 1))):
+            ("inn числом", lambda r: r["поиск"]["data"]["data"][0].__setitem__("inn", 1)),
+            ("inn пустой", lambda r: r["поиск"]["data"]["data"][0].__setitem__("inn", "")),
+            # битая карточка действующего членства — про право ничего не знаем
+            ("нет карточки действующего", lambda r: r["карточки"].pop("5900384")),
+            ("карточка success false", lambda r: r["карточки"]["5900384"].__setitem__(
+                "success", False)),
+            ("нет ключа right", lambda r: карточка(r, "5900384").pop("right")),
+            ("право строкой", lambda r: карточка(r, "5900384").__setitem__("right", "x")),
+            ("право без статуса", lambda r: карточка(r, "5900384")["right"].pop(
+                "right_status")),
+            ("checks пропали", lambda r: карточка(r, "5900384").pop("checks"))):
         д, av = разбор(правка)
         check(errors, av["состояние"] == "не проверено" and д is None
               and str(av["причина"]).startswith("схема:"), "%s: %r" % (имя, av))
+    д, av = разбор(lambda r: карточка(r, "5900384")["right"]["right_status"].__setitem__(
+        "title", "Приостановлено"))
+    check(errors, "примечание" in д and д["членства"][0]["право"] == "Приостановлено",
+          "незнакомый статус права без примечания: %r" % д)
     д, av = разбор(lambda r: [x["member_status"].update(code="2", title="Исключен")
                               for x in r["поиск"]["data"]["data"]])
     check(errors, д["право_не_действует"] is False and д["членств_действующих"] == 0,
@@ -1364,6 +1432,49 @@ def case_sro(fc):
         сиг = {x.get("id"): x for x in profiles.extract_signals(fetch)}
         check(errors, (сиг.get("сро_право_не_действует") or {}).get("статус") == статус,
               "сигнал при %r: %r" % (значение, сиг.get("сро_право_не_действует")))
+    # транспорт: POST как у страницы, карточка — один раз на id, без повторов
+    журнал, статус = [], {"код": 200}
+    строки = copy.deepcopy(base["поиск"])
+    строки["data"]["data"].append(copy.deepcopy(строки["data"]["data"][0]))  # дубль строки
+
+    class Ответ:
+        def __init__(self, тело):
+            self.status, self.тело = 200, json.dumps(тело, ensure_ascii=False).encode()
+
+        def read(self):
+            return self.тело
+
+    class Opener:
+        def open(self, req, timeout=None):
+            журнал.append((req.full_url, req.get_method(), req.get_header("Referer"),
+                           req.get_header("User-agent"), json.loads(req.data)))
+            if статус["код"] != 200:
+                raise urllib.error.HTTPError(req.full_url, статус["код"], "x", {}, None)
+            if "/member/list" in req.full_url:
+                return Ответ(строки)
+            return Ответ(base["карточки"][req.full_url.split("/")[-2]])
+    orig_opener, orig_start = fc._make_opener, fc._START
+    fc._make_opener = lambda **kw: Opener()
+    fc._START = fc.time.monotonic()
+    try:
+        raw = fc.raw_sro(None, inn)
+        адреса = [j[0] for j in журнал]
+        check(errors, адреса[0] == fc.НОСТРОЙ + "/api/sro/all/member/list"
+              and журнал[0][4]["searchString"] == inn and len(адреса) == len(set(адреса))
+              and sorted(raw["карточки"]) == sorted(base["карточки"]),
+              "поиск и карточки без дублей: %r" % адреса)
+        check(errors, all(m == "POST" and ref == fc.НОСТРОЙ + "/" and ua == fc.UA_ПРОЕКТА
+                          for _, m, ref, ua, _ in журнал), "POST, Referer, UA: %r" % журнал)
+        for код, префикс in ((403, "антибот:"), (429, "антибот:"), (500, "сеть:")):
+            статус["код"], n = код, len(журнал)
+            try:
+                fc.raw_sro(None, inn)
+                errors.append("%d: ожидалось SourceUnavailable" % код)
+            except fc.SourceUnavailable as e:
+                check(errors, str(e).startswith(префикс) and len(журнал) == n + 1,
+                      "%d: %s одним запросом: %r" % (код, префикс, str(e)))
+    finally:
+        fc._make_opener, fc._START = orig_opener, orig_start
     return errors
 
 
