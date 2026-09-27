@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>inn-check-ru</title>
+<style>
+  :root {
+    --фон: #ffffff; --текст: #1c1b1f; --тише: #5f5b66; --рамка: #d6d3dc;
+    --поле: #f7f6f9; --акцент: #2f5bb7; --акцент-текст: #ffffff;
+    --красный: #b3261e; --жёлтый: #8a5a00; --зелёный: #1b6e3a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --фон: #1c1b1f; --текст: #ece9f0; --тише: #b0abb8; --рамка: #45414c;
+      --поле: #26242a; --акцент: #9db8f5; --акцент-текст: #10131a;
+      --красный: #f2b8b5; --жёлтый: #f0c26b; --зелёный: #8fd6a4;
+    }
+  }
+  body { margin: 0; width: 360px; background: var(--фон); color: var(--текст);
+         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { padding: 12px 14px 14px; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; }
+  section { border-top: 1px solid var(--рамка); padding-top: 8px; margin-top: 10px; }
+  section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+  .тише { color: var(--тише); }
+  .ошибка { color: var(--красный); }
+  .свет { font-size: 18px; margin-right: 6px; }
+  label { display: block; margin: 6px 0 2px; }
+  input[type=text], input[type=date], input[type=number], textarea, select {
+    width: 100%; box-sizing: border-box; padding: 5px 7px; border-radius: 6px;
+    border: 1px solid var(--рамка); background: var(--поле); color: var(--текст);
+    font: inherit;
+  }
+  textarea { min-height: 44px; resize: vertical; }
+  .ряд { display: flex; gap: 12px; align-items: center; margin: 4px 0; }
+  .ряд label { display: inline; margin: 0; }
+  button { margin-top: 10px; margin-right: 6px; padding: 6px 12px; border-radius: 6px;
+           border: 1px solid var(--акцент); background: var(--акцент);
+           color: var(--акцент-текст); font: inherit; cursor: pointer; }
+  button.вторая { background: transparent; color: var(--акцент); }
+  button:disabled { opacity: .5; cursor: default; }
+  :focus-visible { outline: 2px solid var(--акцент); outline-offset: 1px; }
+  ul { margin: 4px 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>inn-check-ru</h1>
+
+  <section id="проверка">
+    <div id="результат" class="тише">Выделите ИНН на любой странице и выберите
+      «Проверить ИНН в inn-check-ru» в контекстном меню.</div>
+    <label for="профиль">Профиль проверки</label>
+    <select id="профиль"></select>
+  </section>
+
+  <section id="форма" hidden>
+    <h2 id="заголовок-формы">Ручной блок</h2>
+    <div class="тише">Страница: <span id="страница"></span></div>
+    <label for="инн">ИНН контрагента</label>
+    <input id="инн" type="text" inputmode="numeric" autocomplete="off">
+    <div class="ряд" role="radiogroup" aria-label="Итог">
+      <label><input type="radio" name="итог" value="проверено" checked> проверено</label>
+      <label><input type="radio" name="итог" value="не проверено"> не проверено</label>
+    </div>
+    <div id="поля"></div>
+    <div id="про-причину" hidden>
+      <label for="причина">Почему не проверено</label>
+      <input id="причина" type="text" placeholder="капча не пройдена, поиск не завершён…">
+    </div>
+    <label for="найдено">Что найдено (без ФИО физлиц)</label>
+    <textarea id="найдено" maxlength="500"></textarea>
+    <label for="параметры">Параметры поиска</label>
+    <input id="параметры" type="text" maxlength="500" placeholder="ИНН, роль, период">
+    <label for="дата">Дата проверки</label>
+    <input id="дата" type="date">
+    <div class="ряд">
+      <label><input id="без-фио" type="checkbox"> на экране нет ФИО физлиц</label>
+    </div>
+    <button id="сохранить">Сохранить блок</button>
+    <button id="со-снимком" class="вторая">Блок и снимок в пакет</button>
+    <div id="итог-формы" role="status"></div>
+  </section>
+
+  <section id="не-реестр" class="тише" hidden>
+    Форма ручного блока открывается на страницах fssp.gov.ru и kad.arbitr.ru.
+  </section>
+</main>
+<script type="module" src="popup.js"></script>
+</body>
+</html>

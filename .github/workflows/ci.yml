@@ -118,6 +118,12 @@ jobs:
       - name: "ручной блок: форма знает поля сигналов, вклейка не трогает пакет"
         run: python3 eval/run_manual_block_eval.py
 
+      - name: "native-хост расширения: кадры, граница доверия, пакет, установка"
+        run: python3 eval/run_native_host_eval.py
+
+      - name: "браузерное расширение: манифест, права, сверка с Python, lib.js в Node"
+        run: python3 eval/run_extension_eval.py
+
       - name: колесо содержит canon и CLI работает из чистого venv
         shell: bash
         run: |

@@ -71,6 +71,8 @@ py-modules = [
   "extract_inn",
   "domain_check",
   "manual_block",
+  "native_host",
+  "install_native_host",
 ]
 packages = ["inn_check_ru_mcp", "inn_check_ru_data"]
 

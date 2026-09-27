@@ -51,6 +51,7 @@ def checks(v):
     json_version(".codex-plugin/plugin.json", "version")
     json_version(".cursor-plugin/plugin.json", "version")
     json_version("gemini-extension.json", "version")
+    json_version("extension/manifest.json", "version")
 
     ch = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     m = re.search(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\]", ch, re.MULTILINE)

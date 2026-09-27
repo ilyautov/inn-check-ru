@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "inn-check-ru",
+  "version": "1.12.2",
+  "description": "Проверка контрагента по ИНН с любой страницы и ручные блоки ФССП и судов — через локальный движок inn-check-ru.",
+  "permissions": ["activeTab", "contextMenus", "nativeMessaging", "storage"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": {
+    "default_title": "inn-check-ru",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+  },
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+}
