@@ -165,6 +165,11 @@ def удалить(браузер="chrome", дом=None, платформа=None
 
 
 def main(argv):
+    # перенаправленный вывод на Windows — в ANSI (cp1252): русский текст упал бы
+    # после успешной установки (ревью Codex); консоль Python пишет сам
+    for поток in (sys.stdout, sys.stderr):
+        if not поток.isatty():
+            поток.reconfigure(encoding="utf-8")
     args = argv[1:]
     браузер = "chrome"
     if "--браузер" in args:

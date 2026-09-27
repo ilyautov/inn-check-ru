@@ -92,6 +92,14 @@ def main():
     finally:
         удалено = inst.удалить("chrome")
     check(errors, len(удалено) == 3 and not bat.exists(), "удаление: %r" % удалено)
+    # CLI с перенаправленным выводом (ANSI-кодировка раннера): русский текст
+    # не должен ронять уже сделанную установку
+    скрипт = str(ROOT / "scripts" / "install_native_host.py")
+    for argv in (["--id", ID, "--браузер", "edge"], ["--удалить", "--браузер", "edge"]):
+        proc = subprocess.run([sys.executable, скрипт, *argv], capture_output=True,
+                              timeout=60, check=False)
+        check(errors, proc.returncode == 0, "CLI %s: код %d, %r" % (
+            argv[0], proc.returncode, proc.stderr[-300:]))
     try:
         winreg.OpenKey(winreg.HKEY_CURRENT_USER, inst.ключ_реестра("chrome")).Close()
         errors.append("ключ реестра остался после удаления")
