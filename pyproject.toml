@@ -59,6 +59,7 @@ py-modules = [
   "sevenzip",
   "fsa_registries",
   "erknm",
+  "minpromtorg",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",

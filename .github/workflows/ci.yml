@@ -235,6 +235,9 @@ jobs:
       - name: "ЕРКНМ: помесячные выгрузки proverki.gov.ru, устоявшиеся месяцы, индекс частями, блок (офлайн)"
         run: python3 eval/run_erknm_eval.py
 
+      - name: "Минпромторг: лицензии на лекарства и ПП 719, 404 у версии, схема, блок (офлайн)"
+        run: python3 eval/run_minpromtorg_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 
