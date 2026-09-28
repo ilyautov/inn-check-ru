@@ -48,6 +48,7 @@ py-modules = [
   "fetch_counterparty",
   "rzn_licenses",
   "pledge_text",
+  "disq_dump",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",
