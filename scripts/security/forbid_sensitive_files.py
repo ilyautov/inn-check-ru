@@ -24,6 +24,20 @@ ALLOW = [
     ".env.example", "example.credentials.json", "credentials.example.json",
     ".mcp.json",  # plugin distribution manifest — secret-free, scanned by scan_mcp_config.py
 ]
+# Public CA certificates (exact paths). rospatent.gov.ru does not send its intermediate,
+# so rospatent_tz.py ships it. Content is checked: certificates only, no private key.
+ALLOW_CERTS = [
+    "data/ca/globalsign_gcc_r3_dv_tls_ca_2020.pem",
+]
+
+
+def only_certificates(path: str) -> bool:
+    try:
+        text = Path(path).read_text(encoding="ascii")
+    except (OSError, UnicodeDecodeError):
+        return False
+    begins = [line for line in text.splitlines() if line.startswith("-----BEGIN ")]
+    return bool(begins) and all(line == "-----BEGIN CERTIFICATE-----" for line in begins)
 
 
 def git_files(all_files: bool) -> list[str]:
@@ -48,6 +62,8 @@ def main() -> int:
     blocked = []
     for path in git_files(args.all):
         if matches(path, ALLOW):
+            continue
+        if path in ALLOW_CERTS and only_certificates(path):
             continue
         if matches(path, DENY):
             blocked.append(path)
