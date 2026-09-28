@@ -25,6 +25,9 @@ proxy.py — пользовательский прокси одной точко
     INN_CHECK_PROXY=http://host:3128        # переменная проекта
     HTTPS_PROXY=http://host:3128            # общая переменная окружения
 
+SOCKS5 тоже годится: INN_CHECK_PROXY=socks5://host:1080 (клиент на stdlib в
+socks5.py, имя хоста резолвит прокси). Через SOCKS5 ходит только https.
+
 С логином — http://<логин>:<пароль>@host:3128. Угловые скобки здесь не часть
 синтаксиса, а защита от сканера секретов: образец вида «логин:пароль@хост» в
 исходнике TruffleHog считает утечкой и роняет CI (проверено 22.09.2026).
@@ -35,17 +38,20 @@ proxy.py — пользовательский прокси одной точко
 означает раскрыть его ровно в тот момент, когда этого не ждут.
 """
 
+import base64
 import hashlib
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 
 ПЕРЕМЕННЫЕ = ("INN_CHECK_PROXY", "HTTPS_PROXY", "https_proxy")
-СХЕМЫ = ("http", "https")
-# socks stdlib не умеет: urllib знает только http/https-прокси. Молча
-# проигнорировать socks5 нельзя — пользователь будет думать, что ходит через
-# ноду, а трафик пойдёт напрямую с его IP.
-СХЕМЫ_БЕЗ_ПОДДЕРЖКИ = ("socks4", "socks4a", "socks5", "socks5h")
+СХЕМЫ = ("http", "https", "socks5", "socks5h")
+SOCKS = ("socks5", "socks5h")
+# SOCKS5 — свой клиент на stdlib (socks5.py, DNS на стороне прокси). SOCKS4 не
+# умеем: молча проигнорировать его нельзя — пользователь будет думать, что ходит
+# через ноду, а трафик пойдёт напрямую с его IP.
+СХЕМЫ_БЕЗ_ПОДДЕРЖКИ = ("socks4", "socks4a")
 
 
 def маска(url):
@@ -57,8 +63,13 @@ def маска(url):
     except ValueError:
         return "(URL не разобран)"
     if not p.hostname:
-        return url
-    хост = p.hostname + (":%d" % p.port if p.port else "")
+        # без хоста логин и пароль не отделить — URL целиком не показываем (ревью Codex)
+        return "%s://(без хоста)" % p.scheme if p.scheme else "(URL без хоста)"
+    try:
+        порт = p.port
+    except ValueError:
+        порт = None
+    хост = p.hostname + (":%d" % порт if порт else "")
     if p.username:
         хост = "%s:***@%s" % (p.username, хост) if p.password else "%s@%s" % (p.username, хост)
     return "%s://%s" % (p.scheme, хост)
@@ -87,17 +98,21 @@ def _проверить(url):
     except ValueError as e:
         return "URL прокси не разобран: %s" % e
     if p.scheme in СХЕМЫ_БЕЗ_ПОДДЕРЖКИ:
-        return ("схема %s не поддерживается: стандартная библиотека умеет только "
-                "http/https-прокси, а тащить зависимость ради socks проект не "
-                "будет. Поднимите http-прокси или SSH-туннель "
-                "(ssh -D работает по socks, ssh -L — по http)" % p.scheme)
+        return ("схема %s не поддерживается: годятся http/https-прокси и socks5 "
+                "(ssh -D даёт socks5, ssh -L — http)" % p.scheme)
     if p.scheme not in СХЕМЫ:
-        return ("схема %r не годится: ожидается http:// или https:// "
-                "(получено %r)" % (p.scheme or "нет", url))
+        return ("схема %r не годится: ожидается http://, https:// или socks5:// "
+                "(получено %r)" % (p.scheme or "нет", маска(url)))
     if not p.hostname:
-        return "в URL прокси нет хоста: %r" % url
-    if p.port is not None and not (0 < p.port < 65536):
-        return "порт прокси вне диапазона: %r" % url
+        return "в URL прокси нет хоста: %r" % маска(url)
+    try:
+        порт = p.port
+    except ValueError:
+        return "порт прокси вне диапазона: %r" % маска(url)
+    if p.scheme in SOCKS and not порт:
+        return "у socks5-прокси нужен порт: %r" % маска(url)
+    if порт is not None and not (0 < порт < 65536):
+        return "порт прокси вне диапазона: %r" % маска(url)
     return None
 
 
@@ -140,7 +155,56 @@ def handler(url):
     """
     if not url:
         return urllib.request.ProxyHandler({})
-    return urllib.request.ProxyHandler({"http": url, "https": url})
+    if urllib.parse.urlsplit(url).scheme in SOCKS:
+        # socks ProxyHandler'ом не выражается: см. обработчики()
+        raise ValueError("socks5-прокси подключается через proxy.обработчики()")
+    return _ProxyHandlerБезОбхода({"http": url, "https": url})
+
+
+class _ProxyHandlerБезОбхода(urllib.request.ProxyHandler):
+    """ProxyHandler без исключений NO_PROXY и системных исключений macOS: стандартный
+    пускает такие хосты напрямую, и IP раскрылся бы там, где его прячут (ревью
+    Codex). Остальное — как в stdlib: Basic-авторизация на прокси, CONNECT для https."""
+
+    def proxy_open(self, req, proxy, type):
+        исходный = req.type
+        тип, логин, пароль, хост = urllib.request._parse_proxy(proxy)
+        тип = тип or исходный
+        if логин and пароль:
+            пара = "%s:%s" % (urllib.parse.unquote(логин), urllib.parse.unquote(пароль))
+            req.add_header("Proxy-authorization",
+                           "Basic " + base64.b64encode(пара.encode()).decode("ascii"))
+        req.set_proxy(urllib.parse.unquote(хост), тип)
+        if исходный == тип or исходный == "https":
+            return None
+        return self.parent.open(req, timeout=req.timeout)
+
+
+class _ТолькоHTTPчерезПрокси(urllib.request.BaseHandler):
+    """ftp://, file:// и data: через прокси не идут: редирект https -> ftp ушёл бы
+    напрямую, мимо прокси (ревью Codex). handler_order меньше стандартного (500)."""
+    handler_order = 100
+
+    def _отказ(self, req):
+        raise urllib.error.URLError("через прокси разрешены только http(s)://")
+
+    ftp_open = file_open = data_open = _отказ
+
+
+def обработчики(url, context):
+    """Хендлеры urllib для прокси url (или прямого соединения) с TLS-контекстом.
+
+    http/https-прокси — ProxyHandler + HTTPSHandler; socks5 — пустой
+    ProxyHandler (переменные окружения не подхватываются), HTTPS через туннель
+    SOCKS5 и отказ для http:// (иначе он ушёл бы напрямую, мимо прокси)."""
+    if url and urllib.parse.urlsplit(url).scheme in SOCKS:
+        import socks5
+        return [urllib.request.ProxyHandler({}), socks5.SocksHTTPSHandler(url, context),
+                socks5._ТолькоHTTPS()]
+    if url:
+        return [handler(url), urllib.request.HTTPSHandler(context=context),
+                _ТолькоHTTPчерезПрокси()]
+    return [handler(url), urllib.request.HTTPSHandler(context=context)]
 
 
 def описание(конф, insecure=False):

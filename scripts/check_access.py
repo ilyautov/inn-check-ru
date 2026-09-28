@@ -147,8 +147,7 @@ def make_requester(ctx=None, прокси_url=None):
         # Явный ProxyHandler в обоих случаях: пустой отключает подхват переменных
         # окружения, иначе «прямой» прогон мог бы незаметно уйти через HTTPS_PROXY
         # и отчёт сказал бы «доступно с вашей сети» про чужую.
-        proxy.handler(прокси_url),
-        urllib.request.HTTPSHandler(context=ctx), _NoRedirect())
+        *proxy.обработчики(прокси_url, ctx), _NoRedirect())
 
     def requester(url, method, timeout, referer=None, ua=None):
         headers = {"User-Agent": ua or UA, "Accept": "application/json, text/html, */*",

@@ -226,6 +226,9 @@ jobs:
       - name: "товарные знаки Роспатента: индекс, схема, обрыв потока, блок (офлайн)"
         run: python3 eval/run_rospatent_tz_eval.py
 
+      - name: "реестры ФТС, РКН, РАР и загрузка через прокси: индекс, схема, обрыв, блок (офлайн)"
+        run: python3 eval/run_ru_opendata_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 

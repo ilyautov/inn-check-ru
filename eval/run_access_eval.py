@@ -393,7 +393,8 @@ def case_proxy_marks_report(ca):
 def case_proxy_hard_refusal(ca):
     """Негодный прокси — отказ, а не тихий уход напрямую."""
     errors = []
-    for url, что in (("socks5://host:1080", "socks"),
+    for url, что in (("socks4://host:1080", "socks4"),
+                     ("socks5://host", "socks5 без порта"),
                      ("ftp://host", "чужая схема"),
                      ("http://", "нет хоста")):
         конф = ca.proxy.настройка(url, env={})
@@ -402,14 +403,18 @@ def case_proxy_hard_refusal(ca):
               "%s: при ошибке url обязан быть None, иначе пойдём через мусор" % url)
         check(errors, конф["отпечаток"] == "прямое",
               "%s: отпечаток при ошибке" % url)
-    конф = ca.proxy.настройка("socks5://host:1080", env={})
+    конф = ca.proxy.настройка("socks4://host:1080", env={})
     текст = конф["ошибка"] or ""
     check(errors, "socks" in текст and "http" in текст,
-          "про socks надо сказать прямо и подсказать замену: %r" % конф["ошибка"])
+          "про socks4 надо сказать прямо и подсказать замену: %r" % конф["ошибка"])
+    # socks5 принимается: свой клиент на stdlib, пароль в маске скрыт
+    конф = ca.proxy.настройка("socks5://u:p4ss@rf.example:1080", env={})
+    check(errors, конф["ошибка"] is None and конф["url"] and "p4ss" not in конф["маска"],
+          "socks5 должен приниматься: %r" % конф)
     # Главное: код возврата, а не «ну ладно, сходим напрямую».
     буфер = io.StringIO()
     with contextlib.redirect_stdout(буфер):
-        код = ca.main(["check_access.py", "--json", "--прокси", "socks5://host:1080"])
+        код = ca.main(["check_access.py", "--json", "--прокси", "socks4://host:1080"])
     check(errors, "ошибка" in буфер.getvalue(),
           "отказ должен быть виден в stdout: %r" % буфер.getvalue()[:120])
     check(errors, код == 2, "main с негодным прокси должен вернуть 2, вернул %r" % код)

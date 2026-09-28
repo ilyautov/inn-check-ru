@@ -835,6 +835,22 @@ def case_proxy(fc):
               "opener не ходит через заданный прокси: %r"
               % (прокси_хендлеры[0].proxies if прокси_хендлеры else None))
 
+        # 5б. socks5: HTTPS через туннель, ни одного живого ProxyHandler (иначе
+        #     urllib подхватил бы переменные окружения), http:// — отказ, а не
+        #     прямое соединение мимо прокси.
+        fc.установить_прокси("socks5://u:p4ss@rf.example:1080")
+        оп = fc._make_opener()
+        check(errors, any(type(h).__name__ == "SocksHTTPSHandler" for h in оп.handlers)
+              and not [h for h in оп.handlers
+                       if isinstance(h, urllib.request.ProxyHandler) and h.proxies],
+              "socks5 не попал в opener: %r" % оп.handlers)
+        try:
+            оп.open("http://example.invalid/", timeout=2)
+            errors.append("http:// через socks5-opener ушёл напрямую")
+        except Exception as e:
+            check(errors, "только https" in str(e), "http:// упал не отказом: %r" % e)
+        fc.установить_прокси(None)
+
         # 6. Прямое соединение — ЯВНО прямое. urllib по умолчанию подхватывает
         #    ЛЮБУЮ переменную вида *_proxy (ALL_PROXY, ftp_proxy…), а проект
         #    честно знает только про три. Без явного пустого ProxyHandler трафик
@@ -854,8 +870,8 @@ def case_proxy(fc):
             os.environ.pop("ALL_PROXY", None)
 
         # 7. Негодный URL — отказ на уровне opener'а, а не тихий прямой выход.
-        ошибка = fc.установить_прокси("socks5://host:1080")
-        check(errors, ошибка, "socks5 обязан быть отвергнут")
+        ошибка = fc.установить_прокси("socks4://host:1080")
+        check(errors, ошибка, "socks4 обязан быть отвергнут")
         try:
             fc._make_opener()
         except ValueError as e:
