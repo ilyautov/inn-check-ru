@@ -1007,12 +1007,18 @@ def fetch_msp(opener, inn):
 # НПД — npd.nalog.ru
 # ---------------------------------------------------------------------------
 
-NPD_NOTE = ("схема по официальному описанию API (npd.nalog.ru/check-status); "
-            "живой прогон — с РФ-IP (с не-РФ IP 406/403, проверено 19.09.2026)")
+# Живьём 28.09.2026: старый адрес npd.nalog.ru/api/v1/status отдаёт 406 «доступ
+# ограничен владельцем» с любого IP, а адрес из официального описания API
+# (statusnpd.nalog.ru, PDF 2019 года) больше не резолвится. Работает сама страница
+# проверки: ASP.NET-форма без капчи отправляется на себя (multipart, как браузер),
+# ответ — в span lblInfo. Лимит ФНС — 2 запроса в минуту с одного IP.
+NPD_СТРАНИЦА = "https://npd.nalog.ru/check-status/"
+NPD_NOTE = ("форма страницы npd.nalog.ru/check-status (API-адрес больше не работает, "
+            "28.09.2026); лимит ФНС — 2 запроса в минуту с одного IP")
 
 
 def _parse_npd(j, inn):
-    """Разбор ответа npd.nalog.ru check-status (совместимость: dict или None)."""
+    """Разбор ответа (совместимость: dict или None)."""
     if not isinstance(j, dict):
         return None
     status = j.get("status")
@@ -1026,17 +1032,46 @@ def _parse_npd(j, inn):
     }
 
 
+def _multipart(поля):
+    граница = "----inn-check-ru-" + os.urandom(12).hex()
+    тело = b"".join(("--%s\r\nContent-Disposition: form-data; name=\"%s\"\r\n\r\n%s\r\n"
+                     % (граница, k, v)).encode("utf-8") for k, v in поля.items())
+    return тело + ("--%s--\r\n" % граница).encode("ascii"), граница
+
+
+def разобрать_ответ_npd(text, inn):
+    """HTML ответа формы -> {"status", "message"}; SourceUnavailable, если ответа
+    нет или он не распознан (не выдумываем «не самозанятый»)."""
+    m = re.search(r'<span id="ctl00_ctl00_lblInfo"[^>]*>(.*?)</span>', text or "", re.DOTALL)
+    if not m:
+        raise SourceUnavailable("схема: на странице НПД нет поля ответа lblInfo")
+    сообщение = " ".join(html.unescape(re.sub(r"<[^>]+>", " ", m.group(1))).split())
+    if re.fullmatch(r"%s не является плательщиком налога на профессиональный доход\.?"
+                    % re.escape(str(inn)), сообщение):
+        return {"status": False, "message": сообщение}
+    if re.fullmatch(r"%s является плательщиком налога на профессиональный доход\.?"
+                    % re.escape(str(inn)), сообщение):
+        return {"status": True, "message": сообщение}
+    if not сообщение:
+        raise SourceUnavailable("схема: НПД вернул пустой ответ")
+    raise SourceUnavailable("схема: ответ НПД не распознан: %s" % сообщение[:200])
+
+
 def raw_npd(opener, inn):
-    url = "https://npd.nalog.ru/api/v1/status"
-    body = json.dumps({"inn": str(inn),
-                       "date": time.strftime("%d.%m.%Y")}).encode("utf-8")
-    headers = {"User-Agent": UA, "Accept": "application/json",
-               "Content-Type": "application/json",
-               "Referer": "https://npd.nalog.ru/check-status/"}
-    j = _safe_json(_http_post(opener, url, body, headers))
-    if j is None:
-        raise SourceUnavailable("схема: npd вернул не-JSON")
-    return j
+    статус, page = _http_get(opener, NPD_СТРАНИЦА, ua=UA_ПРОЕКТА, повторы=False, xhr=False,
+                             accept="text/html,application/xhtml+xml")
+    if статус != 200:
+        raise SourceUnavailable(_http_status_reason(статус, "странице НПД"))
+    поля = {k: html.unescape(v) for k, v in re.findall(
+        r'<input type="hidden" name="(__[A-Z]+)" id="[^"]*" value="([^"]*)"', page)}
+    if "__VIEWSTATE" not in поля or "ctl00$ctl00$tbINN" not in page:
+        raise SourceUnavailable("схема: форма НПД изменилась (нет __VIEWSTATE или поля ИНН)")
+    поля.update({"ctl00$ctl00$tbINN": str(inn), "ctl00$ctl00$tbDate": time.strftime("%d-%m-%Y"),
+                 "ctl00$ctl00$btSend": "Найти"})
+    тело, граница = _multipart(поля)
+    return разобрать_ответ_npd(_http_post(opener, NPD_СТРАНИЦА, тело, {
+        "User-Agent": UA_ПРОЕКТА, "Referer": NPD_СТРАНИЦА,
+        "Content-Type": "multipart/form-data; boundary=" + граница}), inn)
 
 
 def parse_npd(raw, inn):
@@ -1050,6 +1085,8 @@ def parse_npd(raw, inn):
 
 
 def fetch_npd(opener, inn):
+    if not re.fullmatch(r"\d{12}", str(inn)):
+        return _not_checked("нпд", "профиль: НПД бывает только у физлиц и ИП (ИНН из 12 цифр)")
     return parse_npd(raw_npd(opener, inn), inn)
 
 

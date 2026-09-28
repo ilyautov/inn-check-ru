@@ -77,6 +77,72 @@ def case_npd(fc):
     check(errors, out.get("сообщение"), "нет сообщения НПД")
     check(errors, fc._parse_npd("<html>406</html>", "1") is None,
           "не-JSON НПД должен деградировать в None")
+
+    # форма страницы npd.nalog.ru/check-status (ASP.NET, multipart, ответ в lblInfo)
+    инн = "504110181262"
+    форма = ('<form method="post" action="./" id="MainForm" enctype="multipart/form-data">'
+             '<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="a&amp;b" />'
+             '<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" '
+             'value="112E02C5" /><input name="ctl00$ctl00$tbINN" type="text" /></form>')
+
+    def ответ(текст):
+        return форма + '<span id="ctl00_ctl00_lblInfo">%s</span>' % текст
+
+    class _Ответ:
+        def __init__(self, тело):
+            self.status, self._тело = 200, тело.encode("utf-8")
+
+        def read(self, *a):
+            return self._тело
+
+    class _Опенер:
+        def __init__(self, страница, итог):
+            self.ответы, self.запросы = [страница, итог], []
+
+        def open(self, req, timeout=None):
+            self.запросы.append(req)
+            return _Ответ(self.ответы.pop(0))
+
+    for текст, ждём in (("%s является плательщиком налога на профессиональный доход" % инн, True),
+                        ("%s не является плательщиком налога на профессиональный доход" % инн,
+                         False)):
+        оп = _Опенер(форма, ответ(текст))
+        данные, av = fc.fetch_npd(оп, инн)
+        check(errors, av["состояние"] == "ok" and данные["статус_нпд"] is ждём,
+              "НПД %s: %r %r" % (ждём, данные, av))
+        get, post = оп.запросы
+        тело = post.data.decode("utf-8")
+        check(errors, post.full_url == fc.NPD_СТРАНИЦА and post.get_header("Referer")
+              == fc.NPD_СТРАНИЦА and post.get_header("User-agent") == fc.UA_ПРОЕКТА
+              and get.get_header("User-agent") == fc.UA_ПРОЕКТА
+              and "multipart/form-data; boundary=" in post.get_header("Content-type"),
+              "НПД: заголовки %r" % post.headers)
+        check(errors, 'name="ctl00$ctl00$tbINN"\r\n\r\n%s\r\n' % инн in тело
+              and 'name="__VIEWSTATE"\r\n\r\na&b\r\n' in тело
+              and 'name="ctl00$ctl00$btSend"' in тело, "НПД: тело формы %r" % тело[:300])
+    for метка, страница, итог in (
+            ("пусто", форма, ответ("")),
+            ("чужой ИНН", форма, ответ("504110181263 является плательщиком налога на "
+                                      "профессиональный доход")),
+            ("чужой ИНН, отрицательный", форма, ответ(
+                "504110181263 не является плательщиком налога на профессиональный доход")),
+            ("лимит", форма, ответ("Превышено количество запросов")),
+            ("нет lblInfo", форма, форма),
+            ("форма сменилась", "<html>обновлённая страница</html>", "")):
+        данные, av = fc._run_source("нпд", инн, opener=_Опенер(страница, итог))
+        check(errors, данные is None and av["состояние"] == "не проверено"
+              and av["причина"].startswith("схема:"), "НПД %s: %r" % (метка, av))
+    оп = _Опенер("<html>обновлённая страница</html>", "")
+    try:
+        fc.fetch_npd(оп, инн)
+        errors.append("НПД: сменившаяся форма без ошибки")
+    except fc.SourceUnavailable as e:
+        check(errors, "форма" in str(e) and len(оп.запросы) == 1,
+              "НПД: форму отправили вслепую (%s, запросов %d)" % (e, len(оп.запросы)))
+    оп = _Опенер(форма, форма)
+    данные, av = fc.fetch_npd(оп, "7736207543")
+    check(errors, av["причина"].startswith("профиль:") and not оп.запросы,
+          "НПД для юрлица: %r, запросов %d" % (av, len(оп.запросы)))
     return errors
 
 
