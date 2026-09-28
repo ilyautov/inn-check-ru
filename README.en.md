@@ -1,4 +1,4 @@
-# inn-check-ru: company data by Russian INN for your AI agent
+# inn-check-ru: agent tools to look up a Russian company by INN
 
 > 🇷🇺 [Русская версия](README.md)
 
@@ -8,7 +8,9 @@
   </a>
 </p>
 
-> **Give your agent an INN — get a company dossier.** inn-check-ru connects tools that collect facts about a Russian company from open sources: status, financials, debts, court cases, owners and connections. The dossier helps you study a company, check its connections and compare saved snapshots. Unchecked sources stay visible. A deal check (risk traffic light 🟢/🟡/🔴 for given terms) is an extra mode. Open source, Apache-2.0; the model and third-party APIs may be billed separately.
+A skill, MCP server and CLI for Claude, Codex and other agents. Give it a Russian company's INN and the agent queries the state register (EGRUL), the tax service's open data, filed financial statements (GIR BO), Fedresurs notices, Bank of Russia lists, sanctions lists and about fifteen more registers. The result is a dossier: is the company alive, who owns and runs it, revenue and debts, signs of bankruptcy, related companies. Courts, bailiffs (FSSP) and the bankruptcy register sit behind captchas: the agent opens them in your browser and you solve the captcha.
+
+The point: numbers are computed by code, not by the model, and every register's answer is labelled — found, empty, or not checked. "Found nothing" and "could not check" never merge, so a captcha or a site outage does not turn into "the company is clean".
 
 **Quick start:**
 
