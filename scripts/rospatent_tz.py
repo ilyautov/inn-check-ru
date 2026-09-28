@@ -43,7 +43,9 @@ UA = "inn-check-ru (+https://github.com/ilyautov/inn-check-ru)"
         "срок": "expiration date", "инн": "right holder inn", "действует": "actual"}
 ЛИМИТ_META = 1 << 20
 ЛИМИТ_CSV = 4 << 30          # живьём 693 МБ
-ДОЛЯ_ПАДЕНИЯ = 0.5
+# Реестр знаков только растёт: прекращённые остаются с actual=false. Меньше 98 %
+# прежних строк — оборванная или неполная выгрузка (ревью Codex, P1)
+ДОЛЯ_ПАДЕНИЯ = 0.98
 СВЕЖЕСТЬ_ДНЕЙ = 45           # выгрузка раз в месяц
 БЛОКИРОВКА_ЧАСОВ = 3
 ПОКАЗАТЬ = 20                # в ответе — последние знаки, счёт — по всем
@@ -84,20 +86,27 @@ def _ssl_context():
     пром = _промежуточный()
     if пром:
         ctx.load_verify_locations(cafile=пром)
+        # Python 3.13+ по умолчанию принимает частичную цепочку: промежуточный стал
+        # бы якорем доверия. Снимаем флаг — цепочка обязана дойти до системного
+        # корня (ревью Codex)
+        ctx.verify_flags &= ~getattr(ssl, "VERIFY_X509_PARTIAL_CHAIN", 0)
     return ctx
 
 
 class _Счётчик(io.RawIOBase):
     """Поток ответа с лимитом размера: больше лимита — ValueError посреди чтения."""
 
-    def __init__(self, поток, лимит):
-        self.поток, self.лимит, self.n = поток, лимит, 0
+    def __init__(self, поток, лимит, ожидаем=None):
+        self.поток, self.лимит, self.n, self.ожидаем = поток, лимит, 0, ожидаем
 
     def readable(self):
         return True
 
     def readinto(self, b):
         кусок = self.поток.read(len(b))
+        if not кусок and self.ожидаем is not None and self.n != self.ожидаем:
+            # сервер закрыл поток раньше Content-Length — выгрузка неполная
+            raise ValueError("поток оборван: %d из %d байт" % (self.n, self.ожидаем))
         self.n += len(кусок)
         if self.n > self.лимит:
             raise ValueError("ответ больше лимита %d МБ" % (self.лимит >> 20))
@@ -111,7 +120,9 @@ def _открыть(url, лимит):
         raise ValueError("адрес вне набора открытых данных Роспатента: %s" % url[:80])
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     ответ = urllib.request.urlopen(req, timeout=TIMEOUT, context=_ssl_context())
-    return io.BufferedReader(_Счётчик(ответ, лимит), 1 << 20)
+    длина = ответ.headers.get("Content-Length")
+    return io.BufferedReader(_Счётчик(ответ, лимит, int(длина) if длина and
+                                      длина.isdigit() else None), 1 << 20)
 
 
 def _мета(открыть):
@@ -183,9 +194,11 @@ def построить_индекс(поток_текста, путь, выгр�
             "правообладателей": len(по_инн)}
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(путь), prefix=".индекс-", suffix=".tmp")
     try:
-        with os.fdopen(fd, "wb") as сырой, gzip.GzipFile(fileobj=сырой, mode="wb") as gz:
-            gz.write(json.dumps(dict(мета, построен=сегодня or _сегодня(), по_инн=по_инн),
-                                ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+        # потоком: без полной копии индекса строкой в памяти (ревью Codex)
+        with os.fdopen(fd, "wb") as сырой, gzip.GzipFile(fileobj=сырой, mode="wb") as gz, \
+                io.TextIOWrapper(gz, encoding="utf-8") as текст:
+            json.dump(dict(мета, построен=сегодня or _сегодня(), по_инн=по_инн), текст,
+                      ensure_ascii=False, separators=(",", ":"))
         os.replace(tmp, путь)
     finally:
         if os.path.exists(tmp):
@@ -264,14 +277,15 @@ def lookup(inn, cache_dir=None, сегодня=None):
     сегодня = сегодня or _сегодня()
     знаки = []
     for номер, дата, срок, actual in индекс["по_инн"].get(str(inn), []):
+        # охрана по реестру и срок не истёк на сегодня; без срока — неизвестно
         знаки.append({"номер": номер, "дата_регистрации": дата, "срок_до": срок,
-                      # охрана по реестру и срок не истёк на сегодня
-                      "действует": bool(actual) and (срок is None or срок >= сегодня)})
+                      "действует": (None if срок is None else
+                                    bool(actual) and срок >= сегодня)})
     знаки.sort(key=lambda з: (з["дата_регистрации"] or "", з["номер"]), reverse=True)
     return {
         "в_реестре": bool(знаки),
         "знаков": len(знаки),
-        "действующих": sum(з["действует"] for з in знаки),
+        "действующих": sum(1 for з in знаки if з["действует"] is True),
         "последние": знаки[:ПОКАЗАТЬ],
         "ссылка": "https://www1.fips.ru/registers-web/ — поиск по номеру регистрации",
         "дата_выгрузки": индекс.get("дата_выгрузки"),
