@@ -241,6 +241,9 @@ jobs:
       - name: "УЦ Минцифры: ссылки из page-data, xlsx, ИНН в тексте, блок (офлайн)"
         run: python3 eval/run_uc_eval.py
 
+      - name: "обновление индексов по конфигу пользователя: сеть, учётки, расписание (офлайн)"
+        run: python3 eval/run_refresh_indexes_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 
