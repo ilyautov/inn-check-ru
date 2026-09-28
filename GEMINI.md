@@ -13,8 +13,11 @@
 - Числа считаются кодом (`scripts/`), а не придумываются моделью. Каждая
   цифра — с источником и датой; где данных нет — честное «не проверено».
 - Одиночному агрегатору не верим: факт = совпадение ≥3 источников.
-- MCP-сервер (`mcp/server.py`) отдаёт те же данные инструментами
-  `counterparty_fetch`, `counterparty_fin_scoring`, `sanctions_check`,
-  `affiliates_graph`, `droblenie_check`, `counterparty_diff`.
+- MCP-сервер (`mcp/server.py`, запускается через `uv` — он сам приносит
+  MCP SDK) отдаёт те же данные 14 read-only инструментами: `counterparty_fetch`,
+  `counterparty_verdict`, `counterparty_fin_scoring`, `sanctions_check`,
+  `affiliates_graph`, `droblenie_check`, `counterparty_diff`, `retro_verdict`,
+  `counterparty_batch`, `access_check`, `industry_benchmarks`,
+  `paper_vat_signs`, `due_diligence_dossier`, `extract_inns`.
 - Граф связей требует бесплатный ключ checko (env `CHECKO_API_KEY`); без него
   инструменты графа честно отвечают «не проверено» — это не ошибка.
