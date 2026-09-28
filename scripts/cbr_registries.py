@@ -156,8 +156,10 @@ def листы(данные):
         if i and цель:
             путь = цель.group(1).lstrip("/")
             связи[i.group(1)] = путь if путь.startswith("xl/") else "xl/" + путь
-    out = {}
-    for тег in re.findall(r"<sheet\b[^>]*>", _xml(z, "xl/workbook.xml")):
+    книга = _xml(z, "xl/workbook.xml")
+    out = {"": dt.date(1904, 1, 1) if re.search(r'date1904="(1|true)"', книга)
+           else dt.date(1899, 12, 30)}                 # эпоха дат под пустым именем
+    for тег in re.findall(r"<sheet\b[^>]*>", книга):
         имя = html.unescape(re.search(r'name="([^"]*)"', тег).group(1))
         rid = re.search(r'r:id="([^"]+)"', тег).group(1)
         строки = []
@@ -180,8 +182,9 @@ def листы(данные):
     return out
 
 
-def _дата(s):
-    """«ДД.ММ.ГГГГ» или серийный номер Excel -> ISO; пусто -> None; иное — схема."""
+def _дата(s, эпоха=dt.date(1899, 12, 30)):
+    """«ДД.ММ.ГГГГ» или серийный номер Excel -> ISO; пусто -> None; иное — схема.
+    эпоха — 1904-01-01, если в книге date1904 (ревью Codex)."""
     s = (s or "").strip()
     if not s or s == "-":
         return None
@@ -189,7 +192,7 @@ def _дата(s):
     if m:
         return dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1))).isoformat()
     if re.fullmatch(r"\d{5}(\.0+)?", s):
-        return (dt.date(1899, 12, 30) + dt.timedelta(days=int(float(s)))).isoformat()
+        return (эпоха + dt.timedelta(days=int(float(s)))).isoformat()
     raise ValueError("схема: дата %r" % s[:20])
 
 
@@ -210,6 +213,7 @@ def записи_реестра(реестр, данные):
     """XLSX реестра -> [(инн, запись)]. ValueError — схема не та."""
     опис = РЕЕСТРЫ[реестр]
     книга = листы(данные)
+    эпоха = книга.pop("")
     лишние = set(книга) - set(опис["листы"]) - set(опис.get("пропустить", ()))
     нет = set(опис["листы"]) - set(книга)
     if лишние or нет:
@@ -240,8 +244,12 @@ def записи_реестра(реестр, данные):
                     з[поле] = с[кол[поле]]
             for поле in ("включён", "исключён"):
                 if поле in кол:
-                    з[поле] = _дата(с.get(кол[поле]))
+                    з[поле] = _дата(с.get(кол[поле]), эпоха)
             out.append((инн, з))
+        # пустой лист — обрезанный файл (исключённые у всех реестров — тысячи);
+        # только «в стадии ликвидации» бывает пустым честно (ревью Codex)
+        if n == 0 and статус != "ликвидация_или_реорганизация":
+            raise ValueError("схема: лист «%s» пуст" % лист)
         if n and без_инн > n * ДОЛЯ_БЕЗ_ИНН:
             raise ValueError("схема: на листе «%s» без ИНН %d строк из %d" % (лист, без_инн, n))
     return out
