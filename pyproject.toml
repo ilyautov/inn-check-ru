@@ -50,6 +50,7 @@ py-modules = [
   "pledge_text",
   "disq_dump",
   "cbr_registries",
+  "rospatent_tz",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",
@@ -89,4 +90,4 @@ inn_check_ru_data = "data"
 # пакета отвечает по выручке «не проверено»); проверка — CI-шаг «колесо
 # содержит canon» и PUBLISHING.md
 [tool.setuptools.package-data]
-inn_check_ru_data = ["*.json"]
+inn_check_ru_data = ["*.json", "ca/*.pem"]
