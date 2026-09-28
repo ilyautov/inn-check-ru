@@ -1375,6 +1375,100 @@ def fetch_special_registries(opener, inn, контекст=None):
 # Кэш дампов — ЕРКНМ / РНП (registries_refresh.py), перечни — sanctions_check.py
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# РНП — поиск ЕИС zakupki.gov.ru/epz/dishonestsupplier
+# ---------------------------------------------------------------------------
+#
+# Живьём 28.09.2026: FTP с открытыми данными (ftp.zakupki.gov.ru, ссылка из паспортов
+# наборов DishonestSupplier) больше не существует — NXDOMAIN; дамп взять неоткуда.
+# Работает поиск самой страницы реестра: GET-форма без капчи, карточки в HTML.
+# Сайт открыт только для РФ-IP (из-за рубежа — таймаут): INN_CHECK_PROXY.
+# Поиск находит ИНН и среди учредителей и руководителей недобросовестного
+# поставщика — такие карточки идут в «упоминания», не в записи о самой компании.
+
+РНП_ПОИСК = "https://zakupki.gov.ru/epz/dishonestsupplier/search/results.html"
+РНП_ЗА_ЗАПРОС = 50
+
+
+def _текст_html(s):
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", s or "")).split())
+
+
+def parse_rnp(text, inn):
+    """Страница результатов поиска РНП -> (данные|None, _доступность)."""
+    блок = "рнп"
+    if "Результаты поиска" not in (text or ""):
+        return _not_checked(блок, "схема: на странице нет результатов поиска РНП")
+    карточки = text.split('<div class="search-registry-entry-block')[1:]
+    if not карточки:
+        if "Поиск не дал результатов" not in text:
+            return _not_checked(блок, "схема: нет ни карточек, ни «Поиск не дал результатов»")
+        return None, _av(блок, "пусто", "записей по ИНН нет; " + SOURCES[блок]["пусто_с_оговоркой"])
+    записи, упоминания = [], []
+    for к in карточки:
+        def поле(класс, к=к):
+            m = re.search(r'class="%s[^"]*"[^>]*>(.*?)</div>' % re.escape(класс), к, re.DOTALL)
+            return _текст_html(m.group(1)) if m else ""
+        закон, номер, статус = (поле("registry-entry__header-top__title"),
+                                поле("registry-entry__header-mid__number").lstrip("№ ").strip(),
+                                поле("registry-entry__header-mid__title").lower())
+        m = re.search(r'ИНН \(аналог ИНН\)</div>\s*<div class="registry-entry__body-value">(.*?)</div>',
+                      к, re.DOTALL)
+        инн_записи = _текст_html(m.group(1)) if m else ""
+        даты = {_текст_html(t).lower(): _дата_дмг(_текст_html(v)) for t, v in re.findall(
+            r'data-block__title">(.*?)</div>\s*<div class="data-block__value">(.*?)</div>', к, re.DOTALL)}
+        if not (закон and номер and статус in ("размещено", "исключено")):
+            return _not_checked(блок, "схема: карточка РНП без закона, номера или статуса")
+        # без ИНН карточку не отличить от своей: «чужая» дала бы ложное «нет в РНП»
+        if not re.fullmatch(r"\d{10}|\d{12}", инн_записи):
+            return _not_checked(блок, "схема: в карточке РНП не разобран ИНН поставщика")
+        if not даты.get("включено") or (статус == "исключено" and not даты.get("исключено")):
+            return _not_checked(блок, "схема: в карточке РНП нет даты включения или исключения")
+        запись = {"закон": закон, "номер": номер, "статус": статус,
+                  "включено": даты.get("включено"), "исключено": даты.get("исключено"),
+                  "планируемое_исключение": даты.get("планируемая дата исключения"),
+                  "обновлено": даты.get("обновлено")}
+        if инн_записи == str(inn):
+            записи.append(запись)
+        else:
+            запись["инн_поставщика"] = инн_записи
+            упоминания.append(запись)
+    m = re.search(r"Результаты поиска\s*(?:<[^>]+>\s*)*(более\s+)?([\d\s\xa0]+)\s*запис", text)
+    всего = int(re.sub(r"\D", "", m.group(2))) if m else len(карточки)
+    в_реестре = any(з["статус"] == "размещено" for з in записи)
+    if всего > len(карточки) and not в_реестре:
+        # действующая запись могла остаться на следующих страницах выдачи
+        return _not_checked(блок, "неполно: ЕИС нашла %d записей, показаны %d, действующей "
+                                  "записи этого ИНН среди них нет" % (всего, len(карточки)))
+    return {
+        "в_реестре": в_реестре,
+        "был_в_реестре": bool(записи),
+        "записи": записи,
+        # ИНН нашёлся у учредителя или руководителя другой компании из РНП
+        "упоминания": упоминания,
+        "найдено_всего": всего,
+        "показаны_не_все": всего > len(карточки),
+        "источник": РНП_ПОИСК,
+    }, _av(блок, "ok")
+
+
+def fetch_rnp(opener, inn):
+    """РНП (44-ФЗ, 223-ФЗ, ПП 615): поиск страницы ЕИС, один GET без повторов."""
+    url = РНП_ПОИСК + "?" + urllib.parse.urlencode([
+        ("searchString", str(inn)), ("morphology", "on"), ("strictEqual", "true"),
+        ("sortBy", "UPDATE_DATE"), ("pageNumber", "1"), ("sortDirection", "false"),
+        ("recordsPerPage", "_%d" % РНП_ЗА_ЗАПРОС), ("showLotsInfoHidden", "false"),
+        ("fz94", "on"), ("fz223", "on"), ("ppRf615", "on")])
+    try:
+        статус, text = _http_get(opener, url, referer=РНП_ПОИСК, ua=UA_ПРОЕКТА, повторы=False,
+                                 xhr=False, accept="text/html,application/xhtml+xml")
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e)) from e
+    if статус != 200:
+        raise SourceUnavailable(_http_status_reason(статус))
+    return parse_rnp(text, inn)
+
+
 def fetch_registry_cache(реестр, inn):
     """Офлайн-сверка по локальному кэшу дампов (ЕРКНМ/РНП). Сеть не дёргается.
     в_реестре True -> ok, False -> пусто, кэша нет -> «не проверено»."""
@@ -1647,8 +1741,12 @@ PD_СПИСОК = "https://pd.rkn.gov.ru/operators-registry/operators-list/"
 
 
 def _дата_дмг(s):
+    """«ДД.ММ.ГГГГ» -> ISO; не дата или невозможная дата (31.02) -> None."""
     m = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{4})", s or "")
-    return "%s-%s-%s" % (m.group(3), m.group(2), m.group(1)) if m else None
+    try:
+        return _dt.date(int(m.group(3)), int(m.group(2)), int(m.group(1))).isoformat() if m else None
+    except ValueError:
+        return None
 
 
 def parse_pd_operators(text, inn):
@@ -2716,7 +2814,7 @@ FETCHERS = {
     "нпд": fetch_npd,
     "спецреестры": fetch_special_registries,
     "еркнм": lambda opener, inn: fetch_registry_cache("еркнм", inn),
-    "рнп": lambda opener, inn: fetch_registry_cache("рнп", inn),
+    "рнп": fetch_rnp,
     "список_цб": fetch_cbr_warning,
     "росстат": fetch_rosstat,
     "санкции": fetch_sanctions,
