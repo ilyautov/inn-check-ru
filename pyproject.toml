@@ -60,6 +60,7 @@ py-modules = [
   "fsa_registries",
   "erknm",
   "minpromtorg",
+  "uc_mintsifry",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",
