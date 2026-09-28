@@ -46,6 +46,7 @@ inn-check-ru-mcp = "inn_check_ru_mcp.server:entry"
 [tool.setuptools]
 py-modules = [
   "fetch_counterparty",
+  "rzn_licenses",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",

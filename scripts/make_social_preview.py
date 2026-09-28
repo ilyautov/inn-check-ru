@@ -69,6 +69,15 @@ def _font(path, size, bold=False):
         return ImageFont.truetype(path, size)
 
 
+def _мн(n, одна, две, пять):
+    """Русское склонение числительного: 1 реестр, 2 реестра, 5 реестров."""
+    if n % 10 == 1 and n % 100 != 11:
+        return одна
+    if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        return две
+    return пять
+
+
 def draw(реестры, сигналы):
     from PIL import Image, ImageDraw
 
@@ -105,8 +114,8 @@ def draw(реестры, сигналы):
         x += 42 + int(d.textlength(label, font=chip)) + 46
 
     chips = [
-        ("%d реестров" % реестры, ACCENT),
-        ("%d сигнала риска кодом" % сигналы, ACCENT),
+        ("%d %s" % (реестры, _мн(реестры, "реестр", "реестра", "реестров")), ACCENT),
+        ("%d %s риска кодом" % (сигналы, _мн(сигналы, "сигнал", "сигнала", "сигналов")), ACCENT),
         ("числа с источником и датой", TEXT_DIM),
         ("Apache-2.0", TEXT_DIM),
     ]
@@ -125,8 +134,9 @@ def draw(реестры, сигналы):
     OUT.parent.mkdir(parents=True, exist_ok=True)
     im.save(OUT)
     STAMP.write_text("%d/%d\n" % (реестры, сигналы), encoding="utf-8")
-    print("[ok] %s: %d реестров, %d сигнала" % (OUT.relative_to(ROOT),
-                                                реестры, сигналы))
+    print("[ok] %s: %d %s, %d %s" % (
+        OUT.relative_to(ROOT), реестры, _мн(реестры, "реестр", "реестра", "реестров"),
+        сигналы, _мн(сигналы, "сигнал", "сигнала", "сигналов")))
 
 
 def main():

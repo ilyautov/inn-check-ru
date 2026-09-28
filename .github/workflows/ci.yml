@@ -211,6 +211,9 @@ jobs:
       - name: "поиск по ИНН в дампах ФНС: индекс и три состояния (офлайн)"
         run: python3 eval/run_opendata_index_eval.py
 
+      - name: "лицензии Росздравнадзора: состояния, частичное обновление, блок (офлайн)"
+        run: python3 eval/run_rzn_licenses_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 
