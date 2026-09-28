@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 run_registries_eval.py — офлайн-eval v1.4.0: разведение ИП/ООО, парсинг
-МСП (реальные фикстуры из живого ответа), НПД, ЕРКНМ/РНП по кэшу-фикстуре,
-«не проверено» без кэша. PASS/FAIL, чистый stdlib, гоняется в CI.
+МСП (реальные фикстуры из живого ответа), НПД. ЕРКНМ проверяется в
+run_erknm_eval.py, РНП — в run_fsa_eval.py. PASS/FAIL, чистый stdlib, гоняется в CI.
 """
 
 import importlib.util
@@ -146,44 +146,12 @@ def case_npd(fc):
     return errors
 
 
-def case_registries(rr):
-    errors = []
-    res, note = rr.lookup("еркнм", "504110181262",
-                          cache_dir=str(FIXTURES / "cache_erknm"))
-    check(errors, res is not None, "еркнм: lookup вернул None (%s)" % note)
-    if res:
-        check(errors, res.get("в_реестре") is True,
-              "еркнм: ИНН 504110181262 не найден")
-        check(errors, res.get("записей", 0) >= 1, "еркнм: записей 0")
-        check(errors, "контрольный надзор" in json.dumps(res, ensure_ascii=False),
-              "еркнм: контекст записи пуст")
-    res2, _ = rr.lookup("еркнм", "7700000000",
-                        cache_dir=str(FIXTURES / "cache_erknm"))
-    check(errors, res2 is not None and res2.get("в_реестре") is False,
-          "еркнм: чужой ИНН должен дать в_реестре=False")
-    res3, note3 = rr.lookup("еркнм", "7707083893",
-                            cache_dir=str(FIXTURES / "cache_empty"))
-    check(errors, res3 is None and "кэш отсутствует" in (note3 or ""),
-          "еркнм без кэша: должно быть «не проверено», есть %r" % res3)
-    res4, _ = rr.lookup("рнп", "561017190346",
-                        cache_dir=str(FIXTURES / "cache_rnp"))
-    check(errors, res4 is not None and res4.get("в_реестре") is True,
-          "рнп: ИНН 561017190346 не найден")
-    res5, _ = rr.lookup("рнп", "7707083893",
-                        cache_dir=str(FIXTURES / "cache_rnp"))
-    check(errors, res5 is not None and res5.get("в_реестре") is False,
-          "рнп: чистый ИНН должен дать в_реестре=False")
-    return errors
-
-
 def main():
     fc = load_module("fetch_counterparty", ROOT / "scripts" / "fetch_counterparty.py")
-    rr = load_module("registries_refresh", ROOT / "scripts" / "registries_refresh.py")
     cases = {
         "ип-vs-юрлицо": case_ip_ul(fc),
         "мсп-парсинг": case_msp(fc),
         "нпд-парсинг": case_npd(fc),
-        "еркнм-рнп-lookup": case_registries(rr),
     }
     failed = 0
     for name, errors in cases.items():

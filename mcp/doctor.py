@@ -13,7 +13,7 @@ CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru"))
 
 SCRIPTS = ("fetch_counterparty.py", "fin_scoring.py", "sanctions_check.py",
            "affiliates_graph.py", "droblenie_check.py", "diff_counterparty.py",
-           "registries_refresh.py")
+           "erknm.py")
 
 
 def main():

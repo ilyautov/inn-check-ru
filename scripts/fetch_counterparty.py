@@ -1372,10 +1372,6 @@ def fetch_special_registries(opener, inn, контекст=None):
 
 
 # ---------------------------------------------------------------------------
-# Кэш дампов — ЕРКНМ / РНП (registries_refresh.py), перечни — sanctions_check.py
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # РНП — поиск ЕИС zakupki.gov.ru/epz/dishonestsupplier
 # ---------------------------------------------------------------------------
 #
@@ -1467,27 +1463,6 @@ def fetch_rnp(opener, inn):
     if статус != 200:
         raise SourceUnavailable(_http_status_reason(статус))
     return parse_rnp(text, inn)
-
-
-def fetch_registry_cache(реестр, inn):
-    """Офлайн-сверка по локальному кэшу дампов (ЕРКНМ/РНП). Сеть не дёргается.
-    в_реестре True -> ok, False -> пусто, кэша нет -> «не проверено»."""
-    try:
-        mod = _load_sibling("registries_refresh")
-    except Exception:
-        return _not_checked(реестр, "не покрыто: registries_refresh.py не найден рядом "
-                                    "со скриптом")
-    try:
-        res, note = mod.lookup(реестр, inn)
-    except Exception as e:
-        return _not_checked(реестр, "схема: сбой сверки по кэшу (%s)" % type(e).__name__)
-    if res is None:
-        return _not_checked(реестр, "не покрыто: %s" % note)
-    if not res.get("в_реестре"):
-        warn = "; ".join(res.get("предупреждения") or [])
-        return None, _av(реестр, "пусто", "в кэше дампа записи по ИНН нет" +
-                         (" (%s)" % warn if warn else ""))
-    return res, _av(реестр, "ok")
 
 
 def fetch_opendata_dumps(opener, inn):
@@ -1688,8 +1663,8 @@ def fetch_trademarks(opener, inn):
 
 def _кэш_выгрузки(блок, модуль, inn, ключ_наличия):
     """Общий блок для кэш-реестров, которые качаются с закрытых для не-РФ сайтов
-    (ФТС, РКН, РАР, Росаккредитация — fts_registries.py, rkn_registries.py,
-    rar_licenses.py, fsa_registries.py).
+    (ФТС, РКН, РАР, Росаккредитация, ЕРКНМ — fts_registries.py, rkn_registries.py,
+    rar_licenses.py, fsa_registries.py, erknm.py).
     Сеть не дёргается. Индекса нет или он устарел — «не проверено» в обе стороны:
     лицензию могли выдать или отозвать после выгрузки."""
     try:
@@ -2813,7 +2788,7 @@ FETCHERS = {
     "мсп": fetch_msp,
     "нпд": fetch_npd,
     "спецреестры": fetch_special_registries,
-    "еркнм": lambda opener, inn: fetch_registry_cache("еркнм", inn),
+    "еркнм": lambda opener, inn: _кэш_выгрузки("еркнм", "erknm", inn, "в_реестре"),
     "рнп": fetch_rnp,
     "список_цб": fetch_cbr_warning,
     "росстат": fetch_rosstat,

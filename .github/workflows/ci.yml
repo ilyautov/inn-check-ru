@@ -232,6 +232,9 @@ jobs:
       - name: "Росаккредитация (7z без зависимостей) и реестр операторов ПД: индекс, схема, обрыв, блок (офлайн)"
         run: python3 eval/run_fsa_eval.py
 
+      - name: "ЕРКНМ: помесячные выгрузки proverki.gov.ru, устоявшиеся месяцы, индекс частями, блок (офлайн)"
+        run: python3 eval/run_erknm_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 
