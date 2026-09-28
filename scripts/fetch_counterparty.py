@@ -55,7 +55,8 @@ _итог_проверки (§1.3): сколько deal-killer-источник�
     {"инн", "тип", "профиль",
      "егрюл", "риски", "финансы", "мсп", "нпд", "спецреестры", "еркнм", "рнп",
      "дампы_фнс", "дисквалифицированные", "реестры_цб", "товарные_знаки",
-     "реестры_фтс", "реестры_ркн", "лицензии_рар",
+     "реестры_фтс", "реестры_ркн", "лицензии_рар", "сертификаты_фса",
+     "операторы_пд",
      "лицензии_рзн", "росстат", "список_цб", "санкции", "фссп", "суды", "залоги", "банкротство",
      "федресурс", "контракты", "сро", "сро_проект", "агрегатор",
                                                     # блоки в порядке SOURCES
@@ -80,6 +81,7 @@ _итог_проверки (§1.3): сколько deal-killer-источник�
 
 import concurrent.futures
 import datetime as _dt
+import html
 import http.cookiejar
 import importlib.util
 import itertools
@@ -1555,7 +1557,8 @@ def fetch_trademarks(opener, inn):
 
 def _кэш_выгрузки(блок, модуль, inn, ключ_наличия):
     """Общий блок для кэш-реестров, которые качаются с закрытых для не-РФ сайтов
-    (ФТС, РКН, РАР — fts_registries.py, rkn_registries.py, rar_licenses.py).
+    (ФТС, РКН, РАР, Росаккредитация — fts_registries.py, rkn_registries.py,
+    rar_licenses.py, fsa_registries.py).
     Сеть не дёргается. Индекса нет или он устарел — «не проверено» в обе стороны:
     лицензию могли выдать или отозвать после выгрузки."""
     try:
@@ -1591,6 +1594,72 @@ def fetch_rkn_registries(opener, inn):
 def fetch_rar_licenses(opener, inn):
     """Лицензии РАР на алкоголь (rar_licenses.py, локальный индекс)."""
     return _кэш_выгрузки("лицензии_рар", "rar_licenses", inn, "в_реестре")
+
+
+def fetch_fsa_registries(opener, inn):
+    """Сертификаты и декларации о соответствии Росаккредитации за последние
+    месяцы выгрузок (fsa_registries.py, локальный индекс)."""
+    return _кэш_выгрузки("сертификаты_фса", "fsa_registries", inn, "в_выгрузках")
+
+
+# ---------------------------------------------------------------------------
+# Реестр операторов персональных данных — pd.rkn.gov.ru
+# ---------------------------------------------------------------------------
+
+PD_СПИСОК = "https://pd.rkn.gov.ru/operators-registry/operators-list/"
+
+
+def _дата_дмг(s):
+    m = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{4})", s or "")
+    return "%s-%s-%s" % (m.group(3), m.group(2), m.group(1)) if m else None
+
+
+def parse_pd_operators(text, inn):
+    """Страница поиска реестра операторов ПД -> записи с этим ИНН. Наименование
+    не берётся (у ИП это ФИО); карточка оператора с контактами не запрашивается."""
+    блок = "операторы_пд"
+    if 'id="ResList1"' not in text or "Дата начала обработки" not in text:
+        return _not_checked(блок, "схема: на странице нет таблицы результатов поиска")
+    строки = re.findall(r"<tr class='clmn\d'>(.*?)</tr>", text, re.DOTALL)
+    записи = []
+    for строка in строки:
+        ячейки = [" ".join(html.unescape(re.sub(r"<br\s*/?>", "\n", я)).replace("\xa0", " ")
+                           .split(" ")).strip()
+                  for я in re.findall(r"<td[^>]*>(.*?)</td>", строка, re.DOTALL)]
+        ячейки = [re.sub(r"<[^>]+>", "", я) for я in ячейки]
+        m = re.search(r"ИНН:\s*(\d{12}|\d{10})(?!\d)\s*(.*)", ячейки[1] if len(ячейки) == 5 else "", re.DOTALL)
+        if len(ячейки) != 5 or not m:
+            return _not_checked(блок, "схема: строка результатов не из 5 колонок с ИНН")
+        if m.group(1) != str(inn):
+            continue
+        записи.append({"рег_номер": ячейки[0].strip(),
+                       "тип_оператора": " ".join(m.group(2).split()) or None,
+                       "основание": " ".join(ячейки[2].split()),
+                       "уведомление_от": _дата_дмг(ячейки[3].strip()),
+                       "обработка_с": _дата_дмг(ячейки[4].strip())})
+    if not записи:
+        if строки:
+            return _not_checked(блок, "схема: поиск по ИНН вернул только чужие ИНН")
+        if "Записей не найдено" not in text:
+            return _not_checked(блок, "схема: нет ни строк, ни «Записей не найдено»")
+        return None, _av(блок, "пусто", "уведомления с этим ИНН в реестре нет; "
+                         + SOURCES[блок]["пусто_с_оговоркой"])
+    return {"в_реестре": True, "записи": записи, "источник": PD_СПИСОК}, _av(блок, "ok")
+
+
+def fetch_pd_operators(opener, inn):
+    """Реестр операторов, обрабатывающих персональные данные (Роскомнадзор):
+    форма поиска страницы, один GET без повторов. Сайт открыт только для РФ-IP."""
+    url = PD_СПИСОК + "?" + urllib.parse.urlencode(
+        {"act": "search", "name_full": "", "inn": str(inn), "regn": ""})
+    try:
+        статус, text = _http_get(opener, url, referer=PD_СПИСОК, ua=UA_ПРОЕКТА, повторы=False,
+                                 xhr=False, accept="text/html,application/xhtml+xml")
+    except Exception as e:
+        raise SourceUnavailable(_classify_exc(e)) from e
+    if статус != 200:
+        raise SourceUnavailable(_http_status_reason(статус))
+    return parse_pd_operators(text, inn)
 
 
 def fetch_rzn_licenses(opener, inn):
@@ -2621,6 +2690,8 @@ FETCHERS = {
     "реестры_фтс": fetch_fts_registries,
     "реестры_ркн": fetch_rkn_registries,
     "лицензии_рар": fetch_rar_licenses,
+    "сертификаты_фса": fetch_fsa_registries,
+    "операторы_пд": fetch_pd_operators,
     "дисквалифицированные": fetch_disq_dump,
     "федресурс": fetch_fedresurs,
     "контракты": fetch_contracts,

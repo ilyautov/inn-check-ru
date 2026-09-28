@@ -56,6 +56,8 @@ py-modules = [
   "fts_registries",
   "rkn_registries",
   "rar_licenses",
+  "sevenzip",
+  "fsa_registries",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",
