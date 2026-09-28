@@ -64,6 +64,12 @@
       <label><input type="radio" name="итог" value="проверено" checked> проверено</label>
       <label><input type="radio" name="итог" value="не проверено"> не проверено</label>
     </div>
+    <div id="про-текст" hidden>
+      <label for="текст">Текст страницы результатов</label>
+      <div class="тише">На странице реестра: Ctrl+A (⌘A), Ctrl+C (⌘C), вставьте сюда.
+        Число уведомлений, даты и банки посчитает код.</div>
+      <textarea id="текст" placeholder="Параметры поиска: … ИНН: …"></textarea>
+    </div>
     <div id="поля"></div>
     <div id="про-причину" hidden>
       <label for="причина">Почему не проверено</label>
@@ -84,7 +90,8 @@
   </section>
 
   <section id="не-реестр" class="тише" hidden>
-    Форма ручного блока открывается на страницах fssp.gov.ru и kad.arbitr.ru.
+    Форма ручного блока открывается на страницах fssp.gov.ru, kad.arbitr.ru
+    и reestr-zalogov.ru.
   </section>
 </main>
 <script type="module" src="popup.js"></script>

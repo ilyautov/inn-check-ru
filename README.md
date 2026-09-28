@@ -76,6 +76,7 @@ npx skills add ilyautov/inn-check-ru
 | Пакет доказательств: сырые ответы, SHA-256, штамп времени RFC 3161 | `--пакет`, `evidence_pack.py` |
 | ИНН из счёта, договора, письма, CSV | `extract_inn.py` |
 | Лицензии Росздравнадзора: аптеки, наркотики, медизделия — действует / приостановлена / прекращена | `rzn_licenses.py` |
+| Залоги движимого имущества: вставленный текст страницы reestr-zalogov.ru → число уведомлений, даты, банки-залогодержатели | `pledge_text.py` |
 
 Подробности, границы и допущения каждого — в [SKILL.md](SKILL.md), [references/](references/) и [KNOWN_LIMITS.md](KNOWN_LIMITS.md).
 

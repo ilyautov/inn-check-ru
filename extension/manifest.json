@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "inn-check-ru",
   "version": "1.12.2",
-  "description": "Проверка контрагента по ИНН с любой страницы и ручные блоки ФССП и судов — через локальный движок inn-check-ru.",
+  "description": "Проверка контрагента по ИНН с любой страницы и ручные блоки ФССП, судов и реестра залогов — через локальный движок inn-check-ru.",
   "permissions": ["activeTab", "contextMenus", "nativeMessaging", "storage"],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": {

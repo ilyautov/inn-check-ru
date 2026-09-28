@@ -214,6 +214,9 @@ jobs:
       - name: "лицензии Росздравнадзора: состояния, частичное обновление, блок (офлайн)"
         run: python3 eval/run_rzn_licenses_eval.py
 
+      - name: "реестр залогов: разбор вставленного текста, ручной блок, хост (офлайн)"
+        run: python3 eval/run_pledge_text_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 
