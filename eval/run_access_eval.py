@@ -408,8 +408,8 @@ def case_proxy_hard_refusal(ca):
     check(errors, "socks" in текст and "http" in текст,
           "про socks4 надо сказать прямо и подсказать замену: %r" % конф["ошибка"])
     # socks5 принимается: свой клиент на stdlib, пароль в маске скрыт
-    конф = ca.proxy.настройка("socks5://u:p4ss@rf.example:1080", env={})
-    check(errors, конф["ошибка"] is None and конф["url"] and "p4ss" not in конф["маска"],
+    конф = ca.proxy.настройка("socks5://логин:секрет@rf.example:1080", env={})
+    check(errors, конф["ошибка"] is None and конф["url"] and "секрет" not in конф["маска"],
           "socks5 должен приниматься: %r" % конф)
     # Главное: код возврата, а не «ну ладно, сходим напрямую».
     буфер = io.StringIO()

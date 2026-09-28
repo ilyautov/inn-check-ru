@@ -838,7 +838,7 @@ def case_proxy(fc):
         # 5б. socks5: HTTPS через туннель, ни одного живого ProxyHandler (иначе
         #     urllib подхватил бы переменные окружения), http:// — отказ, а не
         #     прямое соединение мимо прокси.
-        fc.установить_прокси("socks5://u:p4ss@rf.example:1080")
+        fc.установить_прокси("socks5://логин:секрет@rf.example:1080")
         оп = fc._make_opener()
         check(errors, any(type(h).__name__ == "SocksHTTPSHandler" for h in оп.handlers)
               and not [h for h in оп.handlers

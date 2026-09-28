@@ -519,10 +519,10 @@ def case_сеть():
         dt_.get("https://x.example/a", "r", 100, в_файл=f, op=_Опенер(b"abc", 3))
         check(errors, Path(f).read_bytes() == b"abc", "get в файл")
     прокси = load("proxy")
-    for url in ("http://user:s3cret@", "socks5://user:s3cret@", "http://user:s3cret@h:99999"):
+    for url in ("http://логин:секрет@", "socks5://логин:секрет@", "http://логин:секрет@h:99999"):
         конф = прокси.настройка(url, env={})
-        check(errors, конф["ошибка"] and "s3cret" not in конф["ошибка"]
-              and "s3cret" not in (конф["маска"] or ""), "пароль в ошибке: %r" % конф)
+        check(errors, конф["ошибка"] and "секрет" not in конф["ошибка"]
+              and "секрет" not in (конф["маска"] or ""), "пароль в ошибке: %r" % конф)
     # NO_PROXY не пускает мимо http-прокси; ftp/file через прокси — отказ
     import urllib.request
     os.environ["NO_PROXY"] = "*"
@@ -530,7 +530,7 @@ def case_сеть():
         оп = urllib.request.build_opener(*прокси.обработчики("http://rf.example:3128", None))
         req = urllib.request.Request("http://customs.gov.ru/x")
         ph = next(h for h in оп.handlers if isinstance(h, urllib.request.ProxyHandler))
-        ph.proxy_open(req, "http://u:p@rf.example:3128", "http")
+        ph.proxy_open(req, "http://логин:секрет@rf.example:3128", "http")
         check(errors, req.host == "rf.example:3128"
               and req.get_header("Proxy-authorization"), "NO_PROXY обошёл прокси: %r" % req.host)
         for url in ("ftp://example.invalid/x", "file:///etc/hosts"):
@@ -542,7 +542,7 @@ def case_сеть():
     finally:
         os.environ.pop("NO_PROXY", None)
     s5 = load("socks5")
-    оп = s5.opener("socks5://u:p@127.0.0.1:1")
+    оп = s5.opener("socks5://логин:секрет@127.0.0.1:1")
     for url in ("ftp://example.invalid/x", "file:///etc/hosts"):
         try:
             оп.open(url, timeout=2)
@@ -551,7 +551,7 @@ def case_сеть():
             check(errors, "только https" in str(e), "socks5 %s: %r" % (url, e))
     старое = {k: os.environ.pop(k, None) for k in ("INN_CHECK_PROXY", "HTTPS_PROXY", "https_proxy")}
     try:
-        os.environ["INN_CHECK_PROXY"] = "socks5://u:p@rf.example:1080"
+        os.environ["INN_CHECK_PROXY"] = "socks5://логин:секрет@rf.example:1080"
         оп = dt_.opener()
         check(errors, any(type(h).__name__ == "SocksHTTPSHandler" for h in оп.handlers),
               "opener без socks5: %r" % оп.handlers)
