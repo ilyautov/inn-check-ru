@@ -220,6 +220,9 @@ jobs:
       - name: "дисквалифицированные из выгрузки ФНС: индекс, обновление, блок (офлайн)"
         run: python3 eval/run_disq_dump_eval.py
 
+      - name: "госреестры ЦБ: XLSX, схема, частичное скачивание, блок (офлайн)"
+        run: python3 eval/run_cbr_registries_eval.py
+
       - name: "ретроспектива: вердикт на дату в прошлом (офлайн)"
         run: python3 eval/run_retro_eval.py
 

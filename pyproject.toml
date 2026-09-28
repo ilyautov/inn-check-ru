@@ -49,6 +49,7 @@ py-modules = [
   "rzn_licenses",
   "pledge_text",
   "disq_dump",
+  "cbr_registries",
   "fin_scoring",
   "sanctions_check",
   "cbr_warning",
