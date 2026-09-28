@@ -225,6 +225,13 @@ def case_частичное_обновление(rzn):
         os.unlink(замок)
         check(errors, not [f for f in os.listdir(td) if f.endswith((".tmp", ".zip"))],
               "остались временные файлы: %r" % os.listdir(td))
+    # valid не распознан — возраст считается от даты выгрузки (27.09), а не от сборки
+    with tempfile.TemporaryDirectory() as td:
+        rzn.refresh(cache_dir=td, получить=получатель(valid="нет"))
+        индекс = rzn._прочитать(os.path.join(td, rzn.ИНДЕКС))
+        check(errors, not rzn.устарел(индекс, "2026-10-11")
+              and len(rzn.устарел(индекс, "2026-10-12")) == 3,
+              "свежесть без valid: %r" % rzn.устарел(индекс, "2026-10-12"))
     # первый refresh с пустым набором (прежнего индекса нет) — индекс не создаётся
     with tempfile.TemporaryDirectory() as td:
         res = rzn.refresh(cache_dir=td, получить=получатель(
