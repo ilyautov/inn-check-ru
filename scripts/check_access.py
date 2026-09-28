@@ -423,6 +423,20 @@ def is_nonempty(v):
     return True
 
 
+def _движок_для_канареек(прокси_флаг):
+    """fetch_counterparty с той же сетью, что и probe: иначе --прокси проверил бы
+    доступность через ноду, а канарейки пошли бы напрямую (ревью Codex)."""
+    try:
+        import fetch_counterparty as fc
+    except Exception as e:
+        sys.stderr.write("не проверено: fetch_counterparty не импортируется (%s: %s)\n"
+                         % (type(e).__name__, e))
+        return None
+    if hasattr(fc, "установить_прокси"):
+        fc.установить_прокси(прокси_флаг)
+    return fc
+
+
 def run_canaries(fc, registry):
     """Гоняет fc.FETCHERS на канареечных ИНН -> ({id: {инн, результат, причина}}, код выхода).
 
@@ -568,14 +582,7 @@ def main(argv):
     code = 0
     out = dict(report)
     if opts["canaries"]:
-        try:
-            import fetch_counterparty
-        except Exception as e:
-            fc = None
-            sys.stderr.write("не проверено: fetch_counterparty не импортируется (%s: %s)\n"
-                             % (type(e).__name__, e))
-        else:
-            fc = fetch_counterparty
+        fc = _движок_для_канареек(opts["прокси"])
         if fc is None:
             canaries = {sid: {"инн": (d.get("канарейка") or {}).get("инн"),
                               "результат": "не запускалась",

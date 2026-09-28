@@ -28,6 +28,13 @@ proxy.py — пользовательский прокси одной точко
 SOCKS5 тоже годится: INN_CHECK_PROXY=socks5://host:1080 (клиент на stdlib в
 socks5.py, имя хоста резолвит прокси). Через SOCKS5 ходит только https.
 
+Выход через сетевой интерфейс: INN_CHECK_PROXY=iface://en0 (или iface://<IPv4>).
+Это не прокси, а привязка исходящего адреса к локальному интерфейсу — для случая,
+когда весь трафик Мака уходит в VPN, а своя сеть выходит с РФ-IP: запросы идут
+мимо VPN, напрямую через эту сеть (проверено 28.09.2026: V2Box в режиме TUN,
+en0 с российским выходом). Промежуточного узла нет — ИНН видит только ваш
+провайдер. Интерфейс без IPv4 — отказ, а не тихий уход в VPN.
+
 С логином — http://<логин>:<пароль>@host:3128. Угловые скобки здесь не часть
 синтаксиса, а защита от сканера секретов: образец вида «логин:пароль@хост» в
 исходнике TruffleHog считает утечкой и роняет CI (проверено 22.09.2026).
@@ -39,14 +46,21 @@ socks5.py, имя хоста резолвит прокси). Через SOCKS5 �
 """
 
 import base64
+import functools
 import hashlib
+import http.client
+import ipaddress
 import os
+import re
+import socket
+import subprocess
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
 ПЕРЕМЕННЫЕ = ("INN_CHECK_PROXY", "HTTPS_PROXY", "https_proxy")
-СХЕМЫ = ("http", "https", "socks5", "socks5h")
+СХЕМЫ = ("http", "https", "socks5", "socks5h", "iface")
 SOCKS = ("socks5", "socks5h")
 # SOCKS5 — свой клиент на stdlib (socks5.py, DNS на стороне прокси). SOCKS4 не
 # умеем: молча проигнорировать его нельзя — пользователь будет думать, что ходит
@@ -105,6 +119,14 @@ def _проверить(url):
                 "(получено %r)" % (p.scheme or "нет", маска(url)))
     if not p.hostname:
         return "в URL прокси нет хоста: %r" % маска(url)
+    if p.scheme == "iface":
+        if p.username or p.password or ":" in p.netloc or p.path not in ("", "/"):
+            return "у iface:// только имя интерфейса или IPv4: %r" % маска(url)
+        try:
+            адрес_интерфейса(p.hostname)
+        except ValueError as e:
+            return str(e)
+        return None
     try:
         порт = p.port
     except ValueError:
@@ -180,6 +202,80 @@ class _ProxyHandlerБезОбхода(urllib.request.ProxyHandler):
         return self.parent.open(req, timeout=req.timeout)
 
 
+def адрес_интерфейса(имя, _запуск=subprocess.run):
+    """Имя интерфейса (en0) или IPv4 -> IPv4 для source_address. ValueError, если
+    адреса нет: идти тогда по умолчанию — значит молча уйти в VPN."""
+    try:
+        return str(ipaddress.IPv4Address(имя))
+    except ValueError:
+        pass
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9._-]{0,31}", имя or ""):
+        raise ValueError("iface: негодное имя интерфейса %r" % имя)
+    for команда in (["ipconfig", "getifaddr", имя],               # macOS
+                    ["ip", "-4", "-o", "addr", "show", "dev", имя]):  # Linux
+        try:
+            вывод = _запуск(команда, capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.SubprocessError):
+            continue
+        m = re.search(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])", вывод or "")
+        if m:
+            return str(ipaddress.IPv4Address(m.group(1)))
+    raise ValueError("iface: у интерфейса %s нет IPv4-адреса (сеть отключена?)" % имя)
+
+
+IP_BOUND_IF = 25     # macOS, <netinet/in.h>: сокет ходит только через этот интерфейс
+
+
+def _соединить(адрес, интерфейс, цель, timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
+               source_address=None):
+    """socket.create_connection, но только IPv4 и с привязкой к интерфейсу: на macOS
+    — IP_BOUND_IF (как curl --interface), иначе только исходный адрес. Одной
+    привязки адреса мало: при VPN в режиме TUN маршрут выбирается по таблице, и
+    пакет мог бы уйти в туннель (ревью Codex)."""
+    хост, порт = цель
+    ошибка = None
+    for *_, sa in socket.getaddrinfo(хост, порт, socket.AF_INET, socket.SOCK_STREAM):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            if интерфейс and sys.platform == "darwin":
+                s.setsockopt(socket.IPPROTO_IP, IP_BOUND_IF, socket.if_nametoindex(интерфейс))
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                s.settimeout(timeout)
+            s.bind((адрес, 0))
+            s.connect(sa)
+            return s
+        except OSError as e:
+            ошибка = e
+            s.close()
+    raise ошибка or OSError("iface: у %s нет IPv4-адреса" % хост)
+
+
+def _через_интерфейс(класс, адрес, интерфейс):
+    def фабрика(host, **kw):
+        соединение = класс(host, **kw)
+        соединение._create_connection = functools.partial(_соединить, адрес, интерфейс)
+        return соединение
+    return фабрика
+
+
+class _HTTPSчерезИнтерфейс(urllib.request.HTTPSHandler):
+    def __init__(self, адрес, интерфейс, context):
+        super().__init__(context=context)
+        self._фабрика = _через_интерфейс(http.client.HTTPSConnection, адрес, интерфейс)
+
+    def https_open(self, req):
+        return self.do_open(self._фабрика, req, context=self._context)
+
+
+class _HTTPчерезИнтерфейс(urllib.request.HTTPHandler):
+    def __init__(self, адрес, интерфейс):
+        super().__init__()
+        self._фабрика = _через_интерфейс(http.client.HTTPConnection, адрес, интерфейс)
+
+    def http_open(self, req):
+        return self.do_open(self._фабрика, req)
+
+
 class _ТолькоHTTPчерезПрокси(urllib.request.BaseHandler):
     """ftp://, file:// и data: через прокси не идут: редирект https -> ftp ушёл бы
     напрямую, мимо прокси (ревью Codex). handler_order меньше стандартного (500)."""
@@ -197,6 +293,12 @@ def обработчики(url, context):
     http/https-прокси — ProxyHandler + HTTPSHandler; socks5 — пустой
     ProxyHandler (переменные окружения не подхватываются), HTTPS через туннель
     SOCKS5 и отказ для http:// (иначе он ушёл бы напрямую, мимо прокси)."""
+    if url and urllib.parse.urlsplit(url).scheme == "iface":
+        имя = urllib.parse.urlsplit(url).hostname
+        адрес = адрес_интерфейса(имя)
+        интерфейс = None if адрес == имя else имя
+        return [urllib.request.ProxyHandler({}), _HTTPSчерезИнтерфейс(адрес, интерфейс, context),
+                _HTTPчерезИнтерфейс(адрес, интерфейс), _ТолькоHTTPчерезПрокси()]
     if url and urllib.parse.urlsplit(url).scheme in SOCKS:
         import socks5
         return [urllib.request.ProxyHandler({}), socks5.SocksHTTPSHandler(url, context),
@@ -215,6 +317,11 @@ def описание(конф, insecure=False):
     оговорка = ("узел видит, какие ИНН вы проверяете (адреса запросов), но не "
                 "содержимое: https идёт CONNECT-туннелем, TLS остаётся "
                 "end-to-end")
+    if конф["url"].startswith("iface://"):
+        оговорка = ("не прокси: сокет привязан к локальному интерфейсу (на macOS — "
+                    "IP_BOUND_IF, как curl --interface; на Linux — только исходный адрес, "
+                    "маршрут решает система), узла посередине нет, адреса запросов "
+                    "видит ваш провайдер")
     if insecure:
         оговорка = ("COUNTERPARTY_INSECURE=1 вместе с прокси: узел видит адреса "
                     "запросов И может подменить ответы — проверка TLS отключена. "

@@ -564,6 +564,117 @@ def case_сеть():
     finally:
         os.environ.pop("INN_CHECK_PROXY", None)
         os.environ.update({k: v for k, v in старое.items() if v is not None})
+    # iface:// — выход через локальный интерфейс мимо VPN, без узла посередине
+    class _Вывод:
+        def __init__(self, stdout):
+            self.stdout = stdout
+    вызовы = []
+
+    def запуск(вывод, linux=""):
+        def f(команда, **kw):
+            вызовы.append(команда)
+            if команда[0] == "ipconfig" and вывод is None:
+                raise OSError("нет ipconfig")
+            return _Вывод(вывод if команда[0] == "ipconfig" else linux)
+        return f
+    check(errors, прокси.адрес_интерфейса("en0", запуск("192.168.0.101\n")) == "192.168.0.101",
+          "iface: macOS")
+    check(errors, прокси.адрес_интерфейса("en0", запуск(
+        None, "2: en0    inet 10.1.2.3/24 brd 10.1.2.255 scope global en0")) == "10.1.2.3", "iface: Linux")
+    check(errors, прокси.адрес_интерфейса("10.0.0.7", запуск("x")) == "10.0.0.7", "iface: IPv4")
+    for имя, вывод in (("en9", ""), ("en0; rm -rf /", "1.2.3.4")):
+        вызовы.clear()
+        try:
+            прокси.адрес_интерфейса(имя, запуск(вывод))
+            errors.append("iface %r: нет отказа" % имя)
+        except ValueError:
+            check(errors, not (имя.startswith("en0;") and вызовы), "iface: имя ушло в команду")
+    for url in ("iface://en0:80", "iface://en0:bad", "iface://логин:секрет@en0", "iface://en0/x"):
+        конф = прокси.настройка(url, env={})
+        check(errors, конф["ошибка"] and конф["url"] is None and "секрет" not in конф["ошибка"],
+              "iface %s: %r" % (url, конф))
+    конф = прокси.настройка("iface://127.0.0.1", env={})
+    check(errors, конф["url"] == "iface://127.0.0.1" and "интерфейс" in прокси.описание(конф)["оговорка"],
+          "iface: настройка %r" % конф)
+    # сокет: IPv4, IP_BOUND_IF на macOS, bind к адресу интерфейса
+    вызовы_сокета = []
+
+    class _Сокет:
+        def __init__(self, *a):
+            вызовы_сокета.append(("socket",) + a)
+
+        def setsockopt(self, *a):
+            вызовы_сокета.append(("setsockopt",) + a)
+
+        def settimeout(self, t):
+            pass
+
+        def bind(self, a):
+            вызовы_сокета.append(("bind", a))
+
+        def connect(self, a):
+            вызовы_сокета.append(("connect", a))
+
+        def close(self):
+            pass
+    import socket as _socket
+    из_модуля = (прокси.socket.socket, прокси.socket.if_nametoindex, прокси.sys.platform)
+    try:
+        прокси.socket.socket = _Сокет
+        прокси.socket.if_nametoindex = lambda имя: 7
+        прокси.sys.platform = "darwin"
+        прокси._соединить("192.168.0.101", "en0", ("127.0.0.1", 443), timeout=3)
+    finally:
+        прокси.socket.socket, прокси.socket.if_nametoindex, прокси.sys.platform = из_модуля
+    check(errors, вызовы_сокета == [
+        ("socket", _socket.AF_INET, _socket.SOCK_STREAM),
+        ("setsockopt", _socket.IPPROTO_IP, прокси.IP_BOUND_IF, 7),
+        ("bind", ("192.168.0.101", 0)), ("connect", ("127.0.0.1", 443))],
+        "iface: сокет %r" % вызовы_сокета)
+    # check_access: канарейки получают тот же --прокси, что и probe
+    ca = load("check_access")
+    import types
+    фейк = types.ModuleType("fetch_counterparty")
+    фейк.установить_прокси = lambda url: вызовы.append(("прокси", url))
+    было = sys.modules.get("fetch_counterparty")
+    sys.modules["fetch_counterparty"] = фейк
+    try:
+        вызовы.clear()
+        check(errors, ca._движок_для_канареек("iface://en0") is фейк
+              and вызовы == [("прокси", "iface://en0")], "канарейки без --прокси: %r" % вызовы)
+    finally:
+        if было is None:
+            sys.modules.pop("fetch_counterparty", None)
+        else:
+            sys.modules["fetch_counterparty"] = было
+    import http.server
+    import threading
+
+    class _Эхо(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            тело = self.client_address[0].encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(тело)))
+            self.end_headers()
+            self.wfile.write(тело)
+
+        def log_message(self, *a):
+            pass
+    сервер = http.server.HTTPServer(("127.0.0.1", 0), _Эхо)
+    threading.Thread(target=сервер.serve_forever, daemon=True).start()
+    try:
+        оп = urllib.request.build_opener(*прокси.обработчики("iface://127.0.0.1", None))
+        check(errors, any(type(h).__name__ == "_HTTPSчерезИнтерфейс" for h in оп.handlers),
+              "iface: нет https-хендлера")
+        ответ = оп.open("http://127.0.0.1:%d/" % сервер.server_port, timeout=5).read()
+        check(errors, ответ == b"127.0.0.1", "iface: исходный адрес %r" % ответ)
+        try:
+            оп.open("file:///etc/hosts", timeout=2)
+            errors.append("iface: file:// не отказ")
+        except Exception as e:
+            check(errors, "только http" in str(e), "iface file://: %r" % e)
+    finally:
+        сервер.shutdown()
     return "сеть", errors
 
 
