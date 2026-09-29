@@ -40,6 +40,10 @@ The traffic light is an assessment for the owner, not a verdict on the company: 
 
 Legal or credit guarantee. It evaluates risk from open data; professionals close the deal.
 
+## Where data goes
+
+No servers, no telemetry. Only the INN being checked leaves your machine, to open registries: Federal Tax Service sites (egrul, pb, bo, rmsp, service, npd .nalog.ru / .nalog.gov.ru), zakupki.gov.ru, pd.rkn.gov.ru, digital.mchs.gov.ru, websbor.rosstat.gov.ru, bankrot.fedresurs.ru and fedresurs.ru, clearspending.ru, reestr.nostroy.ru and reestr.nopriz.ru; with your own key also api.checko.ru and suggestions.dadata.ru. Sanctions lists and open-data dumps are downloaded whole and matched locally in `~/.cache/inn-check-ru/`. A proxy you configure sees which INNs you check. Details: [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+
 ## License
 
 Apache-2.0. Extracted from [small-business-ru](https://github.com/ilyautov/small-business-ru) — 34 AI skills for Russian small-business operations.

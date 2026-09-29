@@ -183,6 +183,10 @@ claude plugin marketplace update inn-check-ru && claude plugin update inn-check-
 
 **Как проверить подписанта по доверенности?** Номер машиночитаемой доверенности — в реестре ФНС m4d.nalog.gov.ru. Отозванная доверенность обесценивает подпись.
 
+## Куда уходят данные
+
+Серверов и телеметрии у проекта нет. Наружу уходит только проверяемый ИНН — в открытые реестры: сайты ФНС (egrul, pb, bo, rmsp, service, npd), zakupki.gov.ru, pd.rkn.gov.ru, digital.mchs.gov.ru, websbor.rosstat.gov.ru, bankrot.fedresurs.ru и fedresurs.ru, clearspending.ru, reestr.nostroy.ru и reestr.nopriz.ru. Если вы сами задали ключ — ещё api.checko.ru и suggestions.dadata.ru. Санкционные списки и открытые данные скачиваются целиком и сверяются на вашей машине, кэш и снимки лежат в `~/.cache/inn-check-ru/`. Если включён свой прокси, он видит, какие ИНН вы проверяете. Подробно — [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+
 ## Вклад и безопасность
 
 [CONTRIBUTING.md](CONTRIBUTING.md) — баги, расхождения с реестрами, новые источники. [SECURITY.md](SECURITY.md) — модель угроз и как сообщить об уязвимости.
