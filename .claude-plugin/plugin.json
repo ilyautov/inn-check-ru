@@ -1,10 +1,34 @@
 {
   "name": "inn-check-ru",
+  "displayName": "INN Check RU",
   "version": "1.12.2",
   "description": "Проверка контрагента по ИНН: ЕГРЮЛ, ФССП, суды, банкротства, финансы → светофор риска 🟢/🟡/🔴 с рекомендацией. | Russian counterparty due-diligence by INN over open registries.",
+  "icon": "./extension/icons/128.png",
   "author": {
     "name": "Ilya Utov",
     "email": "ilyautov@gmail.com"
   },
-  "skills": ["./"]
+  "homepage": "https://inn-check-ru.aifrontier.tech",
+  "repository": "https://github.com/ilyautov/inn-check-ru",
+  "documentationUrl": "https://github.com/ilyautov/inn-check-ru#readme",
+  "supportUrl": "https://github.com/ilyautov/inn-check-ru/issues",
+  "privacyPolicyUrl": "https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md",
+  "license": "Apache-2.0",
+  "keywords": [
+    "inn",
+    "russia",
+    "counterparty",
+    "due-diligence",
+    "kyc",
+    "egrul",
+    "fssp",
+    "bankruptcy",
+    "sanctions",
+    "контрагент",
+    "инн",
+    "проверка"
+  ],
+  "skills": [
+    "./"
+  ]
 }
