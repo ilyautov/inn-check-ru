@@ -174,9 +174,34 @@ camelCase — оба подводных камня учтены и провер�
 | Docker MCP Registry | `Dockerfile` в корне, образ проверяется в CI; PR docker/mcp-registry #5223 (`servers/inn-check-ru/server.yaml`, `source.commit` — коммит релиза: после каждого релиза его надо поднимать) |
 | travisvn/awesome-claude-skills | позже: закрывает PR скиллов меньше 10 звёзд и PR, поданные с помощью ИИ, — подавать руками |
 | VoltAgent/awesome-agent-skills | позже: не берёт скиллы без сложившегося сообщества |
+| каталог плагинов Anthropic (claude.ai/directory) | подаётся вручную, см. ниже |
 | mcp.so | **нет**: размещение платное |
 | Smithery | **нет, сознательно**: требует HTTP-сервер у них в облаке — каждый проверяемый ИНН шёл бы через чужую инфраструктуру (тот же «узел в середине», что отвергнут в роадмапе §11), а из облака вне РФ половина источников отвечала бы «не проверено» |
 | PulseMCP | подтягивает официальный реестр сам; страница закрыта Cloudflare, проверить не удалось |
+
+## Каталог плагинов Anthropic (ручной шаг)
+
+Подача — через портал https://claude.ai/directory/manage → Submit new → Plugin
+bundle, репозиторий `ilyautov/inn-check-ru`, путь — корень, ветка `main`.
+Нужен план Pro/Max/Team/Enterprise. Кнопка Validate прогоняет все проверки
+каталога; чек-лист — https://claude.com/docs/plugins/pre-submission-checklist.
+
+Что каталог блокирует и как это закрыто:
+- лаунчер без точной версии и `uv run` без `--frozen`/`--locked` — в `.mcp.json`
+  точные пины и `--frozen` (проверяет `eval/run_mcp_sdk_eval.py`);
+- README меньше 40 слов, нет LICENSE, битый манифест — есть, `claude plugin
+  validate .` проходит.
+
+Что уйдёт ревьюеру (не блокирует, «Held for a reviewer»), состояние на
+30.09.2026:
+- плагин запускает пакет из PyPI — у каталога это проверяется всегда;
+- бинарные фикстуры тестов (`eval/fixtures/**/*.zip`, `eval/fixtures/tsa/*`) и
+  файлы больше 256 КиБ (`data/benchmarks_ru.json`, `calibration/cohort_2021.csv`);
+- необязательные ключи `CHECKO_API_KEY` и `DADATA_API_KEY` читаются из окружения
+  пользователя, а не через `userConfig` плагина.
+
+После публикации каталог сам сканирует новые коммиты отслеживаемой ветки;
+`version` в `.claude-plugin/plugin.json` поднимается с каждым релизом.
 
 ## Social preview репозитория (ручной шаг)
 

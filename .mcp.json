@@ -3,8 +3,11 @@
     "inn-check-ru": {
       "command": "uv",
       "args": [
-        "run", "--quiet", "--no-project",
-        "--with", "mcp>=1.30,<2",
+        "run", "--frozen", "--quiet", "--no-project",
+        "--with", "mcp==1.30.0",
+        "--with", "anyio==4.15.1",
+        "--with", "idna==3.20",
+        "--with", "python-multipart==0.0.32",
         "${CLAUDE_PLUGIN_ROOT}/mcp/server.py"
       ],
       "env": {}
