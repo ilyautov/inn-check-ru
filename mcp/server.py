@@ -10,7 +10,8 @@ server.py — MCP-сервер inn-check-ru (stdio, FastMCP). Тонкая об�
     python3 mcp/server.py          # НЕ python3 -m mcp.server (см. README)
 
 Все инструменты read-only: сервер ничего не пишет во внешние сервисы.
-Ключи — только из env (CHECKO_API_KEY), секретов в коде нет.
+Ключи — из env (CHECKO_API_KEY, DADATA_API_KEY) или из настроек плагина
+(userConfig, защищённое хранилище системы), секретов в коде нет.
 """
 
 import os
@@ -50,6 +51,8 @@ try:
     from . import tools_impl  # установка колесом (пакет inn_check_ru_mcp)
 except ImportError:
     import tools_impl  # запуск скриптом из mcp/
+
+tools_impl.ключи_из_плагина(os.environ)
 
 def _версия():
     """Версия пакета для serverInfo. Без неё FastMCP отдаёт клиенту свою

@@ -30,5 +30,21 @@
   ],
   "skills": [
     "./"
-  ]
+  ],
+  "userConfig": {
+    "checko_api_key": {
+      "type": "string",
+      "title": "Ключ Checko (необязательно)",
+      "description": "Бесплатный ключ checko.ru/integration/api: граф связей, признаки дробления, запасной путь к недостоверности. Без него эти проверки — «не проверено». Уходит только в api.checko.ru.",
+      "sensitive": true,
+      "required": false
+    },
+    "dadata_api_key": {
+      "type": "string",
+      "title": "Ключ DaData (необязательно)",
+      "description": "Ключ dadata.ru: запасной путь к признаку недостоверности. Уходит только в suggestions.dadata.ru.",
+      "sensitive": true,
+      "required": false
+    }
+  }
 }

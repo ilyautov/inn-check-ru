@@ -197,8 +197,9 @@ bundle, репозиторий `ilyautov/inn-check-ru`, путь — корен�
 - плагин запускает пакет из PyPI — у каталога это проверяется всегда;
 - бинарные фикстуры тестов (`eval/fixtures/**/*.zip`, `eval/fixtures/tsa/*`) и
   файлы больше 256 КиБ (`data/benchmarks_ru.json`, `calibration/cohort_2021.csv`);
-- необязательные ключи `CHECKO_API_KEY` и `DADATA_API_KEY` читаются из окружения
-  пользователя, а не через `userConfig` плагина.
+- необязательные ключи Checko и DaData: с 30.09.2026 плагин спрашивает их через
+  `userConfig` (sensitive), но скрипты для CLI по-прежнему читают
+  `CHECKO_API_KEY` / `DADATA_API_KEY` из окружения — это ревьюер видит тоже.
 
 После публикации каталог сам сканирует новые коммиты отслеживаемой ветки;
 `version` в `.claude-plugin/plugin.json` поднимается с каждым релизом.

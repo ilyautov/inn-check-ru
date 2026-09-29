@@ -5,6 +5,12 @@
 ## [Unreleased]
 
 ### Changed
+- **Ключи Checko и DaData — в настройках плагина.** `.claude-plugin/plugin.json`
+  объявляет два необязательных скрытых поля (`userConfig`, `sensitive`): Claude Code
+  спрашивает их при включении и хранит в защищённом хранилище системы. `.mcp.json`
+  передаёт их серверу в `INN_CHECK_PLUGIN_*`, сервер переносит заполненные в
+  `CHECKO_API_KEY` / `DADATA_API_KEY`; пустое поле или неподставленный шаблон ключ из
+  окружения не затирают. Проверка — `eval/run_mcp_sdk_eval.py`.
 - **`.mcp.json` плагина: точные версии.** Сервер запускается `uv run --frozen
   --no-project --with mcp==1.30.0` и тремя транзитивными пинами из
   `mcp/requirements.txt` вместо диапазона `mcp>=1.30,<2`: каталог плагинов Anthropic

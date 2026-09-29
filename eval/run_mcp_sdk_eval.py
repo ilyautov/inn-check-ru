@@ -7,6 +7,7 @@ mcp 2.x (FastMCP переименован в MCPServer) и у сломанной
 запуск — отдельный процесс (сервер при ошибке делает sys.exit). PASS/FAIL, CI.
 """
 
+import importlib.util
 import json
 import os
 import re
@@ -69,6 +70,39 @@ def пины():
     return ошибки
 
 
+def ключи():
+    """Ключи из настроек плагина: .mcp.json передаёт userConfig в INN_CHECK_PLUGIN_*,
+    сервер переносит непустые в CHECKO_API_KEY / DADATA_API_KEY и не затирает ключ из
+    окружения пустым полем или неподставленным шаблоном."""
+    ошибки = []
+    spec = importlib.util.spec_from_file_location("tools_impl", ROOT / "mcp" / "tools_impl.py")
+    ti = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ti)
+    env = {"INN_CHECK_PLUGIN_CHECKO_KEY": " ключ1 ", "INN_CHECK_PLUGIN_DADATA_KEY": "",
+           "DADATA_API_KEY": "из-окружения", "PATH": "/bin"}
+    if ti.ключи_из_плагина(env) != ["CHECKO_API_KEY"] or env != {
+            "CHECKO_API_KEY": "ключ1", "DADATA_API_KEY": "из-окружения", "PATH": "/bin"}:
+        ошибки.append("перенос: %r" % env)
+    env = {"INN_CHECK_PLUGIN_CHECKO_KEY": "${user_config.checko_api_key}",
+           "CHECKO_API_KEY": "из-окружения"}
+    if ti.ключи_из_плагина(env) or env != {"CHECKO_API_KEY": "из-окружения"}:
+        ошибки.append("шаблон принят за ключ: %r" % env)
+    конф = json.loads((ROOT / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"][
+        "inn-check-ru"].get("env", {})
+    манифест = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(
+        encoding="utf-8")).get("userConfig", {})
+    if set(конф) != set(ti.КЛЮЧИ_ПЛАГИНА):
+        ошибки.append("env .mcp.json: %r" % sorted(конф))
+    for имя, значение in конф.items():
+        m = re.fullmatch(r"\$\{user_config\.(\w+)\}", значение)
+        опция = манифест.get(m.group(1)) if m else None
+        if not (опция and опция.get("sensitive") is True and not опция.get("required")):
+            ошибки.append("%s -> %r: нет необязательной скрытой опции userConfig" % (имя, значение))
+    if "tools_impl.ключи_из_плагина(os.environ)" not in SERVER.read_text(encoding="utf-8"):
+        ошибки.append("server.py не переносит ключи плагина")
+    return ошибки
+
+
 def main():
     cases = {}
     for версия, ждём, нельзя in (
@@ -83,6 +117,7 @@ def main():
             ошибки.append("stderr: %r" % err[-300:])
         cases["mcp %s без FastMCP — версия и совет" % версия] = ошибки
     cases[".mcp.json плагина: точные версии не ниже границ requirements.txt"] = пины()
+    cases["ключи из настроек плагина (userConfig) не затирают окружение"] = ключи()
     failed = 0
     for name, errors in cases.items():
         if errors:

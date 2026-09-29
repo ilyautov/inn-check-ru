@@ -25,6 +25,27 @@ if not os.path.isdir(SCRIPTS):
     _spec = _ilu.find_spec("fetch_counterparty")
     if _spec and _spec.origin:
         SCRIPTS = os.path.dirname(_spec.origin)
+# Ключи из настроек плагина (userConfig в .claude-plugin/plugin.json, хранятся в
+# защищённом хранилище системы). .mcp.json кладёт их в свои переменные, а не прямо в
+# CHECKO_API_KEY: пустое поле плагина затёрло бы ключ, уже заданный в окружении.
+КЛЮЧИ_ПЛАГИНА = {"INN_CHECK_PLUGIN_CHECKO_KEY": "CHECKO_API_KEY",
+                 "INN_CHECK_PLUGIN_DADATA_KEY": "DADATA_API_KEY"}
+
+
+def ключи_из_плагина(environ):
+    """Непустой ключ из настроек плагина -> переменная, которую читает движок.
+    Пустое поле и неподставленный шаблон `${user_config.…}` ключом не считаются,
+    ключ из окружения остаётся. Промежуточные переменные убираются всегда, чтобы
+    не ехать в дочерние процессы. Возвращает имена заданных ключей, без значений."""
+    заданы = []
+    for откуда, куда in КЛЮЧИ_ПЛАГИНА.items():
+        значение = (environ.pop(откуда, None) or "").strip()
+        if значение and not значение.startswith("${"):
+            environ[куда] = значение
+            заданы.append(куда)
+    return заданы
+
+
 # полный сбор по сети может идти десятки секунд (egrul-поллинг)
 TIMEOUT = float(os.environ.get("INN_CHECK_MCP_TIMEOUT", "150"))
 
