@@ -7,7 +7,7 @@
 В чём фишка: цифры считает код, а не модель. У каждого реестра в ответе видно, что он сказал: нашёл, пусто или проверить не удалось. «Ничего не нашёл» и «не смог проверить» не смешиваются, поэтому капча или упавший сайт не превращаются в «компания чистая».
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.12.2-blueviolet)](CHANGELOG.md)
+[![Версия](https://img.shields.io/badge/версия-1.12.3-blueviolet)](CHANGELOG.md)
 [![Stars](https://img.shields.io/github/stars/ilyautov/inn-check-ru?style=social)](https://github.com/ilyautov/inn-check-ru/stargazers)
 [![skills.sh](https://skills.sh/b/ilyautov/inn-check-ru)](https://skills.sh/ilyautov/inn-check-ru/inn-check-ru)
 
