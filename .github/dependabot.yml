@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # The server still uses the MCP 1.x API; migrate before proposing 2.x.
+    ignore:
+      - dependency-name: mcp
+        versions: [">=2.0.0"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
