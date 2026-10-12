@@ -180,7 +180,9 @@ def кейсы():
     r = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
                        capture_output=True, text=True, check=False)
     корни = {p.split("/")[0] for p in r.stdout.split("\0") if p}
-    скиллу_нужно = {"SKILL.md", "LICENSE", "scripts", "data", "references"}
+    # Сами файлы игнора Hermes исключает всегда.
+    скиллу_нужно = {"SKILL.md", "LICENSE", "scripts", "data", "references",
+                    ".skillignore", ".clawhubignore"}
     не_закрыто = sorted(к for к in корни - скиллу_нужно
                         if "/" + к not in игнор and "/" + к + "/" not in игнор)
     yield (".skillignore закрывает всё, что не едет в ZIP",
@@ -192,7 +194,7 @@ def кейсы():
         p for p in sorted((ROOT / "scripts").glob("*.py"))
         if "scripts/" + p.name not in закрытые_скрипты]
     правила = [
-        (re.compile("[​-‍⁠⁢-⁤﻿‪-‮⁦-⁩]"),
+        (re.compile("[\u200b-\u200d\u2060\u2062-\u2064\ufeff\u202a-\u202e\u2066-\u2069]"),
          "невидимый символ литералом (пишите \\uXXXX)"),
         (re.compile(r"^[^#\n]*os\.environ\b(?!\s*\.get\s*\()"),
          "os.environ целиком (читайте по имени через .get или передавайте параметром)"),
