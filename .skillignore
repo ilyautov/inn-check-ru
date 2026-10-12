@@ -1,0 +1,47 @@
+# Hermes Agent (skills-guard) и ClawHub ставят скилл из корня репозитория и
+# сканируют каждый файл. Здесь всё, что не едет в релизный ZIP
+# (scripts/build_release_zip.py): eval, тесты, сайт, расширение, MCP-сервер.
+# Скиллу нужны только SKILL.md, LICENSE, scripts/, data/, references/.
+# Гейт: eval/run_skill_gate.py.
+/.claude-plugin/
+/.codex-plugin/
+/.cursor-plugin/
+/.dockerignore
+/.github/
+/.gitignore
+/.mcp.json
+/CHANGELOG.md
+/CONTRIBUTING.md
+/Dockerfile
+/GEMINI.md
+/KNOWN_LIMITS.md
+/PRIVACY_POLICY.md
+/PUBLISHING.md
+/README.en.md
+/README.md
+/SECURITY.md
+/assets/
+/benchmark/
+/calibration/
+/commands/
+/docs/
+/eval/
+/extension/
+/gemini-extension.json
+/mcp/
+/packaging/
+/pyproject.toml
+/ruff.toml
+/server.json
+/site/
+/scripts/build_release_zip.py
+/scripts/make_social_preview.py
+/scripts/security/
+# Обновление индексов по cron (README): человек ставит расписание, агент его не
+# вызывает. Целиком копирует окружение для дочернего процесса, и Hermes ставит
+# за это HIGH. В релизном ZIP и pip-пакете остаётся.
+/scripts/refresh_indexes.py
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store

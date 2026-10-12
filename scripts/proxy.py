@@ -144,13 +144,12 @@ def настройка(явный=None, env=None):
     {"url", "маска", "источник", "отпечаток", "ошибка"} — url и ошибка
     взаимоисключающи. Без настройки: url=None, отпечаток="прямое".
     """
-    env = os.environ if env is None else env
     источник, url = None, None
     if явный:
         источник, url = "--прокси", явный.strip()
     else:
         for имя in ПЕРЕМЕННЫЕ:
-            значение = (env.get(имя) or "").strip()
+            значение = ((os.environ.get(имя) if env is None else env.get(имя)) or "").strip()
             if значение:
                 источник, url = имя, значение
                 break

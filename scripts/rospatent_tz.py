@@ -157,7 +157,7 @@ def разобрать(поток_текста):
     """CSV реестра -> (по_инн, всего_записей, с_инн). ValueError — схема."""
     csv.field_size_limit(64 << 20)
     чтец = csv.reader(поток_текста)
-    шапка = [h.replace("﻿", "").strip().lower().replace("_", " ")
+    шапка = [h.replace("\ufeff", "").strip().lower().replace("_", " ")
              for h in next(чтец, [])]
     нет = [п for п in ПОЛЯ.values() if п not in шапка]
     if нет:
@@ -180,7 +180,7 @@ def разобрать(поток_текста):
             raise ValueError("схема: actual %r" % действует[:20])
         с_инн += 1
         по_инн.setdefault(инн, []).append([
-            r[кол["номер"]].replace("﻿", "").strip(), _дата(r[кол["дата"]]),
+            r[кол["номер"]].replace("\ufeff", "").strip(), _дата(r[кол["дата"]]),
             _дата(r[кол["срок"]]), действует == "true"])
     return по_инн, всего, с_инн
 
