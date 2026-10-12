@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Скилл ставится в Hermes Agent.** Встроенный сканер Hermes (skills-guard)
+  проверял весь репозиторий, потому что SKILL.md лежит в корне, и выдавал
+  DANGEROUS (297 срабатываний, `--force` не помогает): тесты с `/etc/passwd`,
+  `rm -rf /` в eval, `curl | python3` в PUBLISHING.md. Новый `.skillignore`
+  оставляет установке ровно то, что едет в релизный ZIP. Вердикт теперь SAFE.
+- `install_ca.py` передаёт бандл в `_build_ssl_context(ca_bundle)` параметром,
+  а не записью в `os.environ`; `--офлайн` ставит флаг модуля вместо переменной
+  окружения; `proxy.настройка` читает переменные прокси по имени. Порядок
+  приоритетов и поведение прежние.
+- Литерал BOM в `rospatent_tz.py` записан как `\ufeff`.
+
+### Added
+- `eval/run_skill_gate.py` проверяет, что `.skillignore` закрывает всё вне
+  релизного ZIP и что в скилле нет правил Hermes уровня HIGH и выше.
+
 ## [1.12.3] — 2026-09-30
 
 ### Changed

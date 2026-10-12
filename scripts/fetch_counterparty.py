@@ -156,7 +156,7 @@ def _time_left():
     return DEADLINE - (time.monotonic() - _START)
 
 
-def _build_ssl_context():
+def _build_ssl_context(ca_bundle=None):
     """TLS-контекст по умолчанию ПРОВЕРЯЕТ сертификат (защита от MITM).
 
     Сайты ФНС иногда используют сертификаты Национального УЦ Минцифры,
@@ -169,7 +169,8 @@ def _build_ssl_context():
     контрагента. Используйте только в изолированной отладке.
     """
     ctx = ssl.create_default_context()
-    ca_bundle = os.environ.get("COUNTERPARTY_CA_BUNDLE")
+    # Порядок: переменная окружения, затем явный бандл (install_ca.py), затем кэш.
+    ca_bundle = os.environ.get("COUNTERPARTY_CA_BUNDLE") or ca_bundle
     if not ca_bundle:
         # scripts/install_ca.py кладёт корень Национального УЦ Минцифры сюда —
         # подхватываем автоматически, верификация остаётся включённой.
@@ -3182,9 +3183,12 @@ MAX_WORKERS = 4                 # уважение к ФНС: не больше 
 _THREAD_LOCAL = threading.local()
 
 
+_ОФЛАЙН_ФЛАГ = []  # непусто после --офлайн
+
+
 def _офлайн():
     """--офлайн или INN_CHECK_OFFLINE=1: только кэш и дампы, сеть запрещена."""
-    return os.environ.get("INN_CHECK_OFFLINE") == "1"
+    return bool(_ОФЛАЙН_ФЛАГ) or os.environ.get("INN_CHECK_OFFLINE") == "1"
 
 
 _СЕТЬ_ЗАПРЕЩЕНА = []
@@ -3529,7 +3533,7 @@ def _parse_args(argv):
         elif a.startswith(("--снимок=", "--snapshot=")):
             снимок = a.split("=", 1)[1]
         elif a in ("--офлайн", "--offline"):
-            os.environ["INN_CHECK_OFFLINE"] = "1"
+            _ОФЛАЙН_ФЛАГ.append(True)
         elif a == "--канарейки":
             canaries = True
         elif a in ("--профиль", "--profile"):

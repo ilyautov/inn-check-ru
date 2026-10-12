@@ -331,11 +331,9 @@ def проверить(ca_dir=None, таймаут=20):
     Минцифры, бандл здесь не поможет; статус «tls» для него ожидаем.
     """
     бандл = _bundle_path(ca_dir)
-    if os.path.isfile(бандл):
-        # fetch_counterparty знает только путь по умолчанию — подсказываем ему наш.
-        os.environ.setdefault("COUNTERPARTY_CA_BUNDLE", бандл)
     fc, sources = _модули_движка()
-    ctx = fc._build_ssl_context()
+    # fetch_counterparty знает только путь по умолчанию — передаём ему наш.
+    ctx = fc._build_ssl_context(бандл if os.path.isfile(бандл) else None)
     итоги = []
     for имя, url in sources.TLS_MINCIFRY_PROBES.items():
         запись = {"источник": имя, "url": url}

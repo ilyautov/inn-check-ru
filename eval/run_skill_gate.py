@@ -170,6 +170,47 @@ def кейсы():
     yield ("вынесенные файлы едут в релизный ZIP", собрался and not нет_в_архиве,
            "в архиве нет: %s" % ", ".join(нет_в_архиве))
 
+    # Hermes Agent (skills-guard) и ClawHub ставят скилл из корня репозитория и
+    # сканируют каждый файл. CRITICAL блокирует установку даже с --force, HIGH
+    # требует --force. Всё, что не едет в релизный ZIP, закрыто .skillignore;
+    # в том, что едет, не должно быть правил уровня HIGH и выше.
+    игнор_файл = ROOT / ".skillignore"
+    игнор = ([l.strip() for l in игнор_файл.read_text(encoding="utf-8").splitlines()
+              if l.strip() and not l.startswith("#")] if игнор_файл.is_file() else [])
+    r = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"],
+                       capture_output=True, text=True, check=False)
+    корни = {p.split("/")[0] for p in r.stdout.split("\0") if p}
+    скиллу_нужно = {"SKILL.md", "LICENSE", "scripts", "data", "references"}
+    не_закрыто = sorted(к for к in корни - скиллу_нужно
+                        if "/" + к not in игнор and "/" + к + "/" not in игнор)
+    yield (".skillignore закрывает всё, что не едет в ZIP",
+           игнор_файл.is_file() and r.returncode == 0 and not не_закрыто,
+           "Hermes отсканирует и заблокирует: %s" % ", ".join(не_закрыто or ["нет .skillignore"]))
+
+    закрытые_скрипты = {l.strip("/") for l in игнор if l.startswith("/scripts/") and l.endswith(".py")}
+    едет = [SKILL] + sorted(REFS.glob("*.md")) + [
+        p for p in sorted((ROOT / "scripts").glob("*.py"))
+        if "scripts/" + p.name not in закрытые_скрипты]
+    правила = [
+        (re.compile("[​-‍⁠⁢-⁤﻿‪-‮⁦-⁩]"),
+         "невидимый символ литералом (пишите \\uXXXX)"),
+        (re.compile(r"^[^#\n]*os\.environ\b(?!\s*\.get\s*\()"),
+         "os.environ целиком (читайте по имени через .get или передавайте параметром)"),
+        (re.compile(r"echo\s+[^\n]*\|\s*(?:ba|z|da|k)?sh\b|echo\s+[^\n]*\|\s*(?:python|perl|ruby|node)"),
+         "echo | интерпретатор"),
+        (re.compile(r"curl\s+[^|\s][^\n]*\|\s*(?:sudo\s+)?(?:ba|z|da|k)?sh\b|curl\s+[^|\s][^\n]*\|\s*python"),
+         "curl | интерпретатор"),
+        (re.compile(r"/etc/passwd|/etc/shadow"), "/etc/passwd"),
+    ]
+    сработало = []
+    for путь in едет:
+        for номер, строка in enumerate(путь.read_text(encoding="utf-8").split("\n"), 1):
+            for rx, что in правила:
+                if rx.search(строка):
+                    сработало.append("%s:%d %s" % (путь.relative_to(ROOT), номер, что))
+    yield ("скилл проходит сканеры установки (Hermes skills-guard)", not сработало,
+           "; ".join(сработало[:10]))
+
 
 def main():
     провал = 0
