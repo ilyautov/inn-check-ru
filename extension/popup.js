@@ -3,7 +3,7 @@
 // активной вкладки (право activeTab — по клику на значок) и, по кнопке, снимок
 // видимой части. Всё остальное вводит пользователь.
 import { ПОЛЯ, РАЗБОР_ТЕКСТА, источникПоUrl, сегодня, новаяОперация, сообщениеБлока,
-  снимокРазрешён, таЖеСтраница } from "./lib.js";
+  снимокРазрешён, таЖеСтраница, хранилище, runIdВерен, выбраннаяПроверка, сообщениеПроверки } from "./lib.js";
 
 const $ = (id) => document.getElementById(id);
 const ПРОФИЛИ = ["нейтрально", "отсрочка", "предоплата", "подрядчик", "доля", "клиент_115фз",
@@ -17,7 +17,7 @@ function текст(el, строка, класс) {
 async function показатьПоследнюю() {
   let запись = null;
   try {
-    запись = (await chrome.storage.session.get("последняя")).последняя;
+    запись = (await хранилище("session").get("последняя")).последняя;
   } catch (e) {
     console.warn("[inn-check-ru] storage.session недоступен:", e);
   }
@@ -93,11 +93,13 @@ function собратьФорму() {
 }
 
 async function активнаяВкладка() {
+  if (!globalThis.chrome?.tabs) return null;
   const [вкладка] = await chrome.tabs.query({ active: true, currentWindow: true });
   return вкладка;
 }
 
 async function сохранить(соСнимком, исходная) {
+  if ($("режим-записи").value === "run") return сохранитьПроверку(исходная);
   const итог = $("итог-формы");
   const форма = собратьФорму();
   const { сообщение, ошибки } = сообщениеБлока(форма, исходная.url,
@@ -154,12 +156,12 @@ async function main() {
     выбор.append(o);
   }
   try {
-    выбор.value = (await chrome.storage.local.get("профиль")).профиль || "нейтрально";
+    выбор.value = (await хранилище("local").get("профиль")).профиль || "нейтрально";
   } catch (e) {
     console.warn("[inn-check-ru] storage.local недоступен:", e);
   }
   выбор.addEventListener("change", () => {
-    chrome.storage.local.set({ профиль: выбор.value }).catch(
+    хранилище("local").set({ профиль: выбор.value }).catch(
       (e) => console.warn("[inn-check-ru] профиль не сохранён:", e));
   });
 
@@ -174,7 +176,8 @@ async function main() {
   $("заголовок-формы").textContent = { "фссп": "Ручной блок: ФССП", "суды": "Ручной блок: арбитражные суды",
     "залоги": "Ручной блок: реестр залогов" }[блок];
   $("про-текст").hidden = !РАЗБОР_ТЕКСТА.includes(блок);
-  $("страница").textContent = new URL(вкладка.url).hostname;
+  $("страница").textContent = вкладка.url;
+  привязка(вкладка);
   $("дата").value = сегодня();
   // ИНН не подставляется сам: последняя проверка могла быть о другой компании,
   // и блок этой страницы лёг бы под чужой ИНН (ревью Kimi). Только по кнопке.
@@ -193,7 +196,7 @@ async function main() {
     });
   }
   try {
-    const было = (await chrome.storage.session.get("сохранение")).сохранение;
+    const было = (await хранилище("session").get("сохранение")).сохранение;
     if (было) {
       текст($("итог-формы"), `Последняя запись (${было.блок}, ИНН ${было.инн}): `
         + (было.ok ? было.состояние : "ошибка — " + было.ошибка)
@@ -207,4 +210,90 @@ async function main() {
   $("со-снимком").addEventListener("click", () => сохранить(true, вкладка));
 }
 
-main();
+main().catch((e) => текст($("результат"), "Не удалось открыть окно: " + e.message, "ошибка"));
+
+
+let выбранная = null;
+let runЗанят = false;
+function сбросВыбора() {
+  выбранная = null;
+  $("run-confirm").checked = false;
+  $("run-confirm").disabled = true;
+  $("выбранная-проверка").hidden = true;
+}
+const ВИДЫ_ШАГОВ = { manual: "ручная проверка", key: "подключение доступа к источнику",
+  cache: "подготовка локальных данных", network: "повторный запрос к источнику",
+  refresh: "обновление данных", resolve_conflict: "проверка противоречивых сведений" };
+const ПРИЧИНЫ_ШАГОВ = { missing_required_field: "не хватает обязательных сведений",
+  source_unavailable: "источник ещё не проверен или недоступен", stale: "данные устарели",
+  conflict: "источники противоречат друг другу", missing_search_scope: "не указаны параметры поиска",
+  incomplete_coverage: "поиск охватывает не все результаты", manual_required: "требуется проверка человеком" };
+const СОСТОЯНИЯ_ПРОВЕРКИ = { ok: "операция завершена", partial: "данные неполные",
+  needs_input: "нужны дополнительные действия", cancelled: "проверка остановлена", error: "ошибка" };
+function показатьВыбор(run, вкладка) {
+  const action = run.pending_actions.find((a) => a.source_id === источникПоUrl(вкладка.url));
+  текст($("выбранная-проверка"), `${run.название}\nИНН ${run.инн}\nПрофиль: ${run.профиль} · Ревизия: ${run.revision}\nrun_id: ${run.run_id}\nСтраница: ${вкладка.url}`
+    + (action ? `\nСледующий шаг: ${ВИДЫ_ШАГОВ[action.kind] || "дополнительное действие"}; ${ПРИЧИНЫ_ШАГОВ[action.reason_code] || "Диагностика: " + action.reason_code}.` : "\nДля этого источника нет ожидаемого шага; результат будет добавлен новой ревизией."));
+  $("выбранная-проверка").hidden = false;
+}
+function привязка(вкладка) {
+  $("режим-записи").addEventListener("change", () => {
+    const run = $("режим-записи").value === "run";
+    сбросВыбора();
+    $("run-binding").hidden = !run;
+    $("legacy-outcome").hidden = run;
+    $("со-снимком").hidden = run;
+    $("без-фио").parentElement.hidden = run;
+    $("про-текст").hidden = run || !РАЗБОР_ТЕКСТА.includes(источникПоUrl(вкладка.url));
+    $("сохранить").textContent = run ? "Сохранить исход в выбранную проверку" : "Сохранить блок";
+    $("про-причину").hidden = !run && собратьФорму().итог !== "не проверено";
+  });
+  $("run-id").addEventListener("input", сбросВыбора);
+  $("run-load").addEventListener("click", async () => {
+    if (runЗанят) return;
+    сбросВыбора();
+    const id = $("run-id").value.trim();
+    if (!runIdВерен(id)) return текст($("run-status"), "Укажите run_id в формате UUID", "ошибка");
+    runЗанят = true;
+    $("run-load").disabled = true;
+    try {
+      const ответ = await chrome.runtime.sendMessage({ тип: "run", сообщение: { команда: "run_read", run_id: id } });
+      if ($("run-id").value.trim() !== id || $("режим-записи").value !== "run") return;
+      выбранная = выбраннаяПроверка(ответ, id);
+      if (!выбранная) throw new Error(ответ?.error?.message || ответ?.ошибка || "Проверка не найдена");
+      показатьВыбор(выбранная, вкладка);
+      $("run-confirm").disabled = false;
+      текст($("run-status"), "Сверьте реквизиты и ИНН формы, затем подтвердите привязку.", "тише");
+    } catch (e) { текст($("run-status"), e.message, "ошибка"); }
+    finally { runЗанят = false; $("run-load").disabled = false; }
+  });
+}
+async function сохранитьПроверку(вкладка) {
+  if (runЗанят) return;
+  const форма = { ...собратьФорму(), текст: "", outcome: $("run-outcome").value,
+    pagination_complete: $("pagination-complete").checked };
+  const { сообщение, ошибки } = сообщениеПроверки(форма, вкладка.url, выбранная,
+    $("run-confirm").checked, crypto.randomUUID());
+  if (ошибки.length) return текст($("итог-формы"), ошибки.join("; "), "ошибка");
+  runЗанят = true;
+  for (const b of document.querySelectorAll("button")) b.disabled = true;
+  try {
+    if (!таЖеСтраница(await активнаяВкладка(), вкладка)) throw new Error("Страница сменилась — откройте окно заново");
+    текст($("итог-формы"), "Сохраняю исход ручного шага…", "тише");
+    const ответ = await chrome.runtime.sendMessage({ тип: "run", сообщение });
+    if (ответ?.status === "error" && ["revision_conflict", "operation_conflict"].includes(ответ.error?.code)) {
+      сбросВыбора();
+      const current = await chrome.runtime.sendMessage({ тип: "run", сообщение: { команда: "run_read", run_id: сообщение.run_id } });
+      const fresh = выбраннаяПроверка(current, сообщение.run_id);
+      if (fresh) показатьВыбор(fresh, вкладка);
+      throw new Error("Проверка изменилась. " + (fresh ? "Загружена актуальная ревизия для просмотра. " : "Не удалось перечитать актуальную ревизию. ") + "Нажмите «Загрузить выбранную проверку», сверьте данные и подтвердите привязку заново.");
+    }
+    if (!ответ || ответ.status === "error" || !ответ.revision) throw new Error(ответ?.error?.message || ответ?.ошибка || "Нет подтверждения записи. Повторите тот же запрос.");
+    const outcome = ответ.data?.metadata?.manual_outcomes?.[источникПоUrl(вкладка.url)];
+    текст($("итог-формы"), `Сохранено в ${ответ.run_id}, ревизия ${ответ.revision}: `
+      + ({ completed: "ручной шаг завершён", incomplete: "поиск не завершён; пробел остаётся", declined: "отказ от проверки; пробел остаётся" }[outcome] || "исход сохранён")
+      + `. Состояние проверки: ${СОСТОЯНИЯ_ПРОВЕРКИ[ответ.status] || "уточните в сохранённой проверке"}.`, "тише");
+    сбросВыбора();
+  } catch (e) { текст($("итог-формы"), e.message, "ошибка"); }
+  finally { runЗанят = false; for (const b of document.querySelectorAll("button")) b.disabled = false; }
+}

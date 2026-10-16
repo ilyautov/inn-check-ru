@@ -53,7 +53,11 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dump_tools
 
-CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru", "erknm"))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+CACHE_DIR = str(dataset_root("erknm"))
 CACHE_DIR_ВИДИМЫЙ = "~/.cache/inn-check-ru/erknm"
 МАНИФЕСТ = "манифест.json.gz"
 МЕСЯЦЫ_ПАПКА = "месяцы"

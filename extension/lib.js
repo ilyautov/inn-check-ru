@@ -72,6 +72,7 @@ export function иннИзТекста(текст) {
 // Источник по URL вкладки: только https и только сайт источника (поддомены —
 // тоже). null — страница не из реестра, форма не показывается.
 export function источникПоUrl(url) {
+  if (typeof url !== "string" || /[\\\s\x00-\x1f\x7f]/.test(url)) return null;
   let u;
   try { u = new URL(url); } catch { return null; }
   // как хост: только https, без userinfo, порт — стандартный
@@ -148,4 +149,54 @@ export function таЖеСтраница(вкладка, исходная) {
 export function своёОкно(отправитель, idРасширения, urlОкна) {
   return Boolean(отправитель) && отправитель.id === idРасширения
     && String(отправитель.url || "").startsWith(urlОкна);
+}
+
+// The popup also runs as a local preview. Storage failures never stop the UI.
+const память = { local: {}, session: {} };
+export const хранилище = (область) => ({
+  async get(ключ) {
+    try {
+      if (globalThis.chrome?.storage?.[область]) return await chrome.storage[область].get(ключ);
+    } catch { /* unavailable extension context: use the in-memory preview */ }
+    return { [ключ]: память[область][ключ] };
+  },
+  async set(данные) {
+    Object.assign(память[область], данные);
+    try { await globalThis.chrome?.storage?.[область]?.set(данные); } catch { /* preview */ }
+  },
+});
+
+export function runIdВерен(id) {
+  return typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id);
+}
+
+export function выбраннаяПроверка(ответ, runId) {
+  if (ответ?.status === "error" || ответ?.run_id !== runId || !runIdВерен(runId)
+      || !Number.isInteger(ответ.revision) || ответ.revision < 1
+      || !иннВерен(ответ.data?.fetch?.инн)) return null;
+  const f = ответ.data.fetch;
+  return { run_id: runId, revision: ответ.revision, инн: f.инн,
+    название: f.егрюл?.название || f.название || "Название не получено",
+    профиль: ответ.data.metadata?.profile || "—", pending_actions: ответ.pending_actions || [] };
+}
+
+export function сообщениеПроверки(форма, url, run, подтверждено, operationId) {
+  const outcome = форма.outcome;
+  const { сообщение, ошибки } = сообщениеБлока({ ...форма,
+    итог: outcome === "completed" ? "проверено" : "не проверено" }, url, operationId);
+  if (!run || !runIdВерен(run.run_id)) ошибки.push("Выберите и загрузите сохранённую проверку");
+  if (!подтверждено) ошибки.push("Подтвердите привязку к показанной проверке");
+  if (run && форма.инн !== run.инн) ошибки.push("ИНН формы не совпадает с выбранной проверкой");
+  if (!["completed", "declined", "incomplete"].includes(outcome)) ошибки.push("Выберите исход ручного шага");
+  if (outcome === "completed" && форма.pagination_complete !== true) ошибки.push("Подтвердите, что просмотрены все страницы результатов");
+  if (outcome === "completed" && !форма.параметры?.trim()) ошибки.push("Укажите параметры поиска, включая ИНН");
+  if (форма.текст?.trim()) ошибки.push("Для привязки к проверке укажите поля вручную; разбор текста доступен в отдельном блоке");
+  const поля = Object.fromEntries(Object.entries(сообщение.поля).map(([k, v]) =>
+    [k, typeof v === "boolean" ? v : Number(String(v).replace(",", "."))]));
+  return { ошибки, сообщение: { команда: "run_manual", run_id: run?.run_id,
+    expected_revision: run?.revision, operation_id: operationId,
+    blocks: { [сообщение.блок]: { ...поля, инн: форма.инн, url,
+      дата_проверки: форма.дата, статус: outcome === "completed" ? "проверено" : "не проверено",
+      outcome, pagination_complete: форма.pagination_complete === true,
+      параметры_поиска: форма.параметры || "", найдено: форма.найдено || "", reason: форма.причина || "" } } } };
 }

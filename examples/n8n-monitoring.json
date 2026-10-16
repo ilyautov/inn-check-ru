@@ -1,0 +1,179 @@
+{
+  "name": "INN monitoring - local claims and explicit ack (configuration sample)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "path",
+              "name": "claim_json_file",
+              "value": "CONFIGURE_ABSOLUTE_LOCAL_CLAIM_JSON_PATH",
+              "type": "string"
+            },
+            {
+              "id": "consumer",
+              "name": "consumer_id",
+              "value": "local-n8n",
+              "type": "string"
+            },
+            {
+              "id": "queue",
+              "name": "events_root",
+              "value": "CONFIGURE_ABSOLUTE_EVENTS_DIRECTORY",
+              "type": "string"
+            },
+            {
+              "id": "python",
+              "name": "python_executable",
+              "value": "CONFIGURE_ABSOLUTE_PYTHON_PATH",
+              "type": "string"
+            },
+            {
+              "id": "script",
+              "name": "workflow_cli",
+              "value": "CONFIGURE_ABSOLUTE_WORKFLOW_CLI_PATH",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "config",
+      "name": "Host configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.claim_json_file }}",
+        "options": {}
+      },
+      "id": "read",
+      "name": "Read local claim JSON",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $('Host configuration').first().json;\nconst body = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst envelope = JSON.parse(body.toString('utf8'));\nif (envelope.status !== 'ok' || !Array.isArray(envelope.data)) throw new Error('Expected claim envelope');\nconst unique = new Map();\nfor (const event of envelope.data) {\n const expiry = typeof event.delivery?.lease_expires_at === 'string' ? Date.parse(event.delivery.lease_expires_at) : NaN;\n if (!/^[0-9a-f]{64}$/.test(event.event_id) || event.delivery.state !== 'delivered' || event.delivery.consumer_id !== config.consumer_id || !Number.isFinite(expiry) || expiry <= Date.now()) throw new Error('Invalid or expired claim');\n unique.set(event.event_id, {json: {event, config, idempotency_key: event.event_id}});\n}\nreturn [...unique.values()];"
+      },
+      "id": "validate",
+      "name": "Validate leases and event identities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Replace this node with an explicitly configured host action adapter.\n// Persist event_id atomically with the action: retries must return prior success.\n// Output event_id, consumer_id, config and host_action_succeeded=true only after success.\nthrow new Error('Configure host action and durable event_id idempotency before acknowledging');"
+      },
+      "id": "action",
+      "name": "Configure host action adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(({json: result}) => {\n if (result.host_action_succeeded !== true || !/^[0-9a-f]{64}$/.test(result.event_id) || result.consumer_id !== result.config.consumer_id) throw new Error('Confirmed host action required before ack');\n return {json: {event_id: result.event_id, ack_required: true, argv: [result.config.python_executable, result.config.workflow_cli, 'events', 'ack', result.event_id, '--consumer-id', result.consumer_id, '--store', result.config.events_root, '--json']}};\n});"
+      },
+      "id": "ack",
+      "name": "Explicit ack request after success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Host configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Host configuration": {
+      "main": [
+        [
+          {
+            "node": "Read local claim JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read local claim JSON": {
+      "main": [
+        [
+          {
+            "node": "Validate leases and event identities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate leases and event identities": {
+      "main": [
+        [
+          {
+            "node": "Configure host action adapter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure host action adapter": {
+      "main": [
+        [
+          {
+            "node": "Explicit ack request after success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

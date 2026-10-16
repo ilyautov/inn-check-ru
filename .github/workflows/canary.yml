@@ -4,7 +4,9 @@ name: canary
 # Гоняет парсеры на канареечных ИНН из scripts/sources.py и падает, если целевые поля
 # пустые. Падение = блок в проде уже отдаёт «не проверено», а не «чисто» (задача 1
 # роадмапа), но починить парсер нужно. Раннер GitHub — не-РФ IP: часть источников
-# ожидаемо «гео», это фиксируется в таблице probe, а не в провале джоба.
+# ожидаемо «гео», это фиксируется в JSON probe/canary с причиной.
+# Сетевой отказ/гео/капча = пропуск источника, не успешная проверка его схемы.
+# CI core остаётся строго офлайн; этот отдельный live job не доказывает покрытие РФ-IP.
 
 on:
   schedule:
@@ -23,10 +25,10 @@ jobs:
           python-version: "3.12"
 
       - name: probe доступности с раннера (не-РФ IP)
-        run: python3 scripts/check_access.py --no-cache
+        run: python3 scripts/check_access.py --no-cache --json
 
       - name: канарейки парсеров (падает при смене схемы ФНС)
         env:
           COUNTERPARTY_DEADLINE: "300"
           COUNTERPARTY_IGNORE_ACCESS_CACHE: "1"
-        run: python3 scripts/check_access.py --канарейки --no-cache
+        run: python3 scripts/check_access.py --канарейки --no-cache --json

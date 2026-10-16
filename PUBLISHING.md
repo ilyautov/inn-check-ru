@@ -4,7 +4,23 @@
 pending publisher на PyPI, первая публикация в реестр MCP. Дальше всё
 делают workflow по тегу. Папка `dist/` в git не живёт, поэтому runbook здесь.
 
+## Текущая ветка: до публикации
+
+Версия **1.13.0 не опубликована**. Изменение исходников/версии и локальное колесо не означают, что PyPI `latest`, MCP Registry, MCPB, ZIP или маркетплейс уже обновлены. Эта работа не создаёт тег, Release, расписания или внешние уведомления.
+
+Перед публикацией используйте установку из ветки или точного локального колеса в отдельный временный venv: [маршрут](references/agent-workflow.md). Сверьте [машинную матрицу](data/workflow_capabilities.json) и [её пояснение](references/capability-matrix.md): plugin объявляет только Checko/DaData, MCPB — ключи и proxy, других настроек в этих манифестах нет; env inheritance не гарантировано. Стандартные MCPB/plugin/Docker не включают PDF/OCR.
+
+Гейты владельца релиза: версия/CLI parser/относительные ссылки, wheel/ZIP inventory и хеши, установка вне checkout без PYTHONPATH, совместимый SDK и 33 tools/list, core без обязательных зависимостей, реальные различия платформ, полный frozen synthetic corpus и независимое code/security review. Промежуточный локальный PASS не заменяет итоговый whole-branch gate, прогон CI и реальные сессии хостов.
+
+Документационные команды: `python3 eval/run_workflow_docs_gate.py`, `python3 eval/run_skill_gate.py`. Installed-проверка: `python3 eval/run_installed_workflow_eval.py --artifacts /absolute/private/acceptance` и отдельный запуск с `--mcp`. Выполняйте их против финального согласованного дерева/индекса; результат и SHA-256 сохраняйте отдельно. Наличие файла CI не означает, что все OS/Python jobs исполнены.
+
+[Recovery](references/workflow-recovery.md) проверяет все committed revisions, raw и managed artifacts. Реальный downgrade на 1.12.3 сохраняет store, но у старого пакета нет workflow entrypoint: это отсутствие поддержки клиента, а не отказ старого релиза `unsupported_schema`. Будущая схема 999 и моделирование schema-older reader — отдельные тесты; миграции с потерей данных нет.
+
+Все восемь новых эмпирических направлений имеют 0 наблюдений и остаются отдельными от software gates: [протокол](docs/research/2026-10-16/pilot-protocol.md), [журнал](docs/research/2026-10-16/experiment-status.json). Нельзя объявлять synthetic 29 реальной точностью, установкой хоста, человеческим согласием или зрелым исходом. Исторические калибровочные результаты относятся к своей когорте.
+
 ## Релизный цикл (тег → всё остальное)
+
+Шаги ниже — инструкция для отдельного решения владельца о публикации, не действие, выполненное при подготовке 1.13.0.
 
 1. Поднять версию везде (истина — frontmatter `SKILL.md`): плагин-манифесты,
    `pyproject.toml`, `server.json`, бейдж README, секция в `CHANGELOG.md`.
@@ -33,7 +49,7 @@ pending publisher на PyPI, первая публикация в реестр M
 и `inn-check-ru-mcp` (колесо + sdist, Trusted Publishing, токена в секретах нет).
 Проверено: CLI из чистого venv отвечает, канон и `proxy` на месте;
 `python3 eval/mcp_handshake.py uvx inn-check-ru-mcp==<версия>` с живого PyPI —
-initialize + 14 инструментов.
+initialize + 14 инструментов в том историческом выпуске; текущая ветка проверяет 33.
 
 До этого пакет не публиковался ни разу, и причин было ТРИ — каждая следующая
 пряталась за предыдущей:

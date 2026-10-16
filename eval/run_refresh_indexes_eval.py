@@ -161,10 +161,9 @@ def case_расписание(ri):
             else:
                 os.environ["INN_CHECK_PROXY"] = старое
         check(errors, "секрет" not in р["текст"] and "Ничего не установлено" in р["текст"], р)
-        check(errors, р["cron"].startswith("0 3 7 * * mkdir -p ")
-              and ("'--конфиг' '%s'" % путь.replace("%", "\\%")) in р["cron"]
+        check(errors, р["cron"].startswith("0 3 * * * ")
               and "100%/" not in р["cron"] and "100%/refresh.json</string>" in р["plist"]
-              and "<key>Day</key><integer>7</integer>" in р["plist"], р["cron"])
+              and "<key>Day</key>" not in р["plist"] and "windows_xml" in р, р["cron"])
         try:
             ri.расписание(os.path.join(td, "нет.json"))
             errors.append("расписание без конфига")

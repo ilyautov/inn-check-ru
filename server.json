@@ -7,13 +7,13 @@
     "url": "https://github.com/ilyautov/inn-check-ru",
     "source": "github"
   },
-  "version": "1.12.3",
+  "version": "1.13.0",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "inn-check-ru-mcp",
-      "version": "1.12.3",
+      "version": "1.13.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -30,6 +30,42 @@
           "description": "Свой http(s)-прокси с РФ-IP, например http://host:3128. Узел видит проверяемые ИНН — только своя нода",
           "isRequired": false,
           "isSecret": true
+        },
+        {
+          "name": "DADATA_API_KEY",
+          "description": "Optional DaData key; host configuration only",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "INN_CHECK_RUNS_DIR",
+          "description": "Absolute writable persistent run directory owned by the host",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "INN_CHECK_EVENTS_DIR",
+          "description": "Absolute writable event queue directory owned by the host",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "INN_CHECK_PROVIDER_POLICY",
+          "description": "Absolute host-owned provider-policy JSON file; default denies paid fallback",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "INN_CHECK_PDF_RENDERER",
+          "description": "Optional absolute pdftoppm executable; local OCR only",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "INN_CHECK_TESSERACT",
+          "description": "Optional absolute tesseract executable; local OCR only",
+          "isRequired": false,
+          "isSecret": false
         }
       ]
     }

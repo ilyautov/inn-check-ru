@@ -39,6 +39,23 @@ import re
 import sys
 from pathlib import Path
 
+# Preserve flat installed imports and legacy absolute-file entry points.
+try:
+    from sibling_imports import load_sibling as _load_sibling
+except ModuleNotFoundError as _error:
+    if _error.name != "sibling_imports":
+        raise
+    import importlib.util as _import_util
+    import sys as _import_sys
+    from pathlib import Path as _ImportPath
+    _spec = _import_util.spec_from_file_location(
+        "sibling_imports", _ImportPath(__file__).resolve().with_name("sibling_imports.py"))
+    _helper = _import_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_helper)
+    # Publish only the complete, stateless bootstrap. Concurrent bootstrap calls
+    # all select the same helper; dependency loads use Python's module locks.
+    _load_sibling = _import_sys.modules.setdefault("sibling_imports", _helper).load_sibling
+
 HERE = Path(__file__).resolve().parent
 DEFAULT_PATH = HERE.parent / "data" / "profiles_ru.json"
 
@@ -71,9 +88,7 @@ class ProfilesError(Exception):
 def _sources():
     """Модуль scripts/sources.py, если импортируется; иначе None (деградация: id вместо имён)."""
     try:
-        if str(HERE) not in sys.path:
-            sys.path.insert(0, str(HERE))
-        import sources
+        sources = _load_sibling("sources")
         return sources
     except Exception:
         return None
@@ -423,12 +438,30 @@ def _состояние_блока(fetch, block):
     return state, reason, date
 
 
+def source_states(fetch):
+    """Materialize the source acceptance states used by dossier availability."""
+    availability = fetch.get("_доступность")
+    if not isinstance(availability, dict):
+        return {}
+    out = {}
+    for sid, entry in availability.items():
+        state, reason, date = _состояние_блока(fetch, sid)
+        out[sid] = dict(entry if isinstance(entry, dict) else {},
+                        состояние=state, причина=reason, дата=date)
+    return out
+
+
 def _значение(fetch, path):
     block, _, field = path.partition(".")
     blk = fetch.get(block)
     if not isinstance(blk, dict):
         return None
-    return blk.get(field)
+    node = blk
+    for part in field.split("."):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(part)
+    return node
 
 
 def _дата(s):
@@ -488,27 +521,25 @@ def _пусто_как(sid, block):
 
 
 def _fin_оценка(fetch, fin_json):
-    """(флаги {id: флаг}, статус, причина, не_проверено[]) из fin-JSON;
+    """(флаги {id: флаг}, статус, причина, не_проверено[], оценки) из fin-JSON;
     без fin-JSON — считаем fin_scoring'ом из блока «финансы» fetch-JSON."""
     if fin_json is None:
         try:
-            if str(HERE) not in sys.path:
-                sys.path.insert(0, str(HERE))
-            import fin_scoring
+            fin_scoring = _load_sibling("fin_scoring")
             fin_json = fin_scoring.score(fetch)
         except Exception as e:
             return {}, "не проверено", ("fin-JSON не передан, fin_scoring недоступен (%s)"
-                                        % type(e).__name__), []
+                                        % type(e).__name__), [], {}
     if not isinstance(fin_json, dict):
-        return {}, "не проверено", "fin-JSON не словарь", []
+        return {}, "не проверено", "fin-JSON не словарь", [], {}
     st = str(fin_json.get("статус") or "").lower()
     if st not in ("ок", "ok"):
         return {}, "не проверено", (fin_json.get("причина")
-                                    or "fin_scoring: статус %r" % fin_json.get("статус")), []
+                                    or "fin_scoring: статус %r" % fin_json.get("статус")), [], {}
     флаги = {f.get("id"): f for f in fin_json.get("флаги") or [] if isinstance(f, dict)}
     fp = fin_json.get("финансовый_профиль")
     нп = list(fp.get("не_проверено") or []) if isinstance(fp, dict) else []
-    return флаги, "ок", None, нп
+    return флаги, "ок", None, нп, fin_json.get("оценки_сигналов") or {}
 
 
 _FIN_НЕ_ПРОВЕРЕНО = {
@@ -527,7 +558,7 @@ def _имя_источника(block, sources):
     return block
 
 
-def extract_signals(fetch_json, fin_json=None, profiles=None):
+def extract_signals(fetch_json, fin_json=None, profiles=None, *, _prepared=False):
     """Все сигналы каталога со статусом найден / отсутствует / не проверен / не применимо,
     источником и датой. Читает `_доступность`: блок «не проверено» → сигнал «не проверен»."""
     try:
@@ -536,9 +567,18 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
         return []
     if not isinstance(fetch_json, dict):
         fetch_json = {}
+    contract = _load_sibling("evidence_contract")
+    bind_financial, prepare = contract.bind_financial, contract.prepare
+    if not _prepared:
+        fetch_json = prepare(fetch_json)
+        if fin_json is None:
+            fin_scoring = _load_sibling("fin_scoring")
+            fin_json = fin_scoring.score(fetch_json)
+        fetch_json = bind_financial(fetch_json, fin_json)
+    evidence = fetch_json["_evidence"]
     sources = _sources()
-    тип = str(fetch_json.get("тип") or "юрлицо")
-    fin = None  # (флаги, статус, причина, не_проверено) — считается один раз
+    тип = "ип" if evidence["applicability"]["subject_type"] == "ip" else "юрлицо"
+    fin = None  # (флаги, статус, причина, не_проверено, оценки) — один раз
     fin_дата = _состояние_блока(fetch_json, "финансы")[2]
     out = []
     for sid, s in profiles["сигналы"].items():
@@ -557,7 +597,7 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
         if пути and all(str(p).startswith("fin.") for p in пути):
             if fin is None:
                 fin = _fin_оценка(fetch_json, fin_json)
-            fin_флаги, fin_статус, fin_причина, fin_нп = fin
+            fin_флаги, fin_статус, fin_причина, fin_нп, fin_оценки = fin
             rec["источник_id"] = "финансы"
             rec["источник"] = _имя_источника("финансы", sources)
             rec["дата"] = fin_дата
@@ -574,6 +614,14 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
                 rec["значение"] = {k: флаг.get(k) for k in ("показатель", "значение", "порог", "год")
                                    if k in флаг}
                 rec["пояснение"] = флаг.get("пояснение")
+            elif sid in fin_оценки:
+                ev = fin_оценки[sid]
+                if isinstance(ev, dict) and ev.get("статус") in СТАТУСЫ:
+                    rec["статус"] = ev["статус"]
+                    rec["причина"] = ev.get("причина")
+                    rec["зависимости"] = ev.get("зависимости")
+                else:
+                    rec["причина"] = "некорректная оценка финансового сигнала"
             else:
                 ключ = _FIN_НЕ_ПРОВЕРЕНО.get(sid, sid)
                 hit = [x for x in fin_нп if ключ in str(x).lower()]
@@ -624,6 +672,50 @@ def extract_signals(fetch_json, fin_json=None, profiles=None):
         else:
             rec["причина"] = "; ".join(dict.fromkeys(причины)) or "нет путей «откуда»"
         out.append(rec)
+    # Same path evaluator, gated by claim knowledge before any absence assertion.
+    for rec in out:
+        original_reason = rec.get("причина")
+        paths = profiles["сигналы"][rec["id"]].get("откуда") or []
+        candidates = [c for c in evidence["claims"].values() if c["field"] in paths]
+        rec["claim_ids"] = sorted(c["claim_id"] for c in candidates)
+        if rec["статус"] == "не применимо":
+            continue
+        known = [c for c in candidates if c["knowledge"] == "known"]
+        all_na = candidates and all(c["knowledge"] == "not_applicable" for c in candidates)
+        if all_na:
+            rec.update(статус="не применимо", причина="not_measurable_for_form")
+        elif paths and all(p.startswith("fin.") for p in paths):
+            if not known:
+                rec.update(статус="не проверен", причина=next((c["reason_code"] for c in candidates if c["reason_code"]), "missing_required_field"))
+        else:
+            outcomes = []
+            for c in known:
+                view = {c["field"].split(".", 1)[0]: {}}
+                node = view
+                parts = c["field"].split(".")
+                for part in parts[:-1]:
+                    node = node.setdefault(part, {})
+                node[parts[-1]] = c["value"]
+                outcomes.append((_оценить_путь(rec["id"], c["field"], view, c["effective_at"] or c["retrieved_at"]), c))
+            positive = next((c for result, c in outcomes if result is True), None)
+            negative = next((c for result, c in outcomes if result is False), None)
+            conflict = any(c["knowledge"] == "conflict" for c in candidates)
+            if positive and not conflict:
+                rec["claim_ids"] = [positive["claim_id"]]
+                rec.update(статус="найден", значение=positive["value"], причина=None)
+            elif negative and not conflict and not (rec["id"] == "банкротство" and any(
+                    c["knowledge"] != "known" for c in candidates)):
+                rec["claim_ids"] = [c["claim_id"] for result, c in outcomes if result is False]
+                rec.update(статус="отсутствует")
+            else:
+                rec.update(статус="не проверен", значение=None,
+                           причина=next((c["reason_code"] or c["knowledge"] for c in candidates
+                                        if c["knowledge"] != "known"), "missing_required_field"))
+        if paths and all(p.startswith("fin.") for p in paths) and known:
+            rec["claim_ids"] = sorted(c["claim_id"] for c in known)
+        if rec["статус"] == "не проверен" and original_reason and original_reason != rec.get("причина"):
+            rec["причина"] = str(rec.get("причина") or "") + "; " + original_reason
+        rec["evidence"] = [{k: c[k] for k in ("claim_id", "field", "knowledge", "reason_code", "raw_ref", "period", "search_scope", "coverage_complete")} for c in candidates]
     return out
 
 
@@ -675,6 +767,62 @@ def _не_проверено(profile_id, причина):
             "статус": "не проверено", "причина": причина}
 
 
+def _рекомендация(profile_id, light, found):
+    """Фактическая часть — из оценённых сигналов; советы не заявляют новых фактов."""
+    if found:
+        facts = "Найдены сигналы: %s. " % "; ".join(s["описание"] for s in found)
+    else:
+        facts = "По проверенным применимым сигналам профиля риски не выявлены. "
+    actions = {
+        "отсрочка": {
+            "🟢": "Лимит и срок отсрочки согласуйте по сумме сделки; обновите снимок перед отгрузкой.",
+            "🟡": "Предоплата или частичная предоплата; отсрочка — только под обеспечение.",
+            "🔴": "Отсрочку не давать: только 100% предоплата или отказ; обеспечение согласуйте отдельно.",
+        },
+        "предоплата": {
+            "🟢": "Аванс согласуйте частями по этапам.",
+            "🟡": "Предоплату ограничить первым этапом; остальное по факту поставки или через аккредитив.",
+            "🔴": "Предоплату не вносить; оплата по факту поставки, аккредитив или отказ.",
+        },
+        "подрядчик": {
+            "🟢": "Оплата по актам приёмки; проверьте СРО, если вид работ его требует.",
+            "🟡": "Нанимать с оплатой по этапам после приёмки, без аванса; проверить СРО и отзывы.",
+            "🔴": "Не нанимать до разбора стоп-сигнала; условия приёмки согласуйте отдельно.",
+        },
+        "доля": {
+            "🟢": "Перед сделкой проверьте залоги долей и историю учредителей.",
+            "🟡": "Найденные факты — аргумент для переговоров о цене и условиях; запросите гарантии продавца.",
+            "🔴": "Сначала устранение стоп-сигнала продавцом, затем переговоры о покупке доли.",
+        },
+        "клиент_115фз": {
+            "🟢": "Проведите идентификацию; бенефициаров уточните по анкете клиента.",
+            "🟡": "Усиленная идентификация: документы о бенефициарах, источник средств, уровень риска ЗСК через банк.",
+            "🔴": "Принимать без решения ответственного по 115-ФЗ нельзя; совпадение по имени требует ручной сверки.",
+        },
+        "самопроверка": {
+            "🟢": "Поддерживайте актуальность отчётности и сведений ЕГРЮЛ.",
+            "🟡": "Разберите найденные сигналы и подготовьте подтверждающие документы для покупателя и банка.",
+            "🔴": "До сделок устраните причину найденного стоп-сигнала.",
+        },
+        "получаю_предоплату": {
+            "🟢": "Принимайте деньги на договор с предметом и сроком; исполните свою часть в срок.",
+            "🟡": "Дождитесь банковских проверок, сохраните договор, счёт и переписку; не тратьте аванс до поставки.",
+            "🔴": "Предоплату не брать до разбора стоп-сигнала; согласуйте оплату по факту поставки или отказ.",
+        },
+        "тендер": {
+            "🟢": "До подачи проверьте историю контрактов и жалобы ФАС; исполнение по 44-ФЗ требует ручной проверки.",
+            "🟡": "Проверьте обеспечение контракта и банковскую гарантию с учётом найденных сигналов.",
+            "🔴": "В тендер в этом виде не идти до разбора найденного стоп-сигнала.",
+        },
+    }
+    action = actions.get(profile_id, {}).get(light)
+    if action is None:
+        # Для незнакомого профиля не используем непроверенные утверждения
+        # из произвольного текстового шаблона.
+        action = "Условия сделки согласуйте после разбора перечисленных фактов."
+    return facts + action
+
+
 def resolve(fetch_json, fin_json, profile_id, profiles=None):
     """Светофор по профилю. См. правило в docstring модуля."""
     try:
@@ -692,8 +840,18 @@ def resolve(fetch_json, fin_json, profile_id, profiles=None):
     if not isinstance(prof, dict):
         return _не_проверено(profile_id, "неизвестный профиль %r; доступны: %s"
                              % (profile_id, ", ".join(профили)))
+    contract = _load_sibling("evidence_contract")
+    _digest, _resource = contract._digest, contract._resource
+    bind_financial, decision_metadata, prepare = contract.bind_financial, contract.decision_metadata, contract.prepare
+    fetch_json = prepare(fetch_json)
+    fetch_json["_evidence"]["rules_version"] = _digest({"profiles": profiles,
+        "canon": _resource("canon_ru.json"), "policy": _resource("evidence_policy.json")})
+    if fin_json is None:
+        fin_scoring = _load_sibling("fin_scoring")
+        fin_json = fin_scoring.score(fetch_json)
+    fetch_json = bind_financial(fetch_json, fin_json)
     sources = _sources()
-    сигналы = extract_signals(fetch_json, fin_json, profiles)
+    сигналы = extract_signals(fetch_json, fin_json, profiles, _prepared=True)
     dk = list(prof.get("deal_killers") or [])
     ov = prof.get("severity_override") or {}
 
@@ -710,21 +868,24 @@ def resolve(fetch_json, fin_json, profile_id, profiles=None):
         fetch_ok, fetch_нп = _по_доступности(fetch_json, sources)
     найдены = [s for s in сигналы if s["статус"] == "найден"]
     не_проверены = [s for s in сигналы if s["статус"] == "не проверен"]
-    dk_нп = [s["id"] for s in не_проверены if s["id"] in dk]
+    # Переопределённый красный сигнал требует той же полноты, что deal-killer.
+    dk_нп = [s["id"] for s in не_проверены
+             if s["id"] in dk or ov.get(s["id"]) == "🔴"]
     состоялась = bool(fetch_ok) and not dk_нп
-    источники_нп = [src for src in prof.get("источники_обязательные") or []
+    required_sources = prof.get("источники_обязательные") or []
+    источники_нп = [src for src in required_sources
                     if _состояние_блока(fetch_json, src)[0] == "не проверено"]
-    # Ручной блок обязательного источника «проверено», но поле его сигнала не
-    # заполнено: сигнал «не проверен», а 🟢 утверждал бы «крупных исков и долгов
-    # не найдено». Найденные сигналы блока при этом работают (🔴/🟡 выдаются),
-    # зелёный — нет. Скриптовые блоки не трогаем: их пустые поля — описанный
-    # предел источника (pb с не-РФ сети), и правило сделало бы 🟢 недостижимым.
-    for s in не_проверены:
-        for путь in (profiles["сигналы"].get(s["id"]) or {}).get("откуда") or []:
-            src = str(путь).partition(".")[0]
-            if (src in (prof.get("источники_обязательные") or [])
-                    and src not in источники_нп and _ручной_блок(fetch_json, src)):
-                источники_нп.append(src)
+    required_unknown = []
+    for signal in не_проверены:
+        paths = (profiles["сигналы"].get(signal["id"]) or {}).get("откуда") or []
+        blocks = [str(path).partition(".")[0] for path in paths]
+        blocks = ["финансы" if block == "fin" else block for block in blocks]
+        if sev(signal) != "⚪" and (signal["id"] in dk_нп or
+                                    any(block in required_sources for block in blocks)):
+            required_unknown.append(signal["id"])
+            for block in blocks:
+                if block in required_sources and block not in источники_нп:
+                    источники_нп.append(block)
 
     факты = [_факт(s) for s in sorted(
         сигналы, key=lambda r: (_ПОРЯДОК_ФАКТОВ.get(r["статус"], 9),
@@ -749,24 +910,27 @@ def resolve(fetch_json, fin_json, profile_id, profiles=None):
             светофор = None
         else:
             светофор = "🟢"
-        rec = prof.get("рекомендации") or {}
         if светофор is None and состоялась:
             рекомендация = ("🟢 не выдаётся: стоп-сигналов не найдено, но из обязательных "
                             "источников профиля не проверено — %s. Добрать по каскаду "
                             "(SKILL.md, шаг 4) и повторить." % ", ".join(источники_нп))
+            if required_unknown:
+                рекомендация += " Не проверены сигналы: %s." % ", ".join(required_unknown)
         elif светофор is None:
             что = dk_нп or fetch_нп or источники_нп
             рекомендация = ("проверка не состоялась: не проверены deal-killer-сигналы/источники — %s. "
                             "Светофор не выдаётся; добрать по каскаду (SKILL.md, шаг 4) и повторить."
                             % (", ".join(что) if что else "см. «не проверено» в фактах"))
         else:
-            рекомендация = rec.get(светофор) or ""
+            рекомендация = _рекомендация(profile_id, светофор, поднят)
             if not состоялась:
                 рекомендация += " Проверка неполная: не проверено — %s." % ", ".join(
                     dk_нп or fetch_нп or источники_нп)
             elif источники_нп:
                 рекомендация += " Из обязательных источников профиля не проверено: %s." % ", ".join(
                     источники_нп)
+            if required_unknown and светофор is not None:
+                рекомендация += " Не проверены обязательные сигналы: %s." % ", ".join(required_unknown)
     out = {
         "профиль": profile_id,
         "вопрос": prof.get("вопрос"),
@@ -778,6 +942,7 @@ def resolve(fetch_json, fin_json, profile_id, profiles=None):
         "рекомендация": рекомендация,
         "факты": факты,
         "не_проверено_deal_killer": dk_нп,
+        "не_проверено_обязательные_сигналы": required_unknown,
         "проверка_состоялась": состоялась,
         "источники_обязательные_не_проверены": источники_нп,
         "вручную": list(prof.get("вручную") or []),
@@ -786,6 +951,17 @@ def resolve(fetch_json, fin_json, profile_id, profiles=None):
         out["подсказка"] = prof.get("подсказка")
     if isinstance(итог, dict) and итог.get("вывод"):
         out["итог_fetch"] = итог.get("вывод")
+    out["_signals"] = сигналы
+    out["_decision"] = decision_metadata(fetch_json, out, profile_id, profiles)
+    out.pop("_signals")
+    for fact, signal in ((fact, next(s for s in сигналы if s["id"] == fact["сигнал"])) for fact in out["факты"]):
+        fact["claim_ids"] = signal.get("claim_ids", [])
+        fact["evidence"] = signal.get("evidence", [])
+    if not out["_decision"]["can_recommend"] and prof.get("формулировка") != "факты":
+        gaps = ", ".join(m["rule_id"] for m in out["_decision"]["missing_evidence"])
+        out["рекомендация"] = (("Проверка не состоялась. " if not состоялась else "") +
+                               "Недостаточно подтверждённых данных для рекомендации по сделке. "
+                                "Проверить: " + (gaps or "полноту обязательных источников") + ".")
     return out
 
 
@@ -813,6 +989,10 @@ def _читать_json(path):
 
 
 def main(argv):
+    # JSON CLI protocol is UTF-8 independently of the host console code page.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = argv[1:]
     if not args or "-h" in args or "--help" in args:
         sys.stderr.write(__doc__)

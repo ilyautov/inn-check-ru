@@ -1,0 +1,541 @@
+{
+  "schema_version": 1,
+  "policy_version": "1",
+  "max_dependencies": 32,
+  "freshness": {
+    "unknown_v1": {
+      "ttl_seconds": null,
+      "basis": null,
+      "rationale": "Нет проверенного срока актуальности; текущая свежесть не утверждается."
+    },
+    "annual_staff_v1": {
+      "ttl_seconds": null,
+      "basis": "period",
+      "rationale": "Год ССЧ из среднесписочная_за_год/численность_год/год; загрузка не переименовывает период."
+    },
+    "annual_financial_v1": {
+      "ttl_seconds": null,
+      "basis": "period",
+      "rationale": "Конкретный год бухгалтерской отчётности; исторический лист без произвольного TTL."
+    },
+    "sanctions_v1": {
+      "ttl_seconds": 604800,
+      "basis": "effective_at",
+      "rationale": "scripts/sanctions_check.py:CACHE_TTL_DAYS=7. Граница этого контракта: stale при now >= expiry."
+    },
+    "historical_event_v1": {
+      "ttl_seconds": null,
+      "basis": "effective_at",
+      "rationale": "Датированное положительное событие сохраняется как история; источник current coverage отдельно."
+    },
+    "registry_v1": {
+      "ttl_seconds": null,
+      "basis": null,
+      "rationale": "Срок текущего юридического факта не равен TTL access probe 24ч; проверенного claim TTL нет."
+    }
+  },
+  "fields": {
+    "fin.коэффициент_автономии": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.падение_выручки": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.текущая_ликвидность": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.транзитный_профиль": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.убыток_2года": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.ча_ниже_уставного_капитала": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "fin.ча_отрицательные_2года": {
+      "source_id": "fin",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": true
+    },
+    "агрегатор.дисквалификация_руководителя": {
+      "source_id": "агрегатор",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "агрегатор.недостоверность_сведений": {
+      "source_id": "агрегатор",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "банкротство.дело": {
+      "source_id": "банкротство",
+      "origin_family": "fedresurs_bankruptcy",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "банкротство.заявления": {
+      "source_id": "банкротство",
+      "origin_family": "fedresurs_bankruptcy",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "банкротство.прекращённое_дело": {
+      "source_id": "банкротство",
+      "origin_family": "fedresurs_bankruptcy",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "банкротство.процедура": {
+      "source_id": "банкротство",
+      "origin_family": "fedresurs_bankruptcy",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "дампы_фнс.год": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_opendata",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "дампы_фнс.налоговая_задолженность": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_opendata",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "дампы_фнс.недоимка_на_дату": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_opendata",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "дампы_фнс.недоимка_руб.всего": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_opendata",
+      "freshness_policy": "unknown_v1",
+      "unit": "RUB",
+      "derived": false
+    },
+    "дампы_фнс.численность_год": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_staff",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "дампы_фнс.численность_сотрудников": {
+      "source_id": "дампы_фнс",
+      "origin_family": "fns_staff",
+      "freshness_policy": "annual_staff_v1",
+      "unit": "person",
+      "derived": false
+    },
+    "дисквалифицированные.дисквалификация_руководителя": {
+      "source_id": "дисквалифицированные",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "егрюл.дата_прекращения": {
+      "source_id": "егрюл",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "егрюл.дата_регистрации": {
+      "source_id": "егрюл",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "егрюл.статус": {
+      "source_id": "егрюл",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "егрюл.уставный_капитал": {
+      "source_id": "егрюл",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": "RUB",
+      "derived": false
+    },
+    "еркнм.проверок": {
+      "source_id": "еркнм",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false,
+      "requires_scope_for_zero": true
+    },
+    "мсп.статус_мсп": {
+      "source_id": "мсп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.дисквалификация_руководителя": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.массовый_адрес": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.массовый_руководитель": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.налоговая_задолженность": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.недостоверность_сведений": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.спецрежим": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.среднесписочная_за_год": {
+      "source_id": "риски",
+      "origin_family": "fns_staff",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.статус": {
+      "source_id": "риски",
+      "origin_family": "fns_egrul",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.численность_год": {
+      "source_id": "риски",
+      "origin_family": "fns_staff",
+      "freshness_policy": "registry_v1",
+      "unit": null,
+      "derived": false
+    },
+    "риски.численность_сотрудников": {
+      "source_id": "риски",
+      "origin_family": "fns_staff",
+      "freshness_policy": "annual_staff_v1",
+      "unit": "person",
+      "derived": false
+    },
+    "рнп.в_реестре": {
+      "source_id": "рнп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "санкции.совпадения": {
+      "source_id": "санкции",
+      "origin_family": null,
+      "freshness_policy": "sanctions_v1",
+      "unit": null,
+      "derived": false
+    },
+    "спецреестры.дисквалификация_руководителя": {
+      "source_id": "спецреестры",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "спецреестры.налоговая_задолженность": {
+      "source_id": "спецреестры",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "спецреестры.недостоверность_сведений": {
+      "source_id": "спецреестры",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "список_цб.формулировка": {
+      "source_id": "список_цб",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "сро.право_не_действует": {
+      "source_id": "сро",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "сро_проект.право_не_действует": {
+      "source_id": "сро_проект",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "суды.ответчик_крупные": {
+      "source_id": "суды",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.намерение_должника": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.намерение_кредитора": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.недостоверность_сведений": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.реорганизация": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.решение_о_ликвидации": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.роль_не_распознана": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "федресурс.сообщения": {
+      "source_id": "федресурс",
+      "origin_family": "fedresurs_messages",
+      "freshness_policy": "historical_event_v1",
+      "unit": null,
+      "derived": false
+    },
+    "финансы.версия_формы": {
+      "source_id": "финансы",
+      "origin_family": "fns_girbo",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "финансы.форма_отчётности": {
+      "source_id": "финансы",
+      "origin_family": "fns_girbo",
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "фссп.долг_погашенный": {
+      "source_id": "фссп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "фссп.долг_текущий": {
+      "source_id": "фссп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "фссп.крупные": {
+      "source_id": "фссп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false
+    },
+    "фссп.производств": {
+      "source_id": "фссп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": null,
+      "derived": false,
+      "requires_scope_for_zero": true
+    },
+    "фссп.сумма": {
+      "source_id": "фссп",
+      "origin_family": null,
+      "freshness_policy": "unknown_v1",
+      "unit": "RUB",
+      "derived": false
+    }
+  },
+  "financial_rows": {
+    "2110": [
+      "выручка"
+    ],
+    "2400": [
+      "прибыль_убыток",
+      "прибыль",
+      "чистая_прибыль"
+    ],
+    "1600": [
+      "активы"
+    ],
+    "1300": [
+      "капитал",
+      "чистые_активы"
+    ],
+    "1500": [
+      "обязательства_краткосрочные"
+    ],
+    "1400": [
+      "обязательства_долгосрочные"
+    ],
+    "1200": [
+      "оборотные_активы"
+    ],
+    "1250": [
+      "денежные_средства"
+    ]
+  },
+  "financial_rule_inputs": {
+    "ча_отрицательные_2года": [
+      "1300:current",
+      "1300:previous"
+    ],
+    "ча_ниже_уставного_капитала": [
+      "1300:current",
+      "егрюл.уставный_капитал"
+    ],
+    "коэффициент_автономии": [
+      "1300:current",
+      "1600:current"
+    ],
+    "текущая_ликвидность": [
+      "1200:current",
+      "1500:current"
+    ],
+    "падение_выручки": [
+      "2110:current",
+      "2110:previous"
+    ],
+    "убыток_2года": [
+      "2400:current",
+      "2400:previous"
+    ],
+    "транзитный_профиль": [
+      "2110:current",
+      "2110:previous",
+      "численность_сотрудников"
+    ]
+  },
+  "forms": {
+    "full": {
+      "rule_status": "applicable",
+      "reason_code": null
+    },
+    "simplified": {
+      "rule_status": "unknown",
+      "reason_code": "unsupported_form",
+      "rationale": "Метка формы — контекст, не доказательство недоступности строки. Достаточные раскрытые листы оставляют правило applicable; недостающие — unknown."
+    },
+    "ip": {
+      "rule_status": "not_applicable",
+      "reason_code": "not_measurable_for_form"
+    },
+    "bank": {
+      "rule_status": "unknown",
+      "reason_code": "unsupported_form"
+    },
+    "npo": {
+      "rule_status": "unknown",
+      "reason_code": "unsupported_form"
+    },
+    "restricted": {
+      "rule_status": "unknown",
+      "reason_code": "not_disclosed"
+    }
+  }
+}

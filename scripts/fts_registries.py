@@ -41,7 +41,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dump_tools
 
-CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru", "fts"))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+CACHE_DIR = str(dataset_root("fts_registries"))
 CACHE_DIR_ВИДИМЫЙ = "~/.cache/inn-check-ru/fts"
 ИНДЕКС = "индекс.json.gz"
 САЙТ = "https://customs.gov.ru"

@@ -1,0 +1,396 @@
+{
+  "type": "object",
+  "required": [
+    "protocol",
+    "rows"
+  ],
+  "properties": {
+    "protocol": {
+      "$ref": "#/$defs/protocol"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "outcome-cohort.schema.json",
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "study_id",
+        "mode",
+        "frozen_at",
+        "engine_hash",
+        "rules_hash",
+        "rubric_hash",
+        "analysis_at",
+        "outcomes_read_at",
+        "horizon_days",
+        "sampling_frame",
+        "target_ci_width",
+        "min_events",
+        "confidence_method",
+        "attrition_policy",
+        "weights_policy",
+        "adjudication_policy",
+        "strata",
+        "split"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "study_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "synthetic",
+            "real"
+          ]
+        },
+        "frozen_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "engine_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rules_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rubric_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "analysis_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "outcomes_read_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "horizon_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampling_frame": {
+          "type": "object",
+          "required": [
+            "description",
+            "frame_hash",
+            "method",
+            "independent_groups"
+          ],
+          "properties": {
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "frame_hash": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "method": {
+              "enum": [
+                "simple_random",
+                "stratified",
+                "convenience",
+                "case_control"
+              ]
+            },
+            "independent_groups": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "target_ci_width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "min_events": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "confidence_method": {
+          "const": "wilson_95"
+        },
+        "attrition_policy": {
+          "const": "count_and_block_inference"
+        },
+        "weights_policy": {
+          "const": "unit_only"
+        },
+        "adjudication_policy": {
+          "const": "two_independent_blinded_then_third"
+        },
+        "strata": {
+          "const": [
+            "form",
+            "size",
+            "sector",
+            "no_reporting"
+          ]
+        },
+        "split": {
+          "type": "object",
+          "required": [
+            "train_subjects",
+            "train_groups",
+            "test_subjects",
+            "test_groups"
+          ],
+          "properties": {
+            "train_subjects": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "train_groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "test_subjects": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "test_groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "row": {
+      "type": "object",
+      "required": [
+        "inn",
+        "split",
+        "group_id",
+        "synthetic",
+        "decision_at",
+        "data_available_at",
+        "green",
+        "engine_hash",
+        "rules_hash",
+        "weight",
+        "strata",
+        "followup_status",
+        "outcomes"
+      ],
+      "properties": {
+        "inn": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "test"
+          ]
+        },
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synthetic": {
+          "type": "boolean"
+        },
+        "decision_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "data_available_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "green": {
+          "type": "boolean"
+        },
+        "engine_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rules_hash": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "weight": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "strata": {
+          "type": "object",
+          "required": [
+            "form",
+            "size",
+            "sector",
+            "no_reporting"
+          ],
+          "properties": {
+            "form": {
+              "enum": [
+                "full",
+                "simplified",
+                "ip",
+                "bank",
+                "npo",
+                "restricted",
+                "unknown"
+              ]
+            },
+            "size": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "no_reporting": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "followup_status": {
+          "enum": [
+            "retained",
+            "lost",
+            "withdrawn"
+          ]
+        },
+        "outcomes": {
+          "type": "object",
+          "required": [
+            "case_filed",
+            "procedure_opened",
+            "liquidation",
+            "client_loss"
+          ],
+          "properties": {
+            "case_filed": {
+              "$ref": "#/$defs/outcome"
+            },
+            "procedure_opened": {
+              "$ref": "#/$defs/outcome"
+            },
+            "liquidation": {
+              "$ref": "#/$defs/outcome"
+            },
+            "client_loss": {
+              "$ref": "#/$defs/outcome"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "outcome": {
+      "type": "object",
+      "required": [
+        "status",
+        "event_at",
+        "horizon_end",
+        "observed_until",
+        "reference"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "event",
+            "no_event",
+            "censored",
+            "missing_oracle"
+          ]
+        },
+        "event_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "horizon_end": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "observed_until": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "reference-review.schema.json"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

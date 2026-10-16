@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "frozen_at": "2026-10-16T09:00:00Z",
+  "seed": 601016,
+  "rubric_path": "benchmark/decision-rubric.json",
+  "rubric_sha256": "4a8562c54ccf13d37315b6baa5a3003c1d10ccb2b2937bf25c56057d5aa71286",
+  "corpus_path": "eval/fixtures/workflow-scenarios.json",
+  "corpus_sha256": "a0da9df00fc81b9a93850c553a9ea364b39ebe53533516608f9b1f9a14352afb",
+  "case_ids": [
+    "full_complete_negative",
+    "full_positive",
+    "simplified_segment",
+    "ip_segment",
+    "bank_segment",
+    "npo_segment",
+    "restricted_segment",
+    "required_missing_risk",
+    "necessary_leaf_removed",
+    "current_debt",
+    "repaid_debt",
+    "bankruptcy_debtor",
+    "bankruptcy_creditor_intent",
+    "bankruptcy_company_is_creditor",
+    "bankruptcy_role_unknown",
+    "mixed_years",
+    "manual_declined",
+    "incomplete_pages",
+    "incomplete_index",
+    "timeout",
+    "truncation",
+    "unknown_enum",
+    "raw_loss",
+    "mirror_duplicate",
+    "provider_reversal",
+    "provider_conflict",
+    "unit_conversion",
+    "annual_reload",
+    "oracle_missing"
+  ],
+  "cases_sha256": "621508fe43989c6c658b5c957b72cd5e68fad96ab4b111bd6204f8564d2ca916",
+  "synthetic_cases": 29,
+  "representative_cases": 0,
+  "independent_review_status": "awaiting_external_evidence",
+  "adjudication_status": "not_performed",
+  "revision": 6,
+  "history": [
+    {
+      "revision": 1,
+      "corpus_sha256": "ff7422bb4b3a1f6c9a9d0c3d9044656635e566531814694eaafd801ef9212902",
+      "rubric_sha256": "3593776ab92aaa0de2e6413953712a92d2056651a49da7e09c02d5c479ba7db1",
+      "reason": "Initial frozen corpus; first diagnostic found missing synthetic manual source date/url. No successful benchmark claimed."
+    },
+    {
+      "revision": 2,
+      "corpus_sha256": "38841da03e25a645041453c329fe1f472b6fb36a5ca511370a3d9f117109423b",
+      "rubric_sha256": "b770deb94f344212eb7ab8d740802db65c0f7dd812cdf0f8a511b3ed86e49bcd",
+      "reason": "Revision 3 closes final-output assertion/provenance gate; no existing expected atomic label changed. Adds finite presentation contract and hashed signal/source vocabulary, not renderer-output snapshots."
+    },
+    {
+      "revision": 3,
+      "corpus_sha256": "38841da03e25a645041453c329fe1f472b6fb36a5ca511370a3d9f117109423b",
+      "rubric_sha256": "dce2e909d524b6ae9eb9304b80e1b0fa4e0fb2f56bdae4ddaf8309fa1549a960",
+      "reason": "Revision 4 removes inspected-output prose from oracle permissions, binds expiry and all source dates independently, and counts rejected heading assertions. Corpus, all source observations and expected atomic labels are unchanged."
+    },
+    {
+      "revision": 4,
+      "corpus_sha256": "38841da03e25a645041453c329fe1f472b6fb36a5ca511370a3d9f117109423b",
+      "rubric_sha256": "c2790b2f9f766f96a8b72a6933a777d3aa8eee86f2cd6b5b0c440c27c353480a",
+      "reason": "Revision 5 replaces key-only output checks with an independent recursive typed boundary contract. All corpus bytes, expected atomic labels and source observations remain unchanged."
+    },
+    {
+      "revision": 5,
+      "corpus_sha256": "38841da03e25a645041453c329fe1f472b6fb36a5ca511370a3d9f117109423b",
+      "rubric_sha256": "6ab83a597ba48fcd914f6f777559a4b7d02c510136026c5011907d2f9cad0781",
+      "output_schema_revision": 1,
+      "output_schema_sha256": "593f09b70110e0266ed417d204de7fdf2e91bffef5cab47c5cc96221710dd074",
+      "reason": "Revision 6 adds independently declared structural cardinality and dependent-field bounds before indexed/nullable traversal. Corpus bytes, source observations, expected atomic labels and all earlier history remain unchanged."
+    }
+  ],
+  "recorded_fixture_source": {
+    "path": "eval/fixtures/net/егрюл_7707083893.raw.json",
+    "sha256": "7c51d21f0370820c3f112f58372e04b53a6a32f7c12bd5b0dd7065fd13b1a28b",
+    "license": "Existing repository test fixture; no new government-data redistribution license asserted",
+    "oracle_status": "existing_parser_fixture_not_independent_decision_oracle",
+    "scope": "Separate parser-to-CLI-dossier smoke test, excluded from synthetic 29-case metrics"
+  },
+  "output_schema_path": "benchmark/decision_schema.py",
+  "output_schema_revision": 2,
+  "output_schema_sha256": "7e13a49c2996064c212b8526fe69d59cc5c05734774499b88c3a0004aef6eb9b",
+  "corpus_revision": 2,
+  "corpus_revision_history": [
+    {
+      "revision": 1,
+      "corpus_sha256": "38841da03e25a645041453c329fe1f472b6fb36a5ca511370a3d9f117109423b",
+      "cases_sha256": "ed9c0694bfe6cfae9b6443a7698b2ed517c0c391ed5659e5630066555fb60e98",
+      "synthetic_cases": 29,
+      "reason": "Original normalized-input/source-stimulus revision; retained as explicit pre-amendment evidence."
+    },
+    {
+      "revision": 2,
+      "corpus_sha256": "a0da9df00fc81b9a93850c553a9ea364b39ebe53533516608f9b1f9a14352afb",
+      "cases_sha256": "621508fe43989c6c658b5c957b72cd5e68fad96ab4b111bd6204f8564d2ca916",
+      "synthetic_cases": 29,
+      "reason": "Correct exactly one synthetic stimulus so mixed_years exercises necessary staff period mismatch: 2025 revenue 120000 to 500000, prior revenue 100000 unchanged (growth 20% to 400%). The normalized field and corresponding frozen raw operand change together; unknown/period_mismatch and can_recommend=false labels are retained. All other 28 cases and every atomic/source/review/adjudication label are unchanged.",
+      "amended_case": "mixed_years",
+      "previous_case_sha256": "4c2882da2968ae8db6eb2b6d6fdb448d62430a8f3a9088c939ec581aaf667dd9",
+      "case_sha256": "71d6a76da200dcd21b7c1a67173795f3f7bbf9464043a3a13ece67e99c2e76cb",
+      "changed_operand": {
+        "normalized_path": "fetch.финансы.отчётность_по_годам.2025.строки.2110",
+        "recording_id": "финансы",
+        "raw_locator": "/payload/отчётность_по_годам/0/строки/2110",
+        "before": 120000,
+        "after": 500000
+      },
+      "previous_input_sha256": "2c25bef374c58047d2a8379d3d811f3c1ef114220a77c8ef5577840b9e421f2b",
+      "input_sha256": "fb58790a98d0673a1076a8f5c1ea67ba113eeea7bd48b437317bcdcd6e093639",
+      "previous_recording_sha256": "35109cfb320d75f3f8d7ee05f5d91dbf52088d1f35969157be4806f0a8585eb1",
+      "recording_sha256": "42b27bd12c962f0183242adad8a86781f6f75b0b2306b3bfeb571022783881fe",
+      "unchanged_other_cases": 28,
+      "expected_labels_unchanged": true
+    }
+  ]
+}

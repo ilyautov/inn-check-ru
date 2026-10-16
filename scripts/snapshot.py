@@ -153,7 +153,7 @@ def остальное(result):
     без телеметрии прогона, без сессионных токенов и без посуточно меняющихся
     служебных отметок."""
     rest = copy.deepcopy(result) if isinstance(result, dict) else {}
-    for ключ in _ТЕЛЕМЕТРИЯ:
+    for ключ in (*_ТЕЛЕМЕТРИЯ, "_evidence", "_decision"):
         rest.pop(ключ, None)
     _вычистить_токены(rest)
     av_map = rest.get("_доступность")
@@ -210,7 +210,7 @@ def остальное(result):
     "риски": ("массовый_адрес", "массовый_руководитель",
               "дисквалификация_руководителя", "численность_сотрудников",
               "спецрежим", "статус", "налоговая_задолженность", "недостоверность_сведений",
-              "среднесписочная_за_год"),
+              "среднесписочная_за_год", "численность_год"),
     "спецреестры": ("дисквалификация_руководителя", "налоговая_задолженность",
                     "недостоверность_сведений"),
     "санкции": ("совпадений", "статус"),
@@ -233,7 +233,9 @@ def остальное(result):
     "еркнм": ("в_реестре", "проверок"),
     "сро": ("право_не_действует",),
     "сро_проект": ("право_не_действует",),
-    "дампы_фнс": ("налоговая_задолженность",),
+    # Численность и её период участвуют в правиле транзита. Отсутствовавшие
+    # в старом снимке значения восстановитель по-прежнему не достраивает.
+    "дампы_фнс": ("налоговая_задолженность", "численность_сотрудников", "численность_год"),
     # статус МСП — вход не_в_мсп; нужен и ручному блоку при молчавшем скрипте
     "мсп": ("статус_мсп",),
     # строки отчётности добавляет _финансы_вердикт; здесь — контракт блока
@@ -294,7 +296,33 @@ def _финансы_вердикт(result):
             if v is not None:
                 строки[код] = v
         out.append({"год": rec.get("год"), "строки": строки})
-    return {"отчётность_по_годам": out} if out else {}
+    result_fin = result.get("финансы") or {}
+    context = {k: copy.deepcopy(result_fin[k]) for k in ("форма_отчётности", "версия_формы") if k in result_fin}
+    return dict(context, отчётность_по_годам=out) if out or context else {}
+
+
+def captured_provider_marker(result):
+    """Retain a saved permission marker, including present null/malformed values.
+
+    Fingerprints may carry it at the root and in the verdict adapter. Neither
+    representation may silently override the other. Validation belongs to the
+    export boundary; the internal snapshot must not erase a refused marker.
+    """
+    if not isinstance(result, dict):
+        return {}
+    verdict = result.get("вердикт")
+    containers = [result] + ([verdict] if isinstance(verdict, dict) else [])
+    markers = [container["_provider_policy"] for container in containers
+               if "_provider_policy" in container]
+    if len(markers) > 1:
+        try:
+            # JSON comparison distinguishes bool/int and int/float, unlike ==.
+            same = json.dumps(markers[0], sort_keys=True) == json.dumps(markers[1], sort_keys=True)
+        except (TypeError, ValueError):
+            same = False
+        if not same:
+            raise ValueError("invalid_captured_provider_policy")
+    return {"_provider_policy": copy.deepcopy(markers[0])} if markers else {}
 
 
 def вердиктные(result):
@@ -309,7 +337,8 @@ def вердиктные(result):
         return {}
     сост = состояния(result)
     дост = result.get("_доступность") if isinstance(result.get("_доступность"), dict) else {}
-    out = {}
+    out = {k: copy.deepcopy(result[k]) for k in ("_evidence", "_decision") if isinstance(result.get(k), dict)}
+    out.update(captured_provider_marker(result))
     for блок, ключи in ВЕРДИКТНЫЕ_ПОЛЯ.items():
         данные = result.get(блок)
         if not isinstance(данные, dict):
@@ -319,7 +348,9 @@ def вердиктные(result):
         # (profiles._состояние_блока), что и живой резолвер.
         заявлен = str(данные.get("статус") or "").strip().lower() in (
             "проверено", "ok", "ок", "собрано")
-        взято = {k: данные[k] for k in ключи if k in данные}
+        evidence_fields = {c["field"].split(".")[1] for c in (result.get("_evidence") or {}).get("claims", {}).values()
+                           if isinstance(c, dict) and c.get("field", "").startswith(блок + ".")}
+        взято = {k: данные[k] for k in set(ключи) | evidence_fields if k in данные}
         # Поля контракта ручного блока (profiles._состояние_блока) — у любого
         # вердиктного блока, из блока или из _доступность: без них ретро того же
         # снимка не засчитало бы ручную проверку, которую засчитал живой резолвер.
@@ -354,10 +385,15 @@ def хеш_остального(result):
 
 def fingerprint(result, дата=None):
     """Нормализованный отпечаток полного результата fetch_counterparty.collect()."""
+    marker = captured_provider_marker(result)
     if _diff.это_отпечаток(result):
-        return copy.deepcopy(result)
+        normalized = copy.deepcopy(result)
+        normalized.update(marker)
+        return normalized
     result = result if isinstance(result, dict) else {}
     return {
+        **{k: copy.deepcopy(result[k]) for k in ("_evidence", "_decision") if k in result},
+        **marker,
         "версия_формата": ВЕРСИЯ_ФОРМАТА,
         "инн": result.get("инн"),
         "дата": дата or time.strftime("%Y-%m-%dT%H:%M:%S"),

@@ -7,6 +7,7 @@
 /.codex-plugin/
 /.cursor-plugin/
 /.dockerignore
+/.gitattributes
 /.github/
 /.gitignore
 /.mcp.json
@@ -26,6 +27,7 @@
 /commands/
 /docs/
 /eval/
+/examples/
 /extension/
 /gemini-extension.json
 /mcp/

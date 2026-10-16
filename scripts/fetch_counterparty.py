@@ -80,10 +80,11 @@ _итог_проверки (§1.3): сколько deal-killer-источник�
 """
 
 import concurrent.futures
+import contextvars
+import copy
 import datetime as _dt
 import html
 import http.cookiejar
-import importlib.util
 import itertools
 import json
 import math
@@ -97,6 +98,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
+from contextlib import contextmanager
 
 TIMEOUT = 25
 RETRIES = 2
@@ -106,6 +109,7 @@ POLL_DELAY = 1.5
 # последовательный обход источников с поллингом висел бы 5+ минут.
 DEADLINE = float(os.environ.get("COUNTERPARTY_DEADLINE", "120"))
 _START = time.monotonic()
+_RUN_START = contextvars.ContextVar("inn_check_budget_start", default=None)
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " \
      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
@@ -116,13 +120,22 @@ ACCESS_CACHE_TTL_H = 24
 PROBE_BLOCKING = ("гео", "tls", "dns")
 
 
-def _load_sibling(name):
-    """Модуль из scripts/ рядом с этим файлом (паттерн diff_counterparty)."""
-    spec = importlib.util.spec_from_file_location(
-        name, os.path.join(os.path.dirname(os.path.abspath(__file__)), name + ".py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+# Preserve flat installed imports and legacy absolute-file entry points.
+try:
+    from sibling_imports import load_sibling as _load_sibling
+except ModuleNotFoundError as _error:
+    if _error.name != "sibling_imports":
+        raise
+    import importlib.util as _import_util
+    import sys as _import_sys
+    from pathlib import Path as _ImportPath
+    _spec = _import_util.spec_from_file_location(
+        "sibling_imports", _ImportPath(__file__).resolve().with_name("sibling_imports.py"))
+    _helper = _import_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_helper)
+    # Publish only the complete, stateless bootstrap. Concurrent bootstrap calls
+    # all select the same helper; dependency loads use Python's module locks.
+    _load_sibling = _import_sys.modules.setdefault("sibling_imports", _helper).load_sibling
 
 
 sources = _load_sibling("sources")
@@ -153,7 +166,8 @@ class SourceUnavailable(Exception):
 
 
 def _time_left():
-    return DEADLINE - (time.monotonic() - _START)
+    started = _RUN_START.get()
+    return DEADLINE - (time.monotonic() - (started if started is not None else _START))
 
 
 def _build_ssl_context(ca_bundle=None):
@@ -235,23 +249,156 @@ def _без_секретов(url):
     return _СЕКРЕТНЫЕ_ПАРАМЕТРЫ.sub(r"\1***", url or "")
 
 
-def _записать(метод, url, статус, данные, тело_запроса=None):
-    if not _ЗАПИСЬ["включена"]:
-        return
-    with _ЗАПИСЬ_LOCK:
-        _ЗАПИСЬ["ответы"].append({
-            "источник": getattr(_ИСТОЧНИК, "id", None),
-            "метод": метод, "url": _без_секретов(url), "статус": статус,
-            "время_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
-            "данные": данные or b"",
-            "тело_запроса": тело_запроса,
-        })
 
+_CAPTURE = contextvars.ContextVar("inn_check_capture", default=None)
+_ON_SOURCE = contextvars.ContextVar("inn_check_on_source", default=None)
+
+
+class CaptureWriteError(RuntimeError):
+    """Durable capture callback failed; source failure must not hide this error."""
+
+
+class CaptureSession:
+    """Per-collection thread-safe capture. It never writes files or performs I/O."""
+    def __init__(self, inn, *, secrets=(), on_response=None):
+        self.subject_inn = str(inn)
+        self.secrets = set(secrets)
+        self.on_response = on_response
+        self.failure = None
+        self.responses = []
+        self.provider_policy = _load_sibling("provider_policy").configured_policy()
+        self.provider_ledger = {}
+        self.provider_results = []
+        self._lock = threading.Lock()
+
+    def record(self, method, url, status, body, request_body=None):
+        sanitize_capture = _load_sibling("evidence_pack").sanitize_capture
+        record = {"response_id": "response-" + str(uuid.uuid4()),
+                  "источник": getattr(_ИСТОЧНИК, "id", None), "метод": method,
+                  "url": url, "статус": status,
+                  "subject_inn": str(getattr(_ИСТОЧНИК, "subject_inn", self.subject_inn)),
+                  "время_utc": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+                  "данные": body or b"", "тело_запроса": request_body}
+        _credential = _load_sibling("redaction")._credential
+        def discover(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if (_credential(key) or key == "t") and isinstance(value, str) and value:
+                        self.secrets.add(value)
+                    discover(value)
+            elif isinstance(node, list):
+                for value in node:
+                    discover(value)
+        with self._lock:
+            for value in (body, request_body):
+                if value:
+                    try:
+                        discover(json.loads(value))
+                    except (ValueError, UnicodeError):
+                        pass
+            safe = sanitize_capture(record, secrets=self.secrets)
+            self.responses.append(safe)
+        if self.on_response is not None:
+            try:
+                self.on_response(copy.deepcopy(safe))
+            except Exception as error:
+                self.failure = CaptureWriteError("capture_callback_failed")
+                raise self.failure from error
+
+    def raw_refs(self, fetch):
+        """Verified response IDs/bytes plus narrowly mapped real parser fields.
+
+        No heuristic value matching: a detail without an INN-bearing record
+        remains unmapped. Callers may add explicitly checked field mappings.
+        """
+        contract = _load_sibling("evidence_contract")
+        _pointer, _same_value = contract._pointer, contract._same_value
+        refs = {"responses": {}, "fields": {}}
+        maps = {"риски": {"статус": "sulst_name_ex", "дата_регистрации": "dtreg"},
+                "егрюл": {"дата_регистрации": "r", "дата_прекращения": "e"}}
+        with self._lock:
+            recorded = list(self.responses)
+        for response in recorded:
+            if response["subject_inn"] != self.subject_inn:
+                continue
+            rid = response["response_id"]
+            refs["responses"][rid] = {"source_id": response["источник"],
+                "subject_inn": self.subject_inn, "request": {"subject_inn": self.subject_inn,
+                    "method": response["метод"], "url": response["url"]},
+                "body": response["данные"], "sha256": response["sha256"],
+                "retrieved_at": response["время_utc"], "first_observed_at": response["время_utc"],
+                "capture_format": response["capture_format"]}
+            if response.get("статус") != 200:
+                continue
+            try:
+                raw = json.loads(response["данные"])
+            except (ValueError, UnicodeError):
+                continue
+            source = response["источник"]
+            prefixes = ("/ul/data", "/ip/data") if source == "риски" else ("/rows",) if source == "егрюл" else ()
+            for prefix in prefixes:
+                try:
+                    rows = _pointer(raw, prefix)
+                except ValueError:
+                    continue
+                if not isinstance(rows, list):
+                    continue
+                identity = "inn" if source == "риски" else "i"
+                for i, row in enumerate(rows):
+                    if not isinstance(row, dict) or str(row.get(identity)) != self.subject_inn:
+                        continue
+                    for normalized, original in maps.get(source, {}).items():
+                        block = fetch.get(source) or {}
+                        if original not in row or normalized not in block or not _same_value(row[original], block[normalized]):
+                            continue
+                        field = source + "." + normalized
+                        refs["fields"].setdefault(field, []).append({"response_id": rid,
+                            "locator": "%s/%s/%s" % (prefix, i, original),
+                            "subject_locator": "%s/%s/%s" % (prefix, i, identity),
+                            "transformation": "identity_v1"})
+        return refs
+
+
+@contextmanager
+def capture_session(inn, *, secrets=(), on_response=None):
+    """Stable Phase 2 adapter: with capture_session(inn) as cap; cap.raw_refs(fetch)."""
+    # Only the collector's known credential settings, never the whole environment.
+    configured = [os.environ.get(key, "").strip() for key in ("CHECKO_API_KEY", "DADATA_API_KEY")]
+    proxy_url = (_ПРОКСИ or {}).get("url")
+    if proxy_url:
+        try:
+            password = urllib.parse.urlsplit(proxy_url).password
+            if password:
+                configured.extend((password, urllib.parse.unquote(password)))
+        except ValueError:
+            pass
+    capture = CaptureSession(inn, secrets=tuple(secrets) + tuple(s for s in configured if s), on_response=on_response)
+    token = _CAPTURE.set(capture)
+    budget_token = _RUN_START.set(time.monotonic())
+    try:
+        yield capture
+        if capture.failure is not None:
+            raise capture.failure
+    finally:
+        _RUN_START.reset(budget_token)
+        _CAPTURE.reset(token)
+
+
+def _записать(метод, url, статус, данные, тело_запроса=None):
+    capture = _CAPTURE.get()
+    if capture is not None:
+        capture.record(метод, url, статус, данные, тело_запроса)
+    elif _ЗАПИСЬ["включена"]:
+        # Compatibility for legacy recording clients; sanitized before buffering.
+        capture = CaptureSession(getattr(_ИСТОЧНИК, "subject_inn", ""))
+        capture.record(метод, url, статус, данные, тело_запроса)
+        with _ЗАПИСЬ_LOCK:
+            _ЗАПИСЬ["ответы"].extend(capture.responses)
 
 def _тело_ошибки(e):
     """Тело HTTP-ошибки для пакета (страница геоблока — тоже доказательство).
     Читается только при включённой записи: иначе поведение движка не меняется."""
-    if not _ЗАПИСЬ["включена"]:
+    if not _ЗАПИСЬ["включена"] and _CAPTURE.get() is None:
         return b""
     try:
         return e.read() or b""
@@ -2322,7 +2469,85 @@ def parse_dadata(raw, inn):
     return данные, _av("агрегатор", "ok")
 
 
+def provider_metadata(capture):
+    """Safe immutable snapshot for full and partial saved-run checkpoints."""
+    if capture.provider_policy is None:
+        return None
+    return {"schema_version": 1, "policy": copy.deepcopy(capture.provider_policy),
+            "results": copy.deepcopy(capture.provider_results)}
+
+
+def _policy_provider_request(opener, provider, inn, fields):
+    """One paid request, existing parser, fixed endpoints; no implicit retry."""
+    key = (os.environ.get("CHECKO_API_KEY" if provider == "checko" else "DADATA_API_KEY") or "").strip()
+    def fail(reason):
+        return {"status": "error", "data": None, "reason_code": reason, "requests_used": 1}
+    if not key:
+        return fail("missing_key")
+    try:
+        if provider == "checko":
+            url = "%s?%s" % (CHECKO, urllib.parse.urlencode({"key": key, "inn": str(inn)}))
+            status, text = _http_get(opener, url, ua=UA_ПРОЕКТА, повторы=False, xhr=False)
+            if status != 200:
+                return fail("http_%s" % status)
+        else:
+            text = _http_post(opener, DADATA, json.dumps({"query": str(inn)}).encode("utf-8"), {
+                "User-Agent": UA_ПРОЕКТА, "Content-Type": "application/json",
+                "Accept": "application/json", "Authorization": "Token " + key})
+        raw = _safe_json(text)
+        if raw is None:
+            return fail("invalid_response")
+        data, availability = (parse_checko if provider == "checko" else parse_dadata)(raw, inn)
+        if data is None or availability.get("состояние") != "ok":
+            return fail("invalid_response")
+        if provider == "checko":
+            d = raw.get("data", {})
+            data["name"] = d.get("НаимСокр") or d.get("НаимПолн")
+            data["address"] = (d.get("ЮрАдрес") or {}).get("АдресРФ")
+        else:
+            d = next((x["data"] for x in raw["suggestions"] if isinstance(x, dict)
+                      and isinstance(x.get("data"), dict) and str(x["data"].get("inn")) == str(inn)
+                      and x["data"].get("branch_type") in ("MAIN", None)), {})
+            data["name"] = (d.get("name") or {}).get("short_with_opf")
+            data["address"] = (d.get("address") or {}).get("value")
+        data = {k:v for k,v in data.items() if k not in ("name", "address") or v is not None}
+        data = _load_sibling("redaction").redact(data, secrets=(key,))
+        return {"status": "ok", "data": data, "reason_code": None, "requests_used": 1}
+    except CaptureWriteError:
+        raise
+    except DeadlineExceeded:
+        return fail("timeout")
+    except SourceUnavailable as error:
+        message = str(error)
+        match = re.search(r"HTTP (401|402|403|429|500|502|503|504)\b", message)
+        return fail("http_" + match.group(1) if match else "timeout" if "timeout" in message.lower() else "unavailable")
+
+
 def fetch_aggregator(opener, inn):
+    policy_module = _load_sibling("provider_policy")
+    capture = _CAPTURE.get()
+    policy = capture.provider_policy if capture else policy_module.configured_policy()
+    if policy is not None:
+        entries = {p["id"]: p for p in policy["providers"]}
+        primary = entries.get("checko") if entries.get("checko", {}).get("enabled") else entries.get("dadata", {})
+        fields = [f for f in primary.get("allowed_fields", []) if f != "graph"]
+        if not fields:
+            return _not_checked("агрегатор", "политика: поля провайдера не разрешены")
+        result = policy_module.fetch_with_policy(inn, fields, policy,
+            request=lambda provider, subject, wanted: _policy_provider_request(opener, provider, subject, wanted),
+            ledger=capture.provider_ledger if capture else {})
+        if capture:
+            capture.provider_results.append(copy.deepcopy({k:v for k,v in result.items() if k != "data"}))
+        if result["data"] is None:
+            return _not_checked("агрегатор", "политика: " + ", ".join(result["limitations"]))
+        data = result["data"]
+        data["агрегатор"] = result["attempts"][-1]["provider"]
+        data["источник"] = data["агрегатор"] + " API — пересказ реестров, не первоисточник"
+        return data, _av("агрегатор", "ok")
+    return _fetch_aggregator_legacy(opener, inn)
+
+
+def _fetch_aggregator_legacy(opener, inn):
     провайдер, ключ = _ключ_агрегатора()
     if провайдер == "checko":
         # ключ в query-строке: пакет доказательств маскирует key= до записи
@@ -3031,6 +3256,7 @@ def _canary_cached(key):
 
 
 def _call_fetcher(source_id, opener, inn, контекст=None):
+    _ИСТОЧНИК.subject_inn = str(inn)
     """Вызов FETCHERS[id] с учётом того, принимает ли он контекст (CONTEXT_FETCHERS).
 
     Подменённые в eval fetcher'ы двух аргументов остаются рабочими: третий
@@ -3100,6 +3326,9 @@ def run_source(source_id, inn, opener=None, профиль=None, контекс�
         return _run_source(source_id, inn, opener, профиль, контекст)
     finally:
         _ИСТОЧНИК.id = прежний
+        active = _CAPTURE.get()
+        if active is not None and active.failure is not None:
+            raise active.failure
 
 
 def _run_source(source_id, inn, opener=None, профиль=None, контекст=None):
@@ -3230,8 +3459,11 @@ def reset_deadline():
     бюджетом. Сбрасывается один раз на collect(), поэтому внутри сбора дедлайн
     остаётся ОБЩИМ на обе фазы и на все потоки, как требует §1.3.
     """
-    global _START
-    _START = time.monotonic()
+    if _CAPTURE.get() is not None:
+        _RUN_START.set(time.monotonic())
+    else:
+        global _START
+        _START = time.monotonic()
 
 
 def _thread_opener():
@@ -3253,28 +3485,44 @@ def _run_wave(ids, inn, профиль, контекст, opener):
     """
     if not ids:
         return []
+    def completed(sid, pair):
+        active = _CAPTURE.get()
+        if active is not None and active.failure is not None:
+            raise active.failure
+        callback = _ON_SOURCE.get()
+        if callback is not None:
+            redact = _load_sibling("redaction").redact
+            safe = redact({"data": pair[0], "availability": pair[1]}, secrets=active.secrets if active else ())
+            callback(sid, safe["data"], safe["availability"])
+
     if len(ids) == 1 or _sequential():
-        return [(sid, run_source(sid, inn, opener=opener or _make_opener(),
-                                 профиль=профиль, контекст=контекст))
-                for sid in ids]
+        out = []
+        for sid in ids:
+            pair = run_source(sid, inn, opener=opener or _make_opener(),
+                              профиль=профиль, контекст=контекст)
+            completed(sid, pair)
+            out.append((sid, pair))
+        return out
 
     def задача(sid):
-        # opener берётся ленивым per-thread: источникам «кэш»/«браузер» он не нужен.
         return run_source(sid, inn, opener=_thread_opener(), профиль=профиль,
                           контекст=контекст)
 
     with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(MAX_WORKERS, len(ids)),
-            thread_name_prefix="источник") as pool:
-        futures = {sid: pool.submit(задача, sid) for sid in ids}
-        out = []
-        for sid in ids:
+            max_workers=min(MAX_WORKERS, len(ids)), thread_name_prefix="источник") as pool:
+        futures = {pool.submit(contextvars.copy_context().run, задача, sid): sid for sid in ids}
+        results = {}
+        for future in concurrent.futures.as_completed(futures):
+            sid = futures[future]
             try:
-                out.append((sid, futures[sid].result()))
-            except Exception as e:          # run_source сам не бросает; страховка
-                out.append((sid, _not_checked(
-                    sid, "схема: сбой параллельного сбора %s: %s" % (type(e).__name__, e))))
-    return out
+                pair = future.result()
+            except CaptureWriteError:
+                raise
+            except Exception as error:
+                pair = _not_checked(sid, "схема: сбой параллельного сбора %s: %s" % (type(error).__name__, error))
+            completed(sid, pair)
+            results[sid] = pair
+    return [(sid, results[sid]) for sid in ids]
 
 
 def _collect_phase(фаза, inn, профиль, result, av_map, opener=None):
@@ -3329,7 +3577,30 @@ def _светофор_после_quick(result, av_map, профиль):
     return вердикт.get("светофор"), [x for x in сигналы if x], None
 
 
-def collect(inn, профиль=None, режим="полный", opener=None):
+def collect(inn, профиль=None, режим="полный", opener=None, *, on_source=None):
+    """Legacy API with isolated capture and evidence; no package/global buffers."""
+    active = _CAPTURE.get()
+    if active is not None:
+        _load_sibling("cache_policy").configure_readers()
+        if active.subject_inn != str(inn):
+            raise ValueError("foreign_capture_subject")
+        token = _ON_SOURCE.set(on_source)
+        try:
+            result = _collect(inn, профиль=профиль, режим=режим, opener=opener)
+        finally:
+            _ON_SOURCE.reset(token)
+        if active.failure is not None:
+            raise active.failure
+        if active.provider_policy is not None:
+            result["_provider_policy"] = provider_metadata(active)
+        result = _load_sibling("redaction").redact(result, secrets=active.secrets)
+        enrich = _load_sibling("evidence_contract").enrich
+        return enrich(result, now=_dt.datetime.now(_dt.timezone.utc).isoformat(), raw_refs=active.raw_refs(result))
+    with capture_session(inn):
+        return collect(inn, профиль=профиль, режим=режим, opener=opener, on_source=on_source)
+
+
+def _collect(inn, профиль=None, режим="полный", opener=None):
     """Сбор по фазам -> полный результат (без записи снимка).
 
     режим (§1.2):
@@ -3617,19 +3888,14 @@ def main(argv):
             sys.stdout.write(json.dumps(
                 {"ошибка": "пакет: " + ошибка_пакета}, ensure_ascii=False, indent=2) + "\n")
             return 2
-        with _ЗАПИСЬ_LOCK:
-            _ЗАПИСЬ["ответы"] = []
-            _ЗАПИСЬ["включена"] = True
-    try:
+    with capture_session(inn) as capture:
         result = collect(inn, профиль=профиль, режим=режим or "полный")
-    finally:
-        _ЗАПИСЬ["включена"] = False
     if do_save:
         save_snapshot(inn, result, полный=(снимок == "полный"))
     if пакет is not None:
         итог = evidence_pack.записать_пакет(
-            пакет, inn, result, _ЗАПИСЬ["ответы"],
-            штамп=os.environ.get("INN_CHECK_TSA") or None)
+            пакет, inn, result, capture.responses,
+            штамп=os.environ.get("INN_CHECK_TSA") or None, secrets=capture.secrets)
         sys.stderr.write("пакет доказательств: %s (%d ответов источников)%s\n" % (
             итог["каталог"], итог["ответов"],
             "; штамп времени: " + итог["штамп"] if итог.get("штамп") else ""))

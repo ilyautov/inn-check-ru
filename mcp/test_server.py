@@ -146,11 +146,11 @@ def case_tools_impl(ti):
         check(ti.counterparty_verdict("не-инн").get("статус") == "не проверено",
               "verdict: невалидный ИНН должен дать «не проверено»")
 
-        b = ti.counterparty_batch(["7707083893", "1234567890"], profile="отсрочка")
+        b = ti.counterparty_batch(["7707083893", "5036045205"], profile="отсрочка")
         check(len(b.get("результаты") or []) == 2, "batch: результаты %s" % b)
         check((b["результаты"][0] or {}).get("светофор") == "🔴",
               "batch: сверху должен быть 🔴")
-        b2 = ti.counterparty_batch("7707083893, 1234567890")
+        b2 = ti.counterparty_batch("7707083893, 5036045205")
         check(len(b2.get("результаты") or []) == 2, "batch: строка через запятую %s" % b2)
         check(ti.counterparty_batch(["1"] * 51).get("статус") == "не проверено",
               "batch: лимит 50 не сработал")
@@ -221,6 +221,21 @@ def case_sdk():
         server = load("inn_check_mcp_server", MCP_DIR / "server.py")
         tools = asyncio.run(server.mcp_server.list_tools())
         names = sorted(t.name for t in tools)
+        by_name = {t.name: t for t in tools}
+        for name in ('counterparty_fetch', 'due_diligence_dossier', 'access_check',
+                     'counterparty_run_start', 'counterparty_run_export', 'counterparty_probe'):
+            tool = by_name.get(name)
+            if tool is None or tool.annotations is None or tool.annotations.readOnlyHint is not False:
+                errors.append('%s: local write effects are not declared' % name)
+        for name in ('counterparty_run_read', 'counterparty_run_resume', 'counterparty_run_render',
+                     'counterparty_doctor', 'counterparty_cache_status', 'counterparty_cache_plan',
+                     'counterparty_events_list'):
+            tool = by_name.get(name)
+            if (tool is None or tool.annotations is None or
+                    tool.annotations.readOnlyHint is not True or tool.annotations.openWorldHint is not False):
+                errors.append('%s: pure/offline effects are incorrect' % name)
+            elif 'root' in tool.inputSchema.get('properties', {}):
+                errors.append('%s: local root leaked into MCP input schema' % name)
         ti = load("tools_impl", MCP_DIR / "tools_impl.py")
         if names != sorted(ti.EXPECTED_TOOLS):
             errors.append("инструменты %s != %s" % (names, sorted(ti.EXPECTED_TOOLS)))

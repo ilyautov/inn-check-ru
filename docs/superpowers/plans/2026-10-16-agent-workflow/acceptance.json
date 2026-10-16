@@ -1,0 +1,4082 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-16",
+  "base_commit": "3e06046995860b5360df5dd3a6110bd7108d36a3",
+  "implementation_commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+  "gates": {
+    "benchmark": "passed",
+    "local_composite": "passed",
+    "installed": "passed",
+    "ci": "passed",
+    "review": "passed",
+    "format": "passed",
+    "handoff_prepared": "passed"
+  },
+  "local_validation": {
+    "status": "passed",
+    "explanation": "Frozen integrated suite plus explicitly selected final delta checks; report source snapshots and reused unchanged/AST-equivalent scopes separately.",
+    "commands": [
+      {
+        "name": "run_decision_gate_eval",
+        "argv": [
+          "python3.12",
+          "-X",
+          "utf8",
+          "eval/run_decision_gate_eval.py"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 37.986,
+        "log": "run_decision_gate_eval.log"
+      },
+      {
+        "name": "run_knowledge_invariants_eval",
+        "argv": [
+          "python3.12",
+          "-X",
+          "utf8",
+          "eval/run_knowledge_invariants_eval.py"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 65.733,
+        "log": "run_knowledge_invariants_eval.log"
+      },
+      {
+        "name": "run_workflow_e2e_eval",
+        "argv": [
+          "python3.12",
+          "-X",
+          "utf8",
+          "eval/run_workflow_e2e_eval.py"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 51.476,
+        "log": "run_workflow_e2e_eval.log"
+      },
+      {
+        "name": "decision-benchmark-report",
+        "argv": [
+          "python3.12",
+          "-X",
+          "utf8",
+          "benchmark/decision_bench.py"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 46.416,
+        "log": "decision-benchmark-report.log"
+      },
+      {
+        "name": "ruff",
+        "argv": [
+          "ruff",
+          "check",
+          "scripts/",
+          "eval/",
+          "mcp/",
+          "calibration/",
+          "packaging/",
+          "benchmark/"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 0.025,
+        "log": "ruff.log"
+      },
+      {
+        "name": "cached-whitespace",
+        "argv": [
+          "git",
+          "diff",
+          "--cached",
+          "--check"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 0.081,
+        "log": "cached-whitespace.log"
+      },
+      {
+        "name": "unstaged-whitespace",
+        "argv": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "status": "passed",
+        "exit_code": 0,
+        "seconds": 0.025,
+        "log": "unstaged-whitespace.log"
+      }
+    ],
+    "snapshots": [
+      {
+        "name": "second_integrated_suite",
+        "git_head": "170a0e0b7302bd0fe7026650511aca66da92d00c",
+        "python": "Python 3.12.1",
+        "platform": "darwin",
+        "source_manifest_sha256": "b573716a01edb78eb9fc505016bb3738deba10e4ec1f30dee7de1eec11ab84ab",
+        "source_unchanged": true,
+        "changed_paths": [],
+        "counts": {
+          "passed": 78,
+          "failed": 4
+        },
+        "known_failures": [
+          {
+            "name": "run_decision_gate_eval",
+            "status": "failed",
+            "exit_code": 1
+          },
+          {
+            "name": "run_knowledge_invariants_eval",
+            "status": "failed",
+            "exit_code": 1
+          },
+          {
+            "name": "run_workflow_e2e_eval",
+            "status": "failed",
+            "exit_code": 1
+          },
+          {
+            "name": "decision-benchmark-report",
+            "status": "failed",
+            "exit_code": 1
+          }
+        ],
+        "interpretation": "All four failures are benchmark-dependent gates tracing to two known context/projection defects. Final changed-scope reruns and review still pending; failed commands are not counted as passing."
+      }
+    ],
+    "effective_failures": 0,
+    "final_affected_snapshot": {
+      "schema_version": 1,
+      "status": "passed",
+      "source_unchanged": true,
+      "changed_paths": [],
+      "source_manifest_sha256": "34804be892f6897acfe0b553d6246f9c217003b7192e7f628e0d276194bb7547",
+      "counts": {
+        "passed": 7,
+        "failed": 0
+      },
+      "scope": "Final four benchmark-dependent gates and static checks; full earlier82-command snapshot retained separately with all original failures."
+    },
+    "effective_covered_commands": 82,
+    "single_final_82_command_invocation_claimed": false,
+    "changed_scope": [
+      ".gitattributes",
+      "benchmark/decision-benchmark.md",
+      "benchmark/decision-schema-contract.md",
+      "benchmark/decision_bench.py",
+      "eval/run_decision_gate_eval.py",
+      "scripts/process_runtime.py",
+      "eval/run_workflow_doctor_eval.py",
+      "eval/run_workflow_feature_mcp_eval.py",
+      ".skillignore",
+      "eval/run_mcp_sdk_eval.py",
+      "eval/run_historical_replay_eval.py",
+      "eval/run_installed_workflow_eval.py"
+    ],
+    "reused_scope": "78 successful frozen commands; final four benchmark-dependent commands replaced by matching-source runs; runtime differs only by independently AST-equal EOF byte, PDF bytes unchanged; actual final CI separately required",
+    "comment_only_followup": {
+      "status": "passed",
+      "paths": {
+        "eval/run_workflow_doctor_eval.py": "b905875843378fa49c19403b81d86db922ec5144bfeed1ddbdab9a3f5b94bdd9",
+        "eval/run_workflow_feature_mcp_eval.py": "83fd1c70a87ded23fd355c44a8eb29e1204f72caf38af03b26d7c8b963d599ba"
+      },
+      "normalized_ast_equal": true,
+      "noncomment_tokens_equal": true,
+      "tests": "doctor9/9+featureMCP13/13; Ruff2files; no global rerun needed for comments",
+      "artifact_inputs_unchanged": true
+    },
+    "environment_limit": "The 82-command runner used a temporary Git index omitting new nonshipping roots, so its skill-package gate was incomplete. A real-index gate reproduced the CI failure and must pass after the narrow .skillignore fix.",
+    "ci_followup_checks": {
+      "status": "passed",
+      "skill_gate_real_index": "16/16",
+      "sdk_harness": "5/5 existing cases and2/2 boundary checks eachPython3.10/3.12",
+      "replay": "21/21 eachPython3.10/3.12",
+      "changed_paths": {
+        ".skillignore": "9bf6abd8472d85ac43c2e2dd0f559a7dac06cf7ed7aca478999d05ab74925dea",
+        "eval/run_mcp_sdk_eval.py": "454d460fcc6b16aa598c5da38471c2c1956edb6a912beb74ed6f6198259c0f16",
+        "eval/run_historical_replay_eval.py": "f2280d5bc7114d3c7c000591980ea7027da7bb61336923b4fbe293b9828fb68d",
+        "eval/run_installed_workflow_eval.py": "28094d43a18f39a3f35658f121da12163650fbee87223dca080ed3b037c6f4b0"
+      },
+      "runtime_engine_unchanged": "b227ad8fc7d41254d7ca16c9306e7ddb47605bc1524cca944e7c5629166f9b05",
+      "artifact_inputs_unchanged": true,
+      "review_open_findings": 0,
+      "installed_git_paths": "2/2 portable boundary checks each Python3.10/3.12; 7 Windows and POSIX selectors; native Windows acceptance still required"
+    },
+    "historical_snapshot_note": "Слова pending в interpretation относятся к моменту второго общего прогона. Последующие проверки изменённых областей и независимое ревью завершились PASS; см. final_affected_snapshot и reviews. Исходные четыре ошибки исторического прогона сохранены и не засчитываются как PASS."
+  },
+  "benchmark": {
+    "status": "passed",
+    "schema_revision": 2,
+    "manifest_revision": 6,
+    "rubric_revision": 6,
+    "corpus_revision": 2,
+    "synthetic_cases": 29,
+    "empirical_accuracy_claimed": false,
+    "counts": {
+      "input_cases": 29,
+      "evaluated_cases": 29,
+      "quality_eligible_cases": 27,
+      "oracle_excluded": 1,
+      "pipeline_errors": 1,
+      "failed_cases": 0,
+      "synthetic_cases": 29,
+      "representative_cases": 0
+    },
+    "corpus_sha256": "b3917f0a5233124baaa7dec000043a47170c6cfdcf624293df53646d26594458",
+    "engine_sha256": "b227ad8fc7d41254d7ca16c9306e7ddb47605bc1524cca944e7c5629166f9b05",
+    "manual_declined_projection": "passed",
+    "canonical_emission_inventory": "passed",
+    "metrics": {
+      "unsupported_assertions": {
+        "numerator": 0,
+        "denominator": 4225,
+        "value": 0.0,
+        "unit": "fraction"
+      },
+      "contradicted_assertions": {
+        "numerator": 0,
+        "denominator": 656,
+        "value": 0.0,
+        "unit": "fraction"
+      },
+      "asserted": {
+        "numerator": 626,
+        "denominator": 837,
+        "value": 0.7479091995221028,
+        "unit": "fraction"
+      },
+      "false_green_required_unknown": {
+        "numerator": 0,
+        "denominator": 27,
+        "value": 0.0,
+        "unit": "fraction"
+      },
+      "coverage": {
+        "numerator": 521,
+        "denominator": 557,
+        "value": 0.9353680430879713,
+        "unit": "fraction"
+      },
+      "abstention": {
+        "numerator": 14,
+        "denominator": 27,
+        "value": 0.5185185185185185,
+        "unit": "fraction"
+      },
+      "abstention_explained": {
+        "numerator": 14,
+        "denominator": 14,
+        "value": 1.0,
+        "unit": "fraction"
+      },
+      "next_check_executability": {
+        "numerator": 36,
+        "denominator": 36,
+        "value": 1.0,
+        "unit": "fraction"
+      },
+      "oracle_agreement": {
+        "numerator": 27,
+        "denominator": 27,
+        "value": 1.0,
+        "unit": "fraction"
+      },
+      "legacy_matched_input_coverage": {
+        "numerator": 500,
+        "denominator": 557,
+        "value": 0.8976660682226212,
+        "unit": "fraction"
+      },
+      "legacy_matched_input_abstention": {
+        "numerator": 15,
+        "denominator": 27,
+        "value": 0.5555555555555556,
+        "unit": "fraction"
+      },
+      "latency_ms": {
+        "numerator": 39498.589085182175,
+        "denominator": 29,
+        "value": 1362.020313282144,
+        "unit": "milliseconds_per_pipeline_attempt"
+      },
+      "recorded_requests": {
+        "numerator": 320,
+        "denominator": 29,
+        "value": 11.03448275862069,
+        "unit": "recorded_responses_per_pipeline_attempt"
+      },
+      "manual_steps": {
+        "numerator": 1,
+        "denominator": 29,
+        "value": 0.034482758620689655,
+        "unit": "manual_imports_per_pipeline_attempt"
+      },
+      "representative_frequency": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "unit": "fraction"
+      },
+      "arbitrary_accounting_unit_conversion": {
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "unit": "fraction"
+      }
+    },
+    "exclusions": [
+      {
+        "case_id": "raw_loss",
+        "reason": "corrupt_store",
+        "scope": "quality_metrics",
+        "expected": true
+      },
+      {
+        "case_id": "oracle_missing",
+        "reason": "missing_independent_oracle",
+        "scope": "quality_metrics"
+      },
+      {
+        "case_id": null,
+        "reason": "no_representative_sample",
+        "scope": "representative_frequency"
+      },
+      {
+        "case_id": null,
+        "reason": "unsupported_feature",
+        "scope": "arbitrary_accounting_unit_conversion"
+      }
+    ],
+    "rules_sha256": "673a90692614bb2cff0d07faf068979d79ab0564fa885ae088fded5059437ace",
+    "fixture_sha256": "a0da9df00fc81b9a93850c553a9ea364b39ebe53533516608f9b1f9a14352afb",
+    "focused_methods": 55,
+    "focused_result": "passed",
+    "interpretation": "29 synthetic mechanism cases,27 quality eligible; expected corrupt_store and missing oracle exclusions retained; no representative accuracy claim"
+  },
+  "artifacts": {
+    "status": "passed",
+    "version": "1.13.0",
+    "wheel": {
+      "name": "inn_check_ru-1.13.0-py3-none-any.whl",
+      "sha256": "9ea45baf6271d1226cd29dacbe3cf3dd29f52bdb164db398c4e7b9b7407b9260"
+    },
+    "zip": {
+      "name": "inn-check-ru.zip",
+      "sha256": "a81aa66e31ffc9c0599277bfb7c5b70da31a5b6d93bd6815f9015658e79db6f6"
+    },
+    "wheel_source_inputs": 79,
+    "flat_modules": 61,
+    "zip_members": 92,
+    "source_drift": [],
+    "standalone_zip_execution": "passed",
+    "installed_sdk_stdio": "passed_actual_sdk_33_tools",
+    "core_no_sdk_pdf": "passed",
+    "recovery_and_real_legacy_downgrade": "passed",
+    "python": "3.12.1",
+    "platform": "darwin",
+    "working_tree_snapshot": true,
+    "build_git_head": "170a0e0b7302bd0fe7026650511aca66da92d00c",
+    "live_paid_calls": 0,
+    "live_registry_calls": 0,
+    "root_verification": {
+      "schema_version": 1,
+      "status": "passed",
+      "wheel_sha256": "9ea45baf6271d1226cd29dacbe3cf3dd29f52bdb164db398c4e7b9b7407b9260",
+      "zip_sha256": "a81aa66e31ffc9c0599277bfb7c5b70da31a5b6d93bd6815f9015658e79db6f6",
+      "wheel_inputs": 79,
+      "zip_members": 92,
+      "modules": 61,
+      "input_drift": [],
+      "core": {
+        "status": "passed",
+        "candidates": 1,
+        "module_origin": "site-packages"
+      },
+      "doctor": "passed",
+      "pdf": {
+        "status": "passed",
+        "method": "pdf_text",
+        "pypdf": "6.21.0",
+        "sdk": false
+      },
+      "live_registry_calls": 0,
+      "requires_dist": [
+        "mcp<2,>=1.30; extra == \"mcp\"",
+        "anyio>=4.15.1; extra == \"mcp\"",
+        "idna>=3.20; extra == \"mcp\"",
+        "python-multipart>=0.0.32; extra == \"mcp\"",
+        "pypdf<7,>=6.21; extra == \"pdf\""
+      ]
+    },
+    "matched_implementation_commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+    "standalone_full_route": {
+      "status": "passed",
+      "evidence_sha256": "b2532720dd56efdd437632b2b7f83f3ef5a7d88d234a961f404b4b6fc6d6c81f",
+      "processes": 20,
+      "module_origins_verified": 61,
+      "committed_revisions": 7,
+      "raw_refs_verified": 6,
+      "artifacts_verified": 3,
+      "offline_operations": 13,
+      "offline_collector_calls": 0,
+      "network_attempts": 0,
+      "sdk": false,
+      "python_site_packages": false,
+      "pythonpath": false,
+      "real_host": "not_run"
+    },
+    "runtime_source_manifest": [
+      {
+        "path": "scripts/sibling_imports.py",
+        "sha256": "887a6aeb1370c41b54e693227d6432179318f53714a7fca1bd8061238441dec4"
+      },
+      {
+        "path": "scripts/process_windows.py",
+        "sha256": "edc07351a77ecb9e0d94c28248f91e54290c4adad47809e8ad012e0ef0debbf6"
+      },
+      {
+        "path": "scripts/process_runtime.py",
+        "sha256": "7c22154858c5fd659e7f2b9d74385f69806fbcc0ec3c97c611a4df59d1f53ede"
+      },
+      {
+        "path": "scripts/cache_policy.py",
+        "sha256": "e067f8da60c65abe7bbaa88766fe8937f539dc65cc4b791fee67cd9df908f8e2"
+      },
+      {
+        "path": "scripts/cache_update_worker.py",
+        "sha256": "c1cf0e2edd7196597315395ea0f7f349c01db223d18159e1c2a82d286efe4ef9"
+      },
+      {
+        "path": "scripts/workflow_doctor.py",
+        "sha256": "6623279d2d1a1fe706914358146f558080ebc62a35c0a096635bf74d82f367c7"
+      },
+      {
+        "path": "scripts/schedule_templates.py",
+        "sha256": "db7f6f535143f29c658a09c08fdda4e36faa1c12fc8de472145d07671123b54d"
+      },
+      {
+        "path": "scripts/evidence_contract.py",
+        "sha256": "f9ad7e36f6cf42bd59633e00b6c571bfb940b1360cb0db6dc61b3a73ec7e41d0"
+      },
+      {
+        "path": "scripts/redaction.py",
+        "sha256": "bd73208f673e07002687e602e2b7576088ac2d255f3e9d2c7230d5ef4823dd66"
+      },
+      {
+        "path": "scripts/run_store.py",
+        "sha256": "d8512ee13089e9b44303f4f3dfbb808ccaef0a29c0e09d6b418206a3e6c31e06"
+      },
+      {
+        "path": "scripts/compare_counterparties.py",
+        "sha256": "03efe0022a05fdb87d14364e1e852dd71d8ccbf96f2d182f577ea94172d6bd12"
+      },
+      {
+        "path": "scripts/document_input.py",
+        "sha256": "9f708db87b979e12c9cfcdc7a26b964a508c99098b5e37c87b4961ca3845cc14"
+      },
+      {
+        "path": "scripts/historical_replay.py",
+        "sha256": "cc47a9ce2a993795fe6a4966fa9d021c22d883e488996c4d418eb4a2e1bbc6e2"
+      },
+      {
+        "path": "scripts/monitor_events.py",
+        "sha256": "7134d5be812dd46cccb88eabac7472ac83e4eaf87b0c949cac785b75343de7d7"
+      },
+      {
+        "path": "scripts/provider_policy.py",
+        "sha256": "3ce5aa6c4a7ec354639318020b261bae62920f954f2f644cf8e58a7c84c79ea1"
+      },
+      {
+        "path": "scripts/run_workflow.py",
+        "sha256": "e067d750cd33b94cd70799930d4b09fb2656f1c08f45129c4bf5a6b216e75427"
+      },
+      {
+        "path": "scripts/workflow_cli.py",
+        "sha256": "0ad3e9bf79ba34a1f869c4d6a9d8a5b7b89ff670b8ad84b3d36ae2e328c5ff1b"
+      },
+      {
+        "path": "scripts/workflow_metrics.py",
+        "sha256": "8efde7be7d4e2ca53f8d211b59830b5e0a82eeef0beda865d7851a30ea99813f"
+      },
+      {
+        "path": "scripts/fetch_counterparty.py",
+        "sha256": "5bc97f8e73061d21e7a33363c5769ef8dd28bac5298ea32d70b7b6d58453db94"
+      },
+      {
+        "path": "scripts/rzn_licenses.py",
+        "sha256": "62387c8034503a3712d62c6fbe2a5638c320f839d49bba65b43b81306b781b01"
+      },
+      {
+        "path": "scripts/pledge_text.py",
+        "sha256": "3410c4be6a4ec4b709794ce6748a3a372936ab628f8d7973c10fdd94afe63f00"
+      },
+      {
+        "path": "scripts/disq_dump.py",
+        "sha256": "eb2b5b43b4e1513a347b51840bf7f44d1e953fc42fb06f19e8285ceb63c100c6"
+      },
+      {
+        "path": "scripts/cbr_registries.py",
+        "sha256": "017a773320df50a62745232bef949a7bfa87adf6bba85fa4e3a00a4b08b51748"
+      },
+      {
+        "path": "scripts/rospatent_tz.py",
+        "sha256": "c556402ea674007d8676506fdb67c5505ea6c72925fc1ea9d6d72f57b0713ea8"
+      },
+      {
+        "path": "scripts/socks5.py",
+        "sha256": "9bd609a4a8cc5d3e22a5e0217fbd6aba925f5cd40d9890e5ab33f0e675ec790b"
+      },
+      {
+        "path": "scripts/dump_tools.py",
+        "sha256": "07d5b17660038736296825efb7365f3821f3bf699984f5a4941192e59d04e264"
+      },
+      {
+        "path": "scripts/fts_registries.py",
+        "sha256": "6635d24d6076a18df9ae5491d15615d58fa6f743991e61fadb506e273f9a3179"
+      },
+      {
+        "path": "scripts/rkn_registries.py",
+        "sha256": "eb32ac83154df6979141719ed663840d3e7e6bc8e168ec5083212156bfa58f24"
+      },
+      {
+        "path": "scripts/rar_licenses.py",
+        "sha256": "afa60613786218eb5a8bccdd880adc8cdd9db44196bb4740e5a1b2493ea91a17"
+      },
+      {
+        "path": "scripts/sevenzip.py",
+        "sha256": "98d920d1230c3f6fe17095bc87a0a83fa14443706a8ef757915a0e9e8acb8bad"
+      },
+      {
+        "path": "scripts/fsa_registries.py",
+        "sha256": "c6fd2a4813c4fb329893c7bd06daf362411de6ddcb02c4a0e3f0298ae0085404"
+      },
+      {
+        "path": "scripts/erknm.py",
+        "sha256": "b8daca26997f647f5a5993cf54ebbf31777a0ec9d5c6e1176acb0630b1e9edb7"
+      },
+      {
+        "path": "scripts/minpromtorg.py",
+        "sha256": "15e33072a4aba8ce0082317dde20822298cad81c66fa3f993007c774dea3f3c4"
+      },
+      {
+        "path": "scripts/uc_mintsifry.py",
+        "sha256": "4fc9d7bb9931903a503a98b12513062e7dce0123650bbacb733c5d162bc5412a"
+      },
+      {
+        "path": "scripts/refresh_indexes.py",
+        "sha256": "4a4fd996e869ddb4c48e06a13fdba99bf891cbe5a4f3b937983b42032868ef5a"
+      },
+      {
+        "path": "scripts/fin_scoring.py",
+        "sha256": "4d0d16bfea13ef71c4c758229556aab31f8530ee495c5d20a2f5d89735af9b9f"
+      },
+      {
+        "path": "scripts/sanctions_check.py",
+        "sha256": "10bf7f1410ca7f71218ab13e414140161c5d1c70c24757d0340bfd0f379eb605"
+      },
+      {
+        "path": "scripts/cbr_warning.py",
+        "sha256": "eca4da9afd7e61ff22d94860385625b2adaa25a96b683437e4a5642f81346a7d"
+      },
+      {
+        "path": "scripts/affiliates_graph.py",
+        "sha256": "f560df7589aafcf89e00728c91ce59401de96c561772b0624f2a88c34667a283"
+      },
+      {
+        "path": "scripts/droblenie_check.py",
+        "sha256": "0ddd604620cd0cea2e829596097bf56b3419af0bb5e140362232ff6bab1f67d2"
+      },
+      {
+        "path": "scripts/diff_counterparty.py",
+        "sha256": "443eee3d7a94ede48f109c791a6afa66f74686f1c43241ce58fba3af6fe8a567"
+      },
+      {
+        "path": "scripts/check_access.py",
+        "sha256": "bb2f0401ac4f46a371afa3d87d102bf7c089edee9f1a78fc14c9620a36b74e09"
+      },
+      {
+        "path": "scripts/proxy.py",
+        "sha256": "85e4bbc2ed2eb4d0f0326f7107ad075307a696af3ed0c614343cdec2f08f4342"
+      },
+      {
+        "path": "scripts/install_ca.py",
+        "sha256": "3c7a74ec43d300dfeb02a85d59cd9003a164a08d0a97e4436461ddaa527cf4c5"
+      },
+      {
+        "path": "scripts/profiles.py",
+        "sha256": "7f1d627cd882827896ef2e8b4e48671cf4aeb2a08724f2ed3086fb29823bf443"
+      },
+      {
+        "path": "scripts/sources.py",
+        "sha256": "2ac76952f89677d1308d3a6b7380ef39382509371c711f4d95b9ebc04b495cc6"
+      },
+      {
+        "path": "scripts/batch_check.py",
+        "sha256": "ae8124e488c04d1b422973e0f062492c769eeda997390460c410b6c8b4b37404"
+      },
+      {
+        "path": "scripts/snapshot.py",
+        "sha256": "879b45760622648755b5f5b83058659c492acd82ef1be8dcb3e6d44fe89a7280"
+      },
+      {
+        "path": "scripts/watchlist.py",
+        "sha256": "61adaa6fef8e2068b80136d5762f12211339b626625bed4c4251f6e4af2497d7"
+      },
+      {
+        "path": "scripts/opendata_refresh.py",
+        "sha256": "568344e7a12a89b4a1bb9b02b78dc1d990db7021a3119ee2c186345b7e574eb5"
+      },
+      {
+        "path": "scripts/opendata_index.py",
+        "sha256": "776aa64e303d56215cd87ae08767eb06cfd1fa28031bcc96229e20350f004681"
+      },
+      {
+        "path": "scripts/retro_verdict.py",
+        "sha256": "e70896fc9d57d793a96939783395daf7033e892dd605663334f313f3fa0198f1"
+      },
+      {
+        "path": "scripts/benchmarks.py",
+        "sha256": "d7beae35b0118e32fb39d9228187634b266e3c6299a7db0dba0a4627edce6ea8"
+      },
+      {
+        "path": "scripts/paper_vat.py",
+        "sha256": "09fe781d4f0f5a7f85477b818c5726d4d83cf1cb9d8a5feabcc41cf2c6201bdc"
+      },
+      {
+        "path": "scripts/dossier.py",
+        "sha256": "5a477558b2cc38de481b3b6c1f979bef37469c478bd258faab34577c54d32431"
+      },
+      {
+        "path": "scripts/evidence_pack.py",
+        "sha256": "c9660c5a955a403ca0ab9e653ba2bfd833dd4ea22463485ba9d8ce9e7f2a6913"
+      },
+      {
+        "path": "scripts/extract_inn.py",
+        "sha256": "04b6c4dc29a3e6fa0d136c6e5c8661771d80a943601aca6367869e100871cf58"
+      },
+      {
+        "path": "scripts/domain_check.py",
+        "sha256": "76922690f5b2901e42fff1852fba5f69617119d79bf5924cb8793a56bfb79c93"
+      },
+      {
+        "path": "scripts/manual_block.py",
+        "sha256": "d8ab9c592f76f40e90bed96d1ac3e3a7592191857af55b8162d71bb53de7c70b"
+      },
+      {
+        "path": "scripts/native_host.py",
+        "sha256": "2feb0ea0767fb8740157e63f4937bb4daef3478327b43ae2f11d842d2d3d13e1"
+      },
+      {
+        "path": "scripts/install_native_host.py",
+        "sha256": "7e7aaf3cafa0ed95740c71e8697cb25eca72828177a07f7a34b0fcd0d8e47e19"
+      },
+      {
+        "path": "mcp/server.py",
+        "sha256": "88f0f49d0ee289cb48e93d2e833674731d40e90334c39b1bed91093dc35ec8a9"
+      },
+      {
+        "path": "mcp/tools_impl.py",
+        "sha256": "3a443bc4f68696a3d052aaad8224a2c67a1572789618b10805a20d04697e3233"
+      }
+    ],
+    "wheel_build_input_manifest": [
+      {
+        "path": "LICENSE",
+        "sha256": "b05976217449b938090f698152ca85065c7ec4537ac3cf5a456b62ba9400b5b2"
+      },
+      {
+        "path": "README.md",
+        "sha256": "c76f22398d0648e852921da03acc8dfc1b808203fd59920f6e04e2656a8b3c3e"
+      },
+      {
+        "path": "data/__init__.py",
+        "sha256": "bcb5a7e71f16ee2017ea9a9b1bd0bbdf7d3ad71ddf4bc1f52c84f99977063186"
+      },
+      {
+        "path": "data/benchmarks_ru.json",
+        "sha256": "e752e6b852f6bf8841f018a07c17c323cf8f722b79d8ed0ca35b08afe29cfc38"
+      },
+      {
+        "path": "data/ca/globalsign_gcc_r3_dv_tls_ca_2020.pem",
+        "sha256": "3e5b6c95080dcc8c80afc1f2d7cec76da0201e895064655f04c3c7c5d438ead2"
+      },
+      {
+        "path": "data/cache_policy.json",
+        "sha256": "65a7a9ab4769b2ae5eaf4a9cba85a0fca5f58d408a3f2a2eb9955fbc6a4db6cd"
+      },
+      {
+        "path": "data/canon_ru.json",
+        "sha256": "8f8a5932d9d674f17dd48bb2ef03816dcd8d02d9cb4fcef62cb0b10c692a3bbe"
+      },
+      {
+        "path": "data/evidence_policy.json",
+        "sha256": "df6f70a8141bb765f3e4a4abed4dc0621490ccb4255ace54a210a76ed0750e0d"
+      },
+      {
+        "path": "data/profiles_ru.json",
+        "sha256": "1cc1fbcc1260cf6ea046da71c834643b7f8991ffbe0aa8b14e0e57a9d6fa0cb2"
+      },
+      {
+        "path": "data/provider_policy.schema.json",
+        "sha256": "b816a62f622794452e1246664b277cdeb56767d23d1ab2b2503c066f7ea9521c"
+      },
+      {
+        "path": "data/workflow_capabilities.json",
+        "sha256": "4e764536dd8f813f59f56929921a6836b4bda1c15a41e1a60140007e4d8a19c7"
+      },
+      {
+        "path": "mcp/__init__.py",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "mcp/doctor.py",
+        "sha256": "5e655ffb352166b3321782d7976fcbd81c16c74e301f17a9ed96310a38acfaab"
+      },
+      {
+        "path": "mcp/process_control.py",
+        "sha256": "7439481039e162440aa3e39ebe6051c966cdab5c6c259c5ad3559e7c5abe24a5"
+      },
+      {
+        "path": "mcp/server.py",
+        "sha256": "88f0f49d0ee289cb48e93d2e833674731d40e90334c39b1bed91093dc35ec8a9"
+      },
+      {
+        "path": "mcp/test_server.py",
+        "sha256": "185f893b986573ea76117e5b2ccd8f91e5ccf2e71fb593cb4b758a956e5880c2"
+      },
+      {
+        "path": "mcp/tools_impl.py",
+        "sha256": "3a443bc4f68696a3d052aaad8224a2c67a1572789618b10805a20d04697e3233"
+      },
+      {
+        "path": "pyproject.toml",
+        "sha256": "faa722cdd6afeeaacac45b7464645daf1eebf2852fa5ef132bc17ef9f5f0e168"
+      },
+      {
+        "path": "scripts/affiliates_graph.py",
+        "sha256": "f560df7589aafcf89e00728c91ce59401de96c561772b0624f2a88c34667a283"
+      },
+      {
+        "path": "scripts/batch_check.py",
+        "sha256": "ae8124e488c04d1b422973e0f062492c769eeda997390460c410b6c8b4b37404"
+      },
+      {
+        "path": "scripts/benchmarks.py",
+        "sha256": "d7beae35b0118e32fb39d9228187634b266e3c6299a7db0dba0a4627edce6ea8"
+      },
+      {
+        "path": "scripts/cache_policy.py",
+        "sha256": "e067f8da60c65abe7bbaa88766fe8937f539dc65cc4b791fee67cd9df908f8e2"
+      },
+      {
+        "path": "scripts/cache_update_worker.py",
+        "sha256": "c1cf0e2edd7196597315395ea0f7f349c01db223d18159e1c2a82d286efe4ef9"
+      },
+      {
+        "path": "scripts/cbr_registries.py",
+        "sha256": "017a773320df50a62745232bef949a7bfa87adf6bba85fa4e3a00a4b08b51748"
+      },
+      {
+        "path": "scripts/cbr_warning.py",
+        "sha256": "eca4da9afd7e61ff22d94860385625b2adaa25a96b683437e4a5642f81346a7d"
+      },
+      {
+        "path": "scripts/check_access.py",
+        "sha256": "bb2f0401ac4f46a371afa3d87d102bf7c089edee9f1a78fc14c9620a36b74e09"
+      },
+      {
+        "path": "scripts/compare_counterparties.py",
+        "sha256": "03efe0022a05fdb87d14364e1e852dd71d8ccbf96f2d182f577ea94172d6bd12"
+      },
+      {
+        "path": "scripts/diff_counterparty.py",
+        "sha256": "443eee3d7a94ede48f109c791a6afa66f74686f1c43241ce58fba3af6fe8a567"
+      },
+      {
+        "path": "scripts/disq_dump.py",
+        "sha256": "eb2b5b43b4e1513a347b51840bf7f44d1e953fc42fb06f19e8285ceb63c100c6"
+      },
+      {
+        "path": "scripts/document_input.py",
+        "sha256": "9f708db87b979e12c9cfcdc7a26b964a508c99098b5e37c87b4961ca3845cc14"
+      },
+      {
+        "path": "scripts/domain_check.py",
+        "sha256": "76922690f5b2901e42fff1852fba5f69617119d79bf5924cb8793a56bfb79c93"
+      },
+      {
+        "path": "scripts/dossier.py",
+        "sha256": "5a477558b2cc38de481b3b6c1f979bef37469c478bd258faab34577c54d32431"
+      },
+      {
+        "path": "scripts/droblenie_check.py",
+        "sha256": "0ddd604620cd0cea2e829596097bf56b3419af0bb5e140362232ff6bab1f67d2"
+      },
+      {
+        "path": "scripts/dump_tools.py",
+        "sha256": "07d5b17660038736296825efb7365f3821f3bf699984f5a4941192e59d04e264"
+      },
+      {
+        "path": "scripts/erknm.py",
+        "sha256": "b8daca26997f647f5a5993cf54ebbf31777a0ec9d5c6e1176acb0630b1e9edb7"
+      },
+      {
+        "path": "scripts/evidence_contract.py",
+        "sha256": "f9ad7e36f6cf42bd59633e00b6c571bfb940b1360cb0db6dc61b3a73ec7e41d0"
+      },
+      {
+        "path": "scripts/evidence_pack.py",
+        "sha256": "c9660c5a955a403ca0ab9e653ba2bfd833dd4ea22463485ba9d8ce9e7f2a6913"
+      },
+      {
+        "path": "scripts/extract_inn.py",
+        "sha256": "04b6c4dc29a3e6fa0d136c6e5c8661771d80a943601aca6367869e100871cf58"
+      },
+      {
+        "path": "scripts/fetch_counterparty.py",
+        "sha256": "5bc97f8e73061d21e7a33363c5769ef8dd28bac5298ea32d70b7b6d58453db94"
+      },
+      {
+        "path": "scripts/fin_scoring.py",
+        "sha256": "4d0d16bfea13ef71c4c758229556aab31f8530ee495c5d20a2f5d89735af9b9f"
+      },
+      {
+        "path": "scripts/fsa_registries.py",
+        "sha256": "c6fd2a4813c4fb329893c7bd06daf362411de6ddcb02c4a0e3f0298ae0085404"
+      },
+      {
+        "path": "scripts/fts_registries.py",
+        "sha256": "6635d24d6076a18df9ae5491d15615d58fa6f743991e61fadb506e273f9a3179"
+      },
+      {
+        "path": "scripts/historical_replay.py",
+        "sha256": "cc47a9ce2a993795fe6a4966fa9d021c22d883e488996c4d418eb4a2e1bbc6e2"
+      },
+      {
+        "path": "scripts/install_ca.py",
+        "sha256": "3c7a74ec43d300dfeb02a85d59cd9003a164a08d0a97e4436461ddaa527cf4c5"
+      },
+      {
+        "path": "scripts/install_native_host.py",
+        "sha256": "7e7aaf3cafa0ed95740c71e8697cb25eca72828177a07f7a34b0fcd0d8e47e19"
+      },
+      {
+        "path": "scripts/manual_block.py",
+        "sha256": "d8ab9c592f76f40e90bed96d1ac3e3a7592191857af55b8162d71bb53de7c70b"
+      },
+      {
+        "path": "scripts/minpromtorg.py",
+        "sha256": "15e33072a4aba8ce0082317dde20822298cad81c66fa3f993007c774dea3f3c4"
+      },
+      {
+        "path": "scripts/monitor_events.py",
+        "sha256": "7134d5be812dd46cccb88eabac7472ac83e4eaf87b0c949cac785b75343de7d7"
+      },
+      {
+        "path": "scripts/native_host.py",
+        "sha256": "2feb0ea0767fb8740157e63f4937bb4daef3478327b43ae2f11d842d2d3d13e1"
+      },
+      {
+        "path": "scripts/opendata_index.py",
+        "sha256": "776aa64e303d56215cd87ae08767eb06cfd1fa28031bcc96229e20350f004681"
+      },
+      {
+        "path": "scripts/opendata_refresh.py",
+        "sha256": "568344e7a12a89b4a1bb9b02b78dc1d990db7021a3119ee2c186345b7e574eb5"
+      },
+      {
+        "path": "scripts/paper_vat.py",
+        "sha256": "09fe781d4f0f5a7f85477b818c5726d4d83cf1cb9d8a5feabcc41cf2c6201bdc"
+      },
+      {
+        "path": "scripts/pledge_text.py",
+        "sha256": "3410c4be6a4ec4b709794ce6748a3a372936ab628f8d7973c10fdd94afe63f00"
+      },
+      {
+        "path": "scripts/process_runtime.py",
+        "sha256": "7c22154858c5fd659e7f2b9d74385f69806fbcc0ec3c97c611a4df59d1f53ede"
+      },
+      {
+        "path": "scripts/process_windows.py",
+        "sha256": "edc07351a77ecb9e0d94c28248f91e54290c4adad47809e8ad012e0ef0debbf6"
+      },
+      {
+        "path": "scripts/profiles.py",
+        "sha256": "7f1d627cd882827896ef2e8b4e48671cf4aeb2a08724f2ed3086fb29823bf443"
+      },
+      {
+        "path": "scripts/provider_policy.py",
+        "sha256": "3ce5aa6c4a7ec354639318020b261bae62920f954f2f644cf8e58a7c84c79ea1"
+      },
+      {
+        "path": "scripts/proxy.py",
+        "sha256": "85e4bbc2ed2eb4d0f0326f7107ad075307a696af3ed0c614343cdec2f08f4342"
+      },
+      {
+        "path": "scripts/rar_licenses.py",
+        "sha256": "afa60613786218eb5a8bccdd880adc8cdd9db44196bb4740e5a1b2493ea91a17"
+      },
+      {
+        "path": "scripts/redaction.py",
+        "sha256": "bd73208f673e07002687e602e2b7576088ac2d255f3e9d2c7230d5ef4823dd66"
+      },
+      {
+        "path": "scripts/refresh_indexes.py",
+        "sha256": "4a4fd996e869ddb4c48e06a13fdba99bf891cbe5a4f3b937983b42032868ef5a"
+      },
+      {
+        "path": "scripts/retro_verdict.py",
+        "sha256": "e70896fc9d57d793a96939783395daf7033e892dd605663334f313f3fa0198f1"
+      },
+      {
+        "path": "scripts/rkn_registries.py",
+        "sha256": "eb32ac83154df6979141719ed663840d3e7e6bc8e168ec5083212156bfa58f24"
+      },
+      {
+        "path": "scripts/rospatent_tz.py",
+        "sha256": "c556402ea674007d8676506fdb67c5505ea6c72925fc1ea9d6d72f57b0713ea8"
+      },
+      {
+        "path": "scripts/run_store.py",
+        "sha256": "d8512ee13089e9b44303f4f3dfbb808ccaef0a29c0e09d6b418206a3e6c31e06"
+      },
+      {
+        "path": "scripts/run_workflow.py",
+        "sha256": "e067d750cd33b94cd70799930d4b09fb2656f1c08f45129c4bf5a6b216e75427"
+      },
+      {
+        "path": "scripts/rzn_licenses.py",
+        "sha256": "62387c8034503a3712d62c6fbe2a5638c320f839d49bba65b43b81306b781b01"
+      },
+      {
+        "path": "scripts/sanctions_check.py",
+        "sha256": "10bf7f1410ca7f71218ab13e414140161c5d1c70c24757d0340bfd0f379eb605"
+      },
+      {
+        "path": "scripts/schedule_templates.py",
+        "sha256": "db7f6f535143f29c658a09c08fdda4e36faa1c12fc8de472145d07671123b54d"
+      },
+      {
+        "path": "scripts/sevenzip.py",
+        "sha256": "98d920d1230c3f6fe17095bc87a0a83fa14443706a8ef757915a0e9e8acb8bad"
+      },
+      {
+        "path": "scripts/sibling_imports.py",
+        "sha256": "887a6aeb1370c41b54e693227d6432179318f53714a7fca1bd8061238441dec4"
+      },
+      {
+        "path": "scripts/snapshot.py",
+        "sha256": "879b45760622648755b5f5b83058659c492acd82ef1be8dcb3e6d44fe89a7280"
+      },
+      {
+        "path": "scripts/socks5.py",
+        "sha256": "9bd609a4a8cc5d3e22a5e0217fbd6aba925f5cd40d9890e5ab33f0e675ec790b"
+      },
+      {
+        "path": "scripts/sources.py",
+        "sha256": "2ac76952f89677d1308d3a6b7380ef39382509371c711f4d95b9ebc04b495cc6"
+      },
+      {
+        "path": "scripts/uc_mintsifry.py",
+        "sha256": "4fc9d7bb9931903a503a98b12513062e7dce0123650bbacb733c5d162bc5412a"
+      },
+      {
+        "path": "scripts/watchlist.py",
+        "sha256": "61adaa6fef8e2068b80136d5762f12211339b626625bed4c4251f6e4af2497d7"
+      },
+      {
+        "path": "scripts/workflow_cli.py",
+        "sha256": "0ad3e9bf79ba34a1f869c4d6a9d8a5b7b89ff670b8ad84b3d36ae2e328c5ff1b"
+      },
+      {
+        "path": "scripts/workflow_doctor.py",
+        "sha256": "6623279d2d1a1fe706914358146f558080ebc62a35c0a096635bf74d82f367c7"
+      },
+      {
+        "path": "scripts/workflow_metrics.py",
+        "sha256": "8efde7be7d4e2ca53f8d211b59830b5e0a82eeef0beda865d7851a30ea99813f"
+      }
+    ]
+  },
+  "ci": {
+    "status": "passed_on_exact_implementation_commit",
+    "runs": [
+      {
+        "name": "supply-chain",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294"
+      },
+      {
+        "name": "security",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960790"
+      },
+      {
+        "name": "ci",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805"
+      }
+    ],
+    "platform_jobs": [
+      {
+        "os": "macos-latest",
+        "python": "3.12",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026263"
+      },
+      {
+        "os": "windows-latest",
+        "python": "3.12",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026340"
+      },
+      {
+        "os": "windows-latest",
+        "python": "3.10",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026388"
+      },
+      {
+        "os": "ubuntu-latest",
+        "python": "3.10",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026455"
+      },
+      {
+        "os": "macos-latest",
+        "python": "3.10",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026507"
+      },
+      {
+        "os": "ubuntu-latest",
+        "python": "3.12",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026537"
+      }
+    ],
+    "distribution_and_security": [
+      {
+        "kind": "wheel",
+        "workflow": "ci",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "name": "колесо содержит canon и CLI работает из чистого venv",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026421#step:37:1"
+      },
+      {
+        "kind": "uvx",
+        "workflow": "ci",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "name": "`uvx inn-check-ru-mcp` поднимает сервер (путь реестра MCP)",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026421#step:38:1"
+      },
+      {
+        "kind": "mcpb",
+        "workflow": "ci",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "name": "расширение .mcpb: манифест валиден, сервер поднимается",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026421#step:39:1"
+      },
+      {
+        "kind": "docker",
+        "workflow": "ci",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805",
+        "name": "Docker-образ поднимает MCP-сервер (путь Docker MCP Registry)",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960805/job/117088026421#step:40:1"
+      },
+      {
+        "kind": "action-pins",
+        "workflow": "supply-chain",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294",
+        "name": "supply-chain / action-pins",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294/job/117088026990"
+      },
+      {
+        "kind": "python-deps",
+        "workflow": "supply-chain",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294",
+        "name": "supply-chain / python-deps",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294/job/117088027388"
+      },
+      {
+        "kind": "osv",
+        "workflow": "supply-chain",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294",
+        "name": "supply-chain / osv / osv-scan",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934961294/job/117088027642"
+      },
+      {
+        "kind": "secrets",
+        "workflow": "security",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960790",
+        "name": "security / secrets",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960790/job/117088035154"
+      },
+      {
+        "kind": "mcp-config",
+        "workflow": "security",
+        "commit": "6d4310efb7169cb358fa111d5741866fb8f7df96",
+        "run_url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960790",
+        "name": "security / mcp-config",
+        "conclusion": "success",
+        "url": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934960790/job/117088035444"
+      }
+    ],
+    "new_eval_count": 34,
+    "total_eval_count": 78,
+    "uncovered_new_evals": [],
+    "iterations": [
+      {
+        "commit": "ee57d6ff685ab7048921b91d40f0354d0c7e7556",
+        "run": "https://github.com/ilyautov/inn-check-ru/actions/runs/38932861082",
+        "classes": [
+          "skillignore nonshipping roots masked locally by stale temporary index",
+          "SDK test child does not inherit parent UTF8 mode on Windows",
+          "historical replay test compact datetime is parsed differently by Python3.10 and3.12"
+        ],
+        "security": "success",
+        "supply_chain": "success",
+        "native_windows_host": "success",
+        "complete_platform_acceptance": false,
+        "conclusion": "failure"
+      },
+      {
+        "commit": "23a3002ef069e05acc647bac73615e1626ef380b",
+        "run": "https://github.com/ilyautov/inn-check-ru/actions/runs/38934141434",
+        "classes": [
+          "Windows installed acceptance used native backslash source keys instead of Git POSIX keys"
+        ],
+        "security": "success",
+        "supply_chain": "success",
+        "native_windows_host": "success",
+        "complete_platform_acceptance": false,
+        "conclusion": "failure"
+      }
+    ]
+  },
+  "reviews": {
+    "status": "approved_scoped_independent_reviews",
+    "open_findings": 0,
+    "records": [
+      {
+        "name": "final-code-closure-review.md",
+        "sha256": "bca9bdf08c631f5297bf0a2ab3c16592fa38c974dbb1595edb21313f356b763b",
+        "scope": "Whole implementation and three integration findings; independent code review",
+        "conclusion": "approved"
+      },
+      {
+        "name": "final-static-security-review.md",
+        "sha256": "a0dbae40d020d1ae6cbefe3ed94a06d69c77bcf4eeb86603a731d02440c71871",
+        "scope": "Defensive static review and ordinary tiny/offline checks; no adversarial/load/real-host claim",
+        "conclusion": "approved"
+      },
+      {
+        "name": "social-preview-final-review.md",
+        "sha256": "6d18e171d40ac155be4fea3ee840a2d6de4c2859b8208a67b7ad057d851e11a2",
+        "scope": "Router-derived counters and preview generator",
+        "conclusion": "approved"
+      },
+      {
+        "name": "final-format-boundary.md",
+        "sha256": "02b62251a579b096db72ef2ccc9d8595bc46da5795ebf5f513424cab7b870675",
+        "scope": "Owner exact EOF/AST/PDF bounds proof; independent closure is recorded separately in benchmark-context-projection-review.md",
+        "conclusion": "approved"
+      },
+      {
+        "name": "benchmark-context-projection-review.md",
+        "sha256": "abdd7cf9334355d5c45963545c8362a8ae608b76f79db3b19d37fe1c209f9273",
+        "scope": "Final benchmark context/projection and EOF/PDF attributes; seven independent pure checks; root full55/invariants/E2E/direct29 separately passed on same source",
+        "conclusion": "approved"
+      },
+      {
+        "name": "final-fixture-annotations-review.md",
+        "sha256": "d2d836b6e49012e4e321d89435a0e8e96942e51c361c9e344493a4edfcbe08c5",
+        "scope": "Two test files,11exactfixturecomment annotations,AST/tokens/modes/positive-control identity; no runtime change",
+        "conclusion": "approved"
+      },
+      {
+        "name": "ci-platform-packaging-closure-review.md",
+        "sha256": "85818b12b6534e6edecd5493b06805146310641b478631e447440f85a28dd23a",
+        "scope": "Real-index package filter and strict child UTF8 harness; all79/92 artifact inputs unchanged",
+        "conclusion": "approved"
+      },
+      {
+        "name": "ci-replay-date-fixture-review.md",
+        "sha256": "6d1945ed89e5f9e3f8d4623a1759a3eb5f0082e7ff9662a7a73f37a06f0b8523",
+        "scope": "Cross-Python replay stimulus reaches intended authority branch; malformed timestamp rejection retained",
+        "conclusion": "approved"
+      },
+      {
+        "name": "ci-windows-artifact-paths-review.md",
+        "sha256": "d2a08cd3e804dfe27a0fcf7a28cfee412a1ae05b1e1f8d4026f8c2ab96fdce1a",
+        "scope": "Two Git-relative input selectors; independent portable RED/GREEN on Python3.10/3.12 and unchanged79/92 artifact inventory",
+        "conclusion": "approved"
+      },
+      {
+        "name": "acceptance-ledger-review.md",
+        "sha256": "cf51ee67b7a55d17e1fe6c96d6fa71a98152b06334345816f95c9a24d31bd33c",
+        "scope": "External final ledger builder, exact CI commit/run/job binding and all41 requirement/99 checkbox mappings with8 empirical tracks kept at0; no production rerun",
+        "conclusion": "approved"
+      }
+    ]
+  },
+  "visual": {
+    "extension": {
+      "scope": "18 mock states, light/dark, 360px; actual installed browser/native journey not_run",
+      "status": "passed_mock_review"
+    },
+    "docx": {
+      "status": "passed_with_documented_emoji_renderer_limit",
+      "pages_inspected": 18,
+      "words_outside_printable_bounds": 0,
+      "source_sha256": "5a477558b2cc38de481b3b6c1f979bef37469c478bd258faab34577c54d32431"
+    },
+    "social_preview": {
+      "status": "passed",
+      "width": 1200,
+      "height": 630,
+      "png_sha256": "224152334bc7225adc1be5a23f8f4848cf22d961d06f1e5bc12a9b10567e8066",
+      "labels": [
+        "33 источника",
+        "31 сигнал профилей"
+      ]
+    }
+  },
+  "format": {
+    "status": "passed",
+    "runtime_change": "exactly_one_terminal_newline_removed",
+    "normalized_ast_equal": true,
+    "windows_helper_unchanged": true,
+    "pdf_bytes_unchanged": true,
+    "attributes": "eval/fixtures/document-input/*.pdf binary",
+    "cached_diff_check": "passed"
+  },
+  "security_preflight": {
+    "scanner": "TruffleHog3.99.2",
+    "commit": "ee57d6ff685ab7048921b91d40f0354d0c7e7556",
+    "base": "3e06046995860b5360df5dd3a6110bd7108d36a3",
+    "results": "verified,unknown",
+    "scope": "current PR range, local backup refs excluded",
+    "findings": 0,
+    "exit_code": 0,
+    "seconds": 3.498
+  },
+  "fixture_annotations": {
+    "status": "passed",
+    "new_exact_lines": 11,
+    "existing_exact_lines": 4,
+    "total_exact_lines": 15,
+    "same_file_distinct_positive_controls": 11,
+    "detector_config_unchanged": true,
+    "ast_and_noncomment_tokens_equal": true,
+    "existing_evals": {
+      "doctor": 9,
+      "feature_mcp": 13
+    },
+    "note": "One percent-encoded synthetic URI has its decoded equivalent on the same annotated comment line for scanner source-line resolution."
+  },
+  "handoff": {
+    "status": "prepared",
+    "destination": "outputs/implementation",
+    "copied_artifact_hashes_match": true,
+    "release_published": false,
+    "pull_request_state": "draft",
+    "final_acceptance_export": "generated from this exact evidence after CI; implementation revision remains explicit"
+  },
+  "release": {
+    "version": "1.13.0",
+    "published": false,
+    "pull_request": "https://github.com/ilyautov/inn-check-ru/pull/10",
+    "pull_request_state": "draft"
+  },
+  "software_status": "completed",
+  "requirements": [
+    {
+      "id": "M1",
+      "software_status": "verified",
+      "scope": "Проверка сохраняется с единым run_id: её можно продолжить в новом процессе, дополнить вручную и явно экспортировать; исходные raw-данные остаются неизменными.",
+      "checks": [
+        {
+          "path": "eval/run_run_store_eval.py",
+          "sha256": "f15a40f9d15e639a77083e37681b39e23c7bcb59f94a200f363b250a797d2df0"
+        },
+        {
+          "path": "eval/run_run_workflow_eval.py",
+          "sha256": "685e3d8890a1371da6d3c881ac2cd27e59a8cd84c22d83c6c2b04727dafffe04"
+        },
+        {
+          "path": "eval/run_manual_handoff_eval.py",
+          "sha256": "b1bc5167ad0db600017cc9e7d62b9d820074c45d53cf8705180b1c6d94891e16"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M2",
+      "software_status": "verified",
+      "scope": "Каждое решающее поле связано с реальным исходным ответом, указателем на значение и хешем; зависимости профильных и финансовых выводов перечислены полностью.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_decision_contract_eval.py",
+          "sha256": "85f9230f3048ef88d3b14d251d14b8599c298bae80504068bf938fb4c1be4a6d"
+        },
+        {
+          "path": "eval/run_financial_support_eval.py",
+          "sha256": "014bcf6c2c2efafab417396fb78aae8f1fb0ad074d2fc7757479955002f1a560"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M3",
+      "software_status": "verified",
+      "scope": "Неизвестные обязательные факты сохраняют пробелы и следующие действия; отказ, неполнота, истечение срока или ответ по чужому субъекту не создают благоприятного факта.",
+      "checks": [
+        {
+          "path": "eval/run_decision_contract_eval.py",
+          "sha256": "85f9230f3048ef88d3b14d251d14b8599c298bae80504068bf938fb4c1be4a6d"
+        },
+        {
+          "path": "eval/run_manual_handoff_eval.py",
+          "sha256": "b1bc5167ad0db600017cc9e7d62b9d820074c45d53cf8705180b1c6d94891e16"
+        },
+        {
+          "path": "eval/run_workflow_doctor_eval.py",
+          "sha256": "b905875843378fa49c19403b81d86db922ec5144bfeed1ddbdab9a3f5b94bdd9"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M4",
+      "software_status": "verified",
+      "scope": "Описаны все 14 зарегистрированных наборов данных: готовность и план проверяются без сети, TTL и ограниченные транзакционные обновления задаются по набору; ресурсы находятся и после установки.",
+      "checks": [
+        {
+          "path": "eval/run_cache_policy_eval.py",
+          "sha256": "123bcbd295dc63eb018319294ef390224d21d6e81d1bef8821c8454c8828b5e0"
+        },
+        {
+          "path": "eval/run_cache_update_eval.py",
+          "sha256": "fef7dc002ccb8cf4caf5888918703dabd8dbded76ed0f100fb5b4f6ec8fd35d9"
+        },
+        {
+          "path": "eval/run_installed_workflow_eval.py",
+          "sha256": "28094d43a18f39a3f35658f121da12163650fbee87223dca080ed3b037c6f4b0"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M5",
+      "software_status": "verified",
+      "scope": "Проверяется фактический путь через оценку, профильное решение и сериализованные ответы CLI/MCP/досье; протоколы повторного расчёта и изучения исходов отделены от эмпирической проверки.",
+      "checks": [
+        {
+          "path": "eval/run_workflow_e2e_eval.py",
+          "sha256": "b65eff2bdd63df2bbe74b4308afeb029f3b41ff4267df3faa57d92bbb4094c67"
+        },
+        {
+          "path": "eval/run_knowledge_invariants_eval.py",
+          "sha256": "d5af6052d575299dc300664fd942001736f4095002d61dd0a03e2b099f9190fd"
+        },
+        {
+          "path": "eval/run_outcome_protocol_eval.py",
+          "sha256": "a492bb0fd42d0445542ff46d50cc405fc228b3ef757b0624965114b20d507ce8"
+        },
+        {
+          "path": "eval/run_historical_replay_eval.py",
+          "sha256": "f2280d5bc7114d3c7c000591980ea7027da7bb61336923b4fbe293b9828fb68d"
+        }
+      ],
+      "empirical_gates": [
+        "E-ORACLE",
+        "E-OUTCOME"
+      ]
+    },
+    {
+      "id": "M6",
+      "software_status": "verified",
+      "scope": "Проверены исходные регрессии аудита, реальные побочные действия и отмена через stdio, а также согласованность возможностей, версий и схем после установки.",
+      "checks": [
+        {
+          "path": "eval/run_mcp_safety_eval.py",
+          "sha256": "9474f66cf65948e3545fff23c537e47efb7ece9e80a5dea1d1e1e6045bdc6e45"
+        },
+        {
+          "path": "eval/run_mcp_review_fixes_eval.py",
+          "sha256": "29334ec67948298254475f0b227abb5e515d3084df382876209252fd2f732456"
+        },
+        {
+          "path": "eval/run_capability_parity_eval.py",
+          "sha256": "6a4f9beac6b5f6879aace3288535cdea855a12d3f2bab898cf6791f91dde5668"
+        },
+        {
+          "path": "eval/run_version_gate.py",
+          "sha256": "64ef809ecc0346c1ee943635ae92457722187cd94e76f4123ac3458a10d30751"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M7",
+      "software_status": "verified",
+      "scope": "События имеют устойчивые сохранённые идентификаторы, сроки владения, повторы и явные подтверждения; потеря покрытия отделена от изменения сведений о компании.",
+      "checks": [
+        {
+          "path": "eval/run_monitor_events_eval.py",
+          "sha256": "37a5f64032ada98074d1da099327f43a94908ba23dac82a079bf2e7daf543faf"
+        },
+        {
+          "path": "eval/run_schedule_plan_eval.py",
+          "sha256": "60691597d401d1747445c3386080d3dcda06213a2beca8186bd286afa7515150"
+        },
+        {
+          "path": "eval/run_watchlist_eval.py",
+          "sha256": "20b69813d274517853ed22f9b222bef2c5744fd15a25cc8ace9f1e8fff66526d"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "M8",
+      "software_status": "verified",
+      "scope": "Реализованы необязательные локальные документы/OCR, явный выбор роли стороны, неизменяемые бюджеты и правила экспорта провайдеров, объяснимый граф и сравнение.",
+      "checks": [
+        {
+          "path": "eval/run_document_input_eval.py",
+          "sha256": "770723b68e5a33912a1170354c6ab473f9f04581b5af385d41c4e69b6d80f6c2"
+        },
+        {
+          "path": "eval/run_provider_workflow_eval.py",
+          "sha256": "3db167c4366fa1429196fa518f522d77ac04b96cf14a02c94f2e23673b37fa4e"
+        },
+        {
+          "path": "eval/run_compare_eval.py",
+          "sha256": "73aebbf70db9f45acf40d6120e343bc9bd0e14aa9d47d7b16bc1a6b0682cf9a9"
+        },
+        {
+          "path": "eval/run_graph_eval.py",
+          "sha256": "12624b68ebf8df34bb1f5800b03bba5714836dc8dff36bdb669676a48fa9b544"
+        }
+      ],
+      "empirical_gates": [
+        "E-DOCS",
+        "E-EXPLAIN"
+      ]
+    },
+    {
+      "id": "R1",
+      "software_status": "verified",
+      "scope": "Типизированные версионируемые утверждения сохраняют идентичность raw-ответа, область отрицательного поиска и все необходимые исходные факты; отсутствие raw у старых данных указано явно.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_decision_contract_eval.py",
+          "sha256": "85f9230f3048ef88d3b14d251d14b8599c298bae80504068bf938fb4c1be4a6d"
+        },
+        {
+          "path": "eval/run_financial_support_eval.py",
+          "sha256": "014bcf6c2c2efafab417396fb78aae8f1fb0ad074d2fc7757479955002f1a560"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "R2",
+      "software_status": "verified",
+      "scope": "Разделены время получения, публикации, первого наблюдения, действия факта, отчётный период и срок актуальности; у неизменённых источников сохраняется время получения.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_historical_replay_eval.py",
+          "sha256": "f2280d5bc7114d3c7c000591980ea7027da7bb61336923b4fbe293b9828fb68d"
+        },
+        {
+          "path": "eval/run_cache_policy_eval.py",
+          "sha256": "123bcbd295dc63eb018319294ef390224d21d6e81d1bef8821c8454c8828b5e0"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "R3",
+      "software_status": "verified",
+      "scope": "Копии не считаются независимыми источниками; перестановка порядка сохраняет смысл конфликта и записанное основание выбора.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_provider_workflow_eval.py",
+          "sha256": "3db167c4366fa1429196fa518f522d77ac04b96cf14a02c94f2e23673b37fa4e"
+        },
+        {
+          "path": "eval/run_knowledge_invariants_eval.py",
+          "sha256": "d5af6052d575299dc300664fd942001736f4095002d61dd0a03e2b099f9190fd"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "R4",
+      "software_status": "verified",
+      "scope": "Синтетическая матрица проверяет полную/упрощённую отчётность, ИП, банки, НКО и ограниченный доступ; приёмка реальных форм остаётся в E-FORMS.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_decision_contract_eval.py",
+          "sha256": "85f9230f3048ef88d3b14d251d14b8599c298bae80504068bf938fb4c1be4a6d"
+        },
+        {
+          "path": "eval/run_workflow_e2e_eval.py",
+          "sha256": "b65eff2bdd63df2bbe74b4308afeb029f3b41ff4267df3faa57d92bbb4094c67"
+        }
+      ],
+      "empirical_gates": [
+        "E-FORMS"
+      ]
+    },
+    {
+      "id": "R5",
+      "software_status": "verified",
+      "scope": "Неизменяемые редакции и повторное воспроизведение original/current_rules сохраняют хеши и исключают сведения, недоступные на дату отсечения; реальные редакции ожидаются в E-VINTAGE.",
+      "checks": [
+        {
+          "path": "eval/run_run_store_eval.py",
+          "sha256": "f15a40f9d15e639a77083e37681b39e23c7bcb59f94a200f363b250a797d2df0"
+        },
+        {
+          "path": "eval/run_historical_replay_eval.py",
+          "sha256": "f2280d5bc7114d3c7c000591980ea7027da7bb61336923b4fbe293b9828fb68d"
+        }
+      ],
+      "empirical_gates": [
+        "E-VINTAGE"
+      ]
+    },
+    {
+      "id": "R6",
+      "software_status": "verified",
+      "scope": "Проверка проспективной когорты требует заранее зафиксированной выборки, разделения субъектов и групп, завершённых горизонтов наблюдения, учёта цензурирования и допустимых предпосылок оценки неопределённости.",
+      "checks": [
+        {
+          "path": "eval/run_outcome_protocol_eval.py",
+          "sha256": "a492bb0fd42d0445542ff46d50cc405fc228b3ef757b0624965114b20d507ce8"
+        }
+      ],
+      "empirical_gates": [
+        "E-OUTCOME"
+      ]
+    },
+    {
+      "id": "R7",
+      "software_status": "verified",
+      "scope": "Замкнутая типизированная схема и независимый эталон из зафиксированных входов отвергают неподтверждённый текст и зелёный вывод при неизвестном обязательном факте; единицы подсчёта реально выданных ответов определены явно.",
+      "checks": [
+        {
+          "path": "eval/run_workflow_e2e_eval.py",
+          "sha256": "b65eff2bdd63df2bbe74b4308afeb029f3b41ff4267df3faa57d92bbb4094c67"
+        },
+        {
+          "path": "eval/run_decision_gate_eval.py",
+          "sha256": "f1e564b82f3cee4962eded273fd627aa5361b215e66228ca57c58acb7deff611"
+        },
+        {
+          "path": "eval/run_knowledge_invariants_eval.py",
+          "sha256": "d5af6052d575299dc300664fd942001736f4095002d61dd0a03e2b099f9190fd"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "R7-B",
+      "software_status": "verified",
+      "scope": "P(outcome|green) и P(green|outcome) считаются отдельно, со своими знаменателями и порогами числа событий; эмпирические значения вероятностей не заявлены.",
+      "checks": [
+        {
+          "path": "eval/run_outcome_protocol_eval.py",
+          "sha256": "a492bb0fd42d0445542ff46d50cc405fc228b3ef757b0624965114b20d507ce8"
+        }
+      ],
+      "empirical_gates": [
+        "E-OUTCOME"
+      ]
+    },
+    {
+      "id": "R8",
+      "software_status": "verified",
+      "scope": "Версионируемые критерии проверки и схема когорты требуют независимых проверок, разрешения разногласий и полной области отрицательного поиска; синтетический корпус помечен явно.",
+      "checks": [
+        {
+          "path": "eval/run_workflow_e2e_eval.py",
+          "sha256": "b65eff2bdd63df2bbe74b4308afeb029f3b41ff4267df3faa57d92bbb4094c67"
+        },
+        {
+          "path": "eval/run_outcome_protocol_eval.py",
+          "sha256": "a492bb0fd42d0445542ff46d50cc405fc228b3ef757b0624965114b20d507ce8"
+        }
+      ],
+      "empirical_gates": [
+        "E-ORACLE"
+      ]
+    },
+    {
+      "id": "R9",
+      "software_status": "verified",
+      "scope": "Удаление фактов, копирование источников, перестановка, смена единиц, времени, транспорта и схемы проверяются на выдаваемых ответах с фиксированными часами и восстановлением исходного поведения.",
+      "checks": [
+        {
+          "path": "eval/run_knowledge_invariants_eval.py",
+          "sha256": "d5af6052d575299dc300664fd942001736f4095002d61dd0a03e2b099f9190fd"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W1",
+      "software_status": "verified",
+      "scope": "UUID-хранилище ограничено заданным корнем; ревизии записываются атомарно и связаны хешами; проверены CAS, идемпотентность, восстановление после сбоя и чтение после перезапуска без записи.",
+      "checks": [
+        {
+          "path": "eval/run_run_store_eval.py",
+          "sha256": "f15a40f9d15e639a77083e37681b39e23c7bcb59f94a200f363b250a797d2df0"
+        },
+        {
+          "path": "eval/run_run_workflow_eval.py",
+          "sha256": "685e3d8890a1371da6d3c881ac2cd27e59a8cd84c22d83c6c2b04727dafffe04"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W2",
+      "software_status": "verified",
+      "scope": "Учтены все 14 существующих обновляющих скриптов; явно заданы выбор наборов, неизвестный размер, ограничения байтов/времени и возврат к последней исправной версии.",
+      "checks": [
+        {
+          "path": "eval/run_cache_policy_eval.py",
+          "sha256": "123bcbd295dc63eb018319294ef390224d21d6e81d1bef8821c8454c8828b5e0"
+        },
+        {
+          "path": "eval/run_cache_update_eval.py",
+          "sha256": "fef7dc002ccb8cf4caf5888918703dabd8dbded76ed0f100fb5b4f6ec8fd35d9"
+        },
+        {
+          "path": "eval/run_refresh_indexes_eval.py",
+          "sha256": "b3a8694139c23fe8b9d3adb18622e8bafc402bafc147c74efff86ce3db5c5574"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W3",
+      "software_status": "verified",
+      "scope": "Установленный doctor отделяет готовность ядра от необязательных SDK и программ; передаются только именованные настройки, версии проверяются строго, секреты скрываются.",
+      "checks": [
+        {
+          "path": "eval/run_installed_workflow_eval.py",
+          "sha256": "28094d43a18f39a3f35658f121da12163650fbee87223dca080ed3b037c6f4b0"
+        },
+        {
+          "path": "eval/run_workflow_doctor_eval.py",
+          "sha256": "b905875843378fa49c19403b81d86db922ec5144bfeed1ddbdab9a3f5b94bdd9"
+        },
+        {
+          "path": "eval/run_mcp_sdk_eval.py",
+          "sha256": "454d460fcc6b16aa598c5da38471c2c1956edb6a912beb74ed6f6198259c0f16"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W4",
+      "software_status": "verified",
+      "scope": "Общая схема ручного ввода и разрешённые команды протокола с кадрами связывают ответ с запуском, субъектом и ревизией; используются PNG-иконки; просмотрены 18 имитируемых состояний интерфейса, реальный хост остаётся в E-HOST.",
+      "checks": [
+        {
+          "path": "eval/run_manual_handoff_eval.py",
+          "sha256": "b1bc5167ad0db600017cc9e7d62b9d820074c45d53cf8705180b1c6d94891e16"
+        },
+        {
+          "path": "eval/run_native_host_eval.py",
+          "sha256": "1432e0d9744548b8a488a7b00d2a1ac8edfc2a87c3c10b4d4786505bc1972810"
+        },
+        {
+          "path": "eval/run_extension_eval.py",
+          "sha256": "8cac3b20987db4e2eebbef62f21d9b40b8108ea8beb5767a9b03b3f365ae2fc8"
+        }
+      ],
+      "empirical_gates": [
+        "E-HOST"
+      ]
+    },
+    {
+      "id": "W5",
+      "software_status": "verified",
+      "scope": "Идентичность конкретного raw-ответа и проверенный указатель на значение сохраняются в ревизиях, ручных дополнениях, снимках и явном экспорте.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_evidence_pack_eval.py",
+          "sha256": "5ab18530e2993f09917c76ec31f78656d6f445f6c4d01f0e66287f0e48e12250"
+        },
+        {
+          "path": "eval/run_run_store_eval.py",
+          "sha256": "f15a40f9d15e639a77083e37681b39e23c7bcb59f94a200f363b250a797d2df0"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W6",
+      "software_status": "verified",
+      "scope": "Зарегистрированы 33 инструмента реального SDK со схемами и аннотациями действий; отмена через stdio завершает дочернее дерево и оставляет восстанавливаемое состояние.",
+      "checks": [
+        {
+          "path": "eval/run_mcp_safety_eval.py",
+          "sha256": "9474f66cf65948e3545fff23c537e47efb7ece9e80a5dea1d1e1e6045bdc6e45"
+        },
+        {
+          "path": "eval/run_workflow_mcp_eval.py",
+          "sha256": "b1da6c5b7faa3c8c8adaf8adc1f134da983d9c20284bdaaf61e2ab399dbadbfa"
+        },
+        {
+          "path": "eval/run_workflow_feature_mcp_eval.py",
+          "sha256": "83fd1c70a87ded23fd355c44a8eb29e1204f72caf38af03b26d7c8b963d599ba"
+        },
+        {
+          "path": "eval/run_capability_parity_eval.py",
+          "sha256": "6a4f9beac6b5f6879aace3288535cdea855a12d3f2bab898cf6791f91dde5668"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W7",
+      "software_status": "verified",
+      "scope": "События сохраняются после закрытия клиента; планы cron/plist/XML и пример конфигурации n8n соблюдают ограничения, не регистрируя планировщик и не отправляя сообщения.",
+      "checks": [
+        {
+          "path": "eval/run_monitor_events_eval.py",
+          "sha256": "37a5f64032ada98074d1da099327f43a94908ba23dac82a079bf2e7daf543faf"
+        },
+        {
+          "path": "eval/run_schedule_plan_eval.py",
+          "sha256": "60691597d401d1747445c3386080d3dcda06213a2beca8186bd286afa7515150"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "W8",
+      "software_status": "verified",
+      "scope": "Проверяются установленные wheel и автономный ZIP, шесть сочетаний ОС/Python в CI и явные ограничения настроек/возможностей; реальный хост и доступность из конкретной географии оцениваются отдельно.",
+      "checks": [
+        {
+          "path": "eval/run_installed_workflow_eval.py",
+          "sha256": "28094d43a18f39a3f35658f121da12163650fbee87223dca080ed3b037c6f4b0"
+        },
+        {
+          "path": "eval/run_capability_parity_eval.py",
+          "sha256": "6a4f9beac6b5f6879aace3288535cdea855a12d3f2bab898cf6791f91dde5668"
+        },
+        {
+          "path": "eval/run_workflow_docs_gate.py",
+          "sha256": "3c8b00e4a2bbfeb2583cfe0a35215955b4e2ed2af4f8451782d066897bfdd759"
+        }
+      ],
+      "empirical_gates": [
+        "E-HOST"
+      ]
+    },
+    {
+      "id": "P1",
+      "software_status": "verified",
+      "scope": "Реализованы схема исполнимых следующих действий, doctor и локальные сводные метрики, включаемые только явно; понимание действий без подсказки остаётся в E-HUMAN.",
+      "checks": [
+        {
+          "path": "eval/run_workflow_doctor_eval.py",
+          "sha256": "b905875843378fa49c19403b81d86db922ec5144bfeed1ddbdab9a3f5b94bdd9"
+        },
+        {
+          "path": "eval/run_workflow_metrics_eval.py",
+          "sha256": "f0fdf383d7976a5c7369413aada9625380ff55af52d9b9f6ff2bbeea7e9f4495"
+        },
+        {
+          "path": "eval/run_workflow_metrics_cli_eval.py",
+          "sha256": "592e6c767141d83190c8074ab98ada57ab0fb160e141dd6ffdbed3d604dc473d"
+        }
+      ],
+      "empirical_gates": [
+        "E-HUMAN"
+      ]
+    },
+    {
+      "id": "P2",
+      "software_status": "verified",
+      "scope": "Пять сценарных передач ручных результатов судов/ФССП выдерживают перезапуск процесса; пять наблюдаемых пользовательских задач остаются в E-HUMAN.",
+      "checks": [
+        {
+          "path": "eval/run_run_workflow_eval.py",
+          "sha256": "685e3d8890a1371da6d3c881ac2cd27e59a8cd84c22d83c6c2b04727dafffe04"
+        },
+        {
+          "path": "eval/run_manual_handoff_eval.py",
+          "sha256": "b1bc5167ad0db600017cc9e7d62b9d820074c45d53cf8705180b1c6d94891e16"
+        },
+        {
+          "path": "eval/run_workflow_metrics_eval.py",
+          "sha256": "f0fdf383d7976a5c7369413aada9625380ff55af52d9b9f6ff2bbeea7e9f4495"
+        }
+      ],
+      "empirical_gates": [
+        "E-HUMAN"
+      ]
+    },
+    {
+      "id": "P3",
+      "software_status": "verified",
+      "scope": "Реализована автоматическая проверка целостности утверждений и ссылок; независимое восстановление вывода человеком остаётся в E-EXPLAIN.",
+      "checks": [
+        {
+          "path": "eval/run_evidence_contract_eval.py",
+          "sha256": "6126ec43063523688cb7e862fcfcaa23bb39ec91da5ba1aa998ea42f81ea7b47"
+        },
+        {
+          "path": "eval/run_workflow_e2e_eval.py",
+          "sha256": "b65eff2bdd63df2bbe74b4308afeb029f3b41ff4267df3faa57d92bbb4094c67"
+        }
+      ],
+      "empirical_gates": [
+        "E-EXPLAIN"
+      ]
+    },
+    {
+      "id": "P4",
+      "software_status": "verified",
+      "scope": "Поля задаются разрешёнными списками, сохранённые правила неизменяемы, повторы/переключения/резервирование ограничены; экспорт фильтруется по замкнутой схеме, включая вызовы графа.",
+      "checks": [
+        {
+          "path": "eval/run_provider_policy_eval.py",
+          "sha256": "58aad27f33449f9ec347051b8056f23675a2c9af9b5e6bdca85b2fdb93242d8a"
+        },
+        {
+          "path": "eval/run_provider_workflow_eval.py",
+          "sha256": "3db167c4366fa1429196fa518f522d77ac04b96cf14a02c94f2e23673b37fa4e"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "P5",
+      "software_status": "verified",
+      "scope": "Ядро читает текст/HTML/DOCX; PDF и локальный OCR необязательны, кандидат и роль выбираются явно; 20 реальных документов с согласием владельцев остаются в E-DOCS.",
+      "checks": [
+        {
+          "path": "eval/run_document_input_eval.py",
+          "sha256": "770723b68e5a33912a1170354c6ab473f9f04581b5af385d41c4e69b6d80f6c2"
+        },
+        {
+          "path": "eval/run_extract_eval.py",
+          "sha256": "2a58ac5b7d0a824f007bc8426b331129f1a03580864c082cee5ed37c2fd1e675"
+        }
+      ],
+      "empirical_gates": [
+        "E-DOCS"
+      ]
+    },
+    {
+      "id": "P6",
+      "software_status": "verified",
+      "scope": "Синтетическая проверка 10 событий охватывает сбой, срок владения, повтор и подтверждение; получатель обеспечивает идемпотентность при доставке как минимум один раз, внешняя доставка ровно один раз не заявлена.",
+      "checks": [
+        {
+          "path": "eval/run_monitor_events_eval.py",
+          "sha256": "37a5f64032ada98074d1da099327f43a94908ba23dac82a079bf2e7daf543faf"
+        },
+        {
+          "path": "eval/run_schedule_plan_eval.py",
+          "sha256": "60691597d401d1747445c3386080d3dcda06213a2beca8186bd286afa7515150"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "P7",
+      "software_status": "verified",
+      "scope": "Сравниваются 2–5 сохранённых субъектов с общей целью и датой, фактическими периодами, покрытием и границей обхода графа; неизвестность не улучшает место в сравнении; понимание человеком остаётся в E-EXPLAIN.",
+      "checks": [
+        {
+          "path": "eval/run_compare_eval.py",
+          "sha256": "73aebbf70db9f45acf40d6120e343bc9bd0e14aa9d47d7b16bc1a6b0682cf9a9"
+        },
+        {
+          "path": "eval/run_graph_eval.py",
+          "sha256": "12624b68ebf8df34bb1f5800b03bba5714836dc8dff36bdb669676a48fa9b544"
+        }
+      ],
+      "empirical_gates": [
+        "E-EXPLAIN"
+      ]
+    },
+    {
+      "id": "A-H1",
+      "software_status": "verified",
+      "scope": "Пакетный ввод проверяется до фиксированного вызова; ограничение фактического числа учитывает дубли/пустые строки и отвергает подстановку путей, опций и раскрытие файлов.",
+      "checks": [
+        {
+          "path": "eval/run_mcp_safety_eval.py",
+          "sha256": "9474f66cf65948e3545fff23c537e47efb7ece9e80a5dea1d1e1e6045bdc6e45"
+        },
+        {
+          "path": "eval/run_mcp_review_fixes_eval.py",
+          "sha256": "29334ec67948298254475f0b227abb5e515d3084df382876209252fd2f732456"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-H2",
+      "software_status": "verified",
+      "scope": "Отсутствующие численность, капитал и предыдущий собственный капитал остаются неизвестными; подтверждённая нулевая численность ФНС сохраняет период и происхождение.",
+      "checks": [
+        {
+          "path": "eval/run_decision_regressions.py",
+          "sha256": "ff72475ebdc42fe79a18a5b2c887a096eedbfd87ad0307253e03dbf3d92354fc"
+        },
+        {
+          "path": "eval/run_financial_support_eval.py",
+          "sha256": "014bcf6c2c2efafab417396fb78aae8f1fb0ad074d2fc7757479955002f1a560"
+        },
+        {
+          "path": "eval/run_fin_eval.py",
+          "sha256": "20500d525580842c32e601f177a74b9abd39df4a9ce19fa9f8ed44a81bf093a8"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-H3",
+      "software_status": "verified",
+      "scope": "Неизвестный применимый обязательный факт или факт, способный повысить тяжесть вывода, запрещает неподтверждённый зелёный статус и выдуманную формулировку рекомендации.",
+      "checks": [
+        {
+          "path": "eval/run_decision_regressions.py",
+          "sha256": "ff72475ebdc42fe79a18a5b2c887a096eedbfd87ad0307253e03dbf3d92354fc"
+        },
+        {
+          "path": "eval/run_decision_contract_eval.py",
+          "sha256": "85f9230f3048ef88d3b14d251d14b8599c298bae80504068bf938fb4c1be4a6d"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-H4",
+      "software_status": "verified",
+      "scope": "Рост требует годов Y и Y-1; одинаковые дубли объединяются, конфликтующие дубли обрабатываются консервативно.",
+      "checks": [
+        {
+          "path": "eval/run_decision_regressions.py",
+          "sha256": "ff72475ebdc42fe79a18a5b2c887a096eedbfd87ad0307253e03dbf3d92354fc"
+        },
+        {
+          "path": "eval/run_fin_eval.py",
+          "sha256": "20500d525580842c32e601f177a74b9abd39df4a9ce19fa9f8ed44a81bf093a8"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-H5",
+      "software_status": "verified",
+      "scope": "Ручная установка копированием и настоящий автономный ZIP включают данные/ресурсы и исполняются вне рабочего каталога репозитория без SDK/PYTHONPATH.",
+      "checks": [
+        {
+          "path": "eval/run_mcp_safety_eval.py",
+          "sha256": "9474f66cf65948e3545fff23c537e47efb7ece9e80a5dea1d1e1e6045bdc6e45"
+        },
+        {
+          "path": "eval/run_installed_workflow_eval.py",
+          "sha256": "28094d43a18f39a3f35658f121da12163650fbee87223dca080ed3b037c6f4b0"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-M1",
+      "software_status": "verified",
+      "scope": "Единый владелец дочерних процессов обрабатывает тайм-аут, отмену, потомков завершившегося родителя и время жизни Windows Job; требуется фактический Windows CI.",
+      "checks": [
+        {
+          "path": "eval/run_mcp_safety_eval.py",
+          "sha256": "9474f66cf65948e3545fff23c537e47efb7ece9e80a5dea1d1e1e6045bdc6e45"
+        },
+        {
+          "path": "eval/run_native_host_windows.py",
+          "sha256": "840cc3ba3dee82da3f76af24f5f587ba76914d8516ae7ef9566f848e0a76e58d"
+        },
+        {
+          "path": "eval/run_workflow_feature_mcp_eval.py",
+          "sha256": "83fd1c70a87ded23fd355c44a8eb29e1204f72caf38af03b26d7c8b963d599ba"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-M2",
+      "software_status": "verified",
+      "scope": "Параллельный тест сохраняет реальные объекты opener, предотвращая ложные срабатывания при повторном использовании идентификаторов объектов.",
+      "checks": [
+        {
+          "path": "eval/run_fetch_eval.py",
+          "sha256": "c7772c1d3c5d0ac0629a4d8556bed982770bfa13962d1e39e352de0774535d1a"
+        }
+      ],
+      "empirical_gates": []
+    },
+    {
+      "id": "A-M3",
+      "software_status": "verified",
+      "scope": "Отсутствие кеша/сети имеет явную причину недоступности или невыполнения; заранее подготовленный некорректный ответ по-прежнему вызывает ошибку схемы.",
+      "checks": [
+        {
+          "path": "eval/run_cbr_warning_eval.py",
+          "sha256": "6bc5991a434e64c737cb900120bf10cd46da7cbf8a098f817650c2d07bedd713"
+        },
+        {
+          "path": "eval/run_cache_policy_eval.py",
+          "sha256": "123bcbd295dc63eb018319294ef390224d21d6e81d1bef8821c8454c8828b5e0"
+        }
+      ],
+      "empirical_gates": []
+    }
+  ],
+  "empirical": [
+    {
+      "id": "E-HUMAN",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-DOCS",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-EXPLAIN",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-FORMS",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-ORACLE",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-VINTAGE",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-OUTCOME",
+      "status": "awaiting_external_evidence",
+      "observed_count": 0
+    },
+    {
+      "id": "E-HOST",
+      "status": "not_run",
+      "observed_count": 0
+    }
+  ],
+  "evidence_semantics": "Отчёт охватывает программные протоколы и явно указанные синтетические проверки, установленные пакеты и платформы. Из них не выводятся эмпирический успех, истинность реестров, права на данные провайдера, принятие пользователями на реальном хосте или вероятности исходов.",
+  "checkbox_dispositions": [
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 1,
+      "original_line": 10,
+      "original_text": "- [x] Reproduce audit H2/H3/H4 against current source before edits. Consider data-shape mismatch, missingness propagation and recommendation generation separately.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 2,
+      "original_line": 11,
+      "original_text": "- [x] Add failing tests for 2025/2023 not being consecutive; duplicate years and yearly growth needing Y-1.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 3,
+      "original_line": 12,
+      "original_text": "- [x] Preserve unknown for absent staff, charter capital and previous equity; zero staff from verified FNS dumps is recognized with its year/provenance.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 4,
+      "original_line": 13,
+      "original_text": "- [x] Apply applicability and required-signal/override policy consistently for manual and automated unknown fields.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 5,
+      "original_line": 14,
+      "original_text": "- [x] Generate recommendations only from checked facts; a missing mass-head fact cannot yield \"не массовый\" or green in the affected required profile.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 6,
+      "original_line": 15,
+      "original_text": "- [x] Run covering existing and new evals and ruff; record red/green evidence and changed interface decisions for later contracts.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0A",
+      "checkbox": 7,
+      "original_line": 16,
+      "original_text": "- [x] Independent code review before completion.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_regressions",
+        "run_fin_eval",
+        "run_financial_support_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 8,
+      "original_line": 22,
+      "original_text": "- [ ] Reproduce option/path injection and cap bypass with disposable files; add failing tests that require no unexpected writes, file expansion or network calls.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 9,
+      "original_line": 23,
+      "original_text": "- [ ] Validate every batch input as an INN before invocation; distinguish API misuse from an ordinary invalid-ID response. Enforce the real input count limit.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 10,
+      "original_line": 24,
+      "original_text": "- [ ] Cancel/reap the complete subprocess group on timeout, with Windows handling and no surviving fetch child.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 11,
+      "original_line": 25,
+      "original_text": "- [ ] Fix parallel spy to retain actual opener references, preventing identity reuse false positives.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 12,
+      "original_line": 26,
+      "original_text": "- [ ] Respect cache/source availability in canaries: absent index is an explicit non-run/coverage reason, schema violation is failure; preserve meaningful failure for sources that should have answered.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 13,
+      "original_line": 27,
+      "original_text": "- [ ] Correct manual installation to include data/ and test copied installation outside checkout.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 14,
+      "original_line": 28,
+      "original_text": "- [ ] Run relevant evals and ruff; record negative-path evidence.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 0,
+      "task": "0B",
+      "checkbox": 15,
+      "original_line": 29,
+      "original_text": "- [ ] Independent security/code review before completion.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval",
+        "run_fetch_eval",
+        "run_cbr_warning_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1A",
+      "checkbox": 1,
+      "original_line": 37,
+      "original_text": "- [ ] Add this independent missingness test plus a recorded-response test that resolves the locator against saved raw bytes and checks its transformation; seed raw hash mismatch and a locator pointing to another company.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_evidence_pack_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1A",
+      "checkbox": 2,
+      "original_line": 59,
+      "original_text": "- [ ] Run `python3 eval/run_evidence_contract_eval.py`; first run must fail because the contract is absent, not because imports accidentally resolve another checkout. Record command/hash/output in `work/implementation-reports/phase-1.json`.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_evidence_pack_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1A",
+      "checkbox": 3,
+      "original_line": 60,
+      "original_text": "- [ ] Implement canonical JSON hashing, typed dictionaries, deep-copy adaptation and checked raw lookup. Map real response ids by captured source/subject/request, then verify every locator resolves; do not fabricate `/field` pointers from normalized JSON. Preserve raw_unavailable for older files. Enforce max dependencies, detect dangling refs/cycles, reject foreign subject refs.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_evidence_pack_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1A",
+      "checkbox": 4,
+      "original_line": 61,
+      "original_text": "- [ ] Migrate status, unreliability, bankruptcy roles, current/repaid debt, sanctions, capital, revenue, staff, financial leaf fields and every decisive path in `data/profiles_ru.json`. Add a coverage test enumerating profile paths and rule dependencies; an unsupported path fails the gate or returns explicit unknown, never drops from the matrix.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_evidence_pack_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1A",
+      "checkbox": 5,
+      "original_line": 62,
+      "original_text": "- [ ] Run the focused eval and `python3 eval/run_evidence_pack_eval.py`; require real raw hashes/locators, original input unmodified, corrupt refs diagnosed and old packs still verified. Request review; root coordinates commit after approval.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_evidence_pack_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1B",
+      "checkbox": 6,
+      "original_line": 70,
+      "original_text": "- [ ] Add frozen-clock cases from this table before implementation.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_profiles_eval",
+        "run_fin_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1B",
+      "checkbox": 7,
+      "original_line": 100,
+      "original_text": "- [ ] Run focused eval red. Implement policy metadata with version and source rationale. Freshness is claim-specific; no single TTL for all financial and registry facts. Unknown family is not independent. Conflict resolution records all candidate ids and selected id/reason or null.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_profiles_eval",
+        "run_fin_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1B",
+      "checkbox": 8,
+      "original_line": 101,
+      "original_text": "- [ ] Add form applicability without inventing bank ratios or inferring form solely from OKVED. `not_measurable_for_form`, `not_applicable`, missing publication and unsupported form are separate. Publish support matrix in `references/evidence-contract.md`; flag any form lacking checked real sample as unverified.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_profiles_eval",
+        "run_fin_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1B",
+      "checkbox": 9,
+      "original_line": 102,
+      "original_text": "- [ ] Run focused eval, `eval/run_fin_eval.py`, `eval/run_profiles_eval.py`; compare reversal tests, UTC boundaries and all six form segments. Review before marking complete.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_evidence_contract_eval",
+        "run_profiles_eval",
+        "run_fin_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1C",
+      "checkbox": 10,
+      "original_line": 110,
+      "original_text": "- [ ] Add a regression that removes the only mass-head field from the existing clean profile fixture; assert the final recommendation does not say “не массовый”, the required gap appears in metadata, and the dossier preserves it. Test transit lists both staff and revenue dependencies and their years. Neutral stays facts_only.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_contract_eval",
+        "run_decision_fixes_eval",
+        "run_financial_support_eval",
+        "run_export_integrity_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1C",
+      "checkbox": 11,
+      "original_line": 130,
+      "original_text": "- [ ] Run `python3 eval/run_decision_contract_eval.py` red. Add optional metadata to existing results and snapshot fingerprints; older snapshots remain readable. Stable rules_version hashes actual profile/canon/policy contents.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_contract_eval",
+        "run_decision_fixes_eval",
+        "run_financial_support_eval",
+        "run_export_integrity_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1C",
+      "checkbox": 12,
+      "original_line": 131,
+      "original_text": "- [ ] Render decisive findings and decisive absences with evidence ids, periods, scope, conflicts and gaps in Markdown/DOCX model. A recommendation may only use asserted supported facts. `can_recommend` must depend on applicable required rules, including severity overrides, not total source count.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_contract_eval",
+        "run_decision_fixes_eval",
+        "run_financial_support_eval",
+        "run_export_integrity_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 1,
+      "task": "1C",
+      "checkbox": 13,
+      "original_line": 132,
+      "original_text": "- [ ] Run both new evals plus existing fin/profiles/dossier/diff/retro evals and ruff on changed files; compare same inputs before/after for coverage and abstention. Preserve legacy API shape and explicit red Phase 0 regressions.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_contract_eval",
+        "run_decision_fixes_eval",
+        "run_financial_support_eval",
+        "run_export_integrity_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2A",
+      "checkbox": 1,
+      "original_line": 35,
+      "original_text": "- [x] Add an isolated test with no network or global HOME mutation:",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_store_eval",
+        "run_redaction_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2A",
+      "checkbox": 2,
+      "original_line": 65,
+      "original_text": "- [x] Run `python3 eval/run_run_store_eval.py` red; add subprocess restart, simultaneous writers (barrier), killed writer before/after revision replace and before HEAD replace, corrupt HEAD/hash, operation id collision with different bytes, oversized JSON and traversal/symlink tests.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_store_eval",
+        "run_redaction_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2A",
+      "checkbox": 3,
+      "original_line": 66,
+      "original_text": "- [x] Implement UUID validation, root confinement, stdlib OS locks, canonical redaction, temp/fsync/replace and hash-linked revisions exactly as design. read never mkdir/writes. CAS errors return no partial visible HEAD; orphan revisions stay uncommitted. Retry matching operation succeeds even with stale expected revision. Keep operation index derived from committed history.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_store_eval",
+        "run_redaction_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2A",
+      "checkbox": 4,
+      "original_line": 67,
+      "original_text": "- [ ] Run focused eval on Linux/macOS/Windows CI; record local platform only until CI exists. Verify redaction sentinels in every file, including `_token_pb`, Authorization and proxy URL userinfo. Root coordinates review/commit.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_store_eval",
+        "run_redaction_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2B",
+      "checkbox": 5,
+      "original_line": 75,
+      "original_text": "- [ ] Test a collector stub returning recorded source data with raw capture. Persist start, exit child, import existing manual validator output in a new child, render and snapshot. Patch all network entry points to raise during resume/render/import. Assert 0 calls, unchanged original raw/evidence digests and retained run id.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_workflow_eval",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2B",
+      "checkbox": 6,
+      "original_line": 92,
+      "original_text": "- [ ] Run new eval red. Implement orchestration via actual score/resolve/manual/dossier, not subprocess recollection for every operation. start persists collecting then completion/cancellation; existing raw capture writes a package under managed storage with real response ids. refresh resolves requested sources plus explicit prerequisites and returns their list; never silently calls full collect. Declined/incomplete actions persist as new revision but remain gaps.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_workflow_eval",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2B",
+      "checkbox": 7,
+      "original_line": 93,
+      "original_text": "- [ ] Add CLI commands and validate public usage below in an isolated temp store; an id is data, never an argv fragment.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_workflow_eval",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2B",
+      "checkbox": 8,
+      "original_line": 109,
+      "original_text": "- [ ] Run new eval, existing manual/evidence_pack/dossier/watchlist/retro evals. Test render no artifact write, explicit export atomic write, cancel leaves recoverable state, stale run shows refresh action without refreshing. Review integration.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_run_workflow_eval",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2C",
+      "checkbox": 9,
+      "original_line": 117,
+      "original_text": "- [ ] Add tests for unknown run, mismatch INN, disallowed URL, explicitly expired expires_at, incomplete pagination, refusal, retry identical operation and revision conflict. Page content including shell/HTML instructions is rendered as text and rejected as command fields.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_manual_handoff_eval",
+        "run_native_host_eval",
+        "run_extension_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2C",
+      "checkbox": 10,
+      "original_line": 130,
+      "original_text": "- [ ] Run manual handoff eval red. Show selected run subject/name/profile/revision and source URL before the user confirms attachment. On conflict reload and ask explicit run selection in UI, never silently attach to latest unrelated run. Use storage fallback outside extension context. Keep PNG manifest icons.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_manual_handoff_eval",
+        "run_native_host_eval",
+        "run_extension_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 2,
+      "task": "2C",
+      "checkbox": 11,
+      "original_line": 131,
+      "original_text": "- [ ] Run native-host/extension evals plus real browser check when available: start from copied extension/native package, attach a block, close client, reopen and resume via MCP/CLI. Record real UI evidence separately from JS/headless checks. Visually review popup layout, long names, readable error/conflict states and light/dark consistency; report observed limits.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_manual_handoff_eval",
+        "run_native_host_eval",
+        "run_extension_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3A",
+      "checkbox": 1,
+      "original_line": 35,
+      "original_text": "- [ ] Add a table-driven inventory test for every registered updater: state, metadata source, TTL rationale/version, size known or unknown, RF network requirement, applicable profiles and exact argv. Unknown values remain null with reason.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_policy_eval",
+        "run_refresh_indexes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3A",
+      "checkbox": 2,
+      "original_line": 53,
+      "original_text": "- [ ] Run focused eval red. Implement pure reads and profile-specific plans. Keep large optional datasets separate from minimal scenario; plan never enables a disabled source. TTL sanctions <=7d, schedule with 1d margin; probe 24h and network fingerprint stays separate. Annual observation period is unaffected by update frequency. Unknown size must not bypass max_bytes during download.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_policy_eval",
+        "run_refresh_indexes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3A",
+      "checkbox": 3,
+      "original_line": 54,
+      "original_text": "- [ ] Test boundary times, repeated status no filesystem changes, mixed 7d/monthly datasets and explicit stale current negatives. Run `eval/run_refresh_indexes_eval.py`, sanctions eval and cache eval. Review policy rationales; no unsupported freshness number is invented.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_policy_eval",
+        "run_refresh_indexes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3B",
+      "checkbox": 4,
+      "original_line": 62,
+      "original_text": "- [ ] Add download fault at byte boundary, schema validation failure, disk full simulation, timeout and two competing updates. Last-known-good cache digest must remain unchanged; orphan staging directories are not treated as valid.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_update_eval",
+        "run_schedule_plan_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3B",
+      "checkbox": 5,
+      "original_line": 75,
+      "original_text": "- [ ] Run red. Reuse updater functions with staging destination, validate then atomic promotion. root must route both status reads and every updater write to that root through supported flags or a narrowly scoped child environment; never mutate process HOME or silently use the user cache. Add a sentinel test proving no writes escape the temp root; enforce total and per-dataset budgets and cancellation. No shell command from URL/metadata. Schedule output only, no actual scheduler registration. Earliest due time accounts for TTL margin, not a universal monthly day.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_update_eval",
+        "run_schedule_plan_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3B",
+      "checkbox": 6,
+      "original_line": 76,
+      "original_text": "- [ ] Run focused eval and existing affected updater evals once; verify schedule next occurrence precedes sanctions expiration across a month boundary. Record emitted commands for Linux/macOS/Windows and review escaping.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_cache_update_eval",
+        "run_schedule_plan_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3C",
+      "checkbox": 7,
+      "original_line": 84,
+      "original_text": "- [ ] Add no-SDK/core-only test, optional missing key, incompatible SDK and broken FastMCP import. Create isolated wheel environment outside checkout; report core_ready independently from sdk_ready.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_doctor_eval",
+        "run_installed_workflow_eval",
+        "run_mcp_sdk_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3C",
+      "checkbox": 8,
+      "original_line": 96,
+      "original_text": "- [ ] Run red; implement explicit SDK version/import checks without importing SDK for core diagnostics. Use actual installed resources, not `repo/scripts` assumptions. Report presence/source of key only; redact sentinel key values and proxy userinfo even in exception messages. `--probe` alone enables network and cache writing.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_doctor_eval",
+        "run_installed_workflow_eval",
+        "run_mcp_sdk_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 3,
+      "task": "3C",
+      "checkbox": 9,
+      "original_line": 97,
+      "original_text": "- [ ] Verify commands below in clean HOME/temp venv Python 3.10/3.12, with/without extra and incompatible SDK fixture. Core functionality passes without API key; executable next actions identify OS and missing optional binary.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_doctor_eval",
+        "run_installed_workflow_eval",
+        "run_mcp_sdk_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4A",
+      "checkbox": 1,
+      "original_line": 37,
+      "original_text": "- [ ] Snapshot tools/list names, input schemas and annotations, including legacy optional save/export effects. Assert pure tools create no files. Run actual stdio initialize → tools/list → run read → render; fake SDK/unit decorator tests alone do not satisfy protocol gate.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_mcp_eval",
+        "run_workflow_feature_mcp_eval",
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4A",
+      "checkbox": 2,
+      "original_line": 51,
+      "original_text": "- [ ] Run red; implement transport wrappers, input validation and ToolAnnotations supported by pinned SDK1. No dynamic readOnly claim for optional save; read-only tools read, write tools mutate local state explicitly. Reuse Phase 0 subprocess group cancellation; async wrapper cancellation must terminate child work, not merely stop waiting for a background thread.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_mcp_eval",
+        "run_workflow_feature_mcp_eval",
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4A",
+      "checkbox": 3,
+      "original_line": 52,
+      "original_text": "- [ ] Add real notifications/cancelled test with descendant marker delayed past cancel; assert no marker, no orphan fetch and cancelled/interrupted run. Run mcp/test_server.py plus MCP sdk/handshake/phase0 safety evals. No SDK2 or Tasks prerequisite.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_mcp_eval",
+        "run_workflow_feature_mcp_eval",
+        "run_mcp_safety_eval",
+        "run_mcp_review_fixes_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4B",
+      "checkbox": 4,
+      "original_line": 60,
+      "original_text": "- [ ] Add ten synthetic events covering company_changed, coverage_lost, coverage_restored and refresh_failed. Test ingest twice, claim then crash, lease expiry, retry, duplicate ack, foreign consumer and concurrent consumers.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_monitor_events_eval",
+        "run_watchlist_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4B",
+      "checkbox": 5,
+      "original_line": 73,
+      "original_text": "- [ ] Run red. Persist stable content IDs and delivery states atomically. Separate transport delivered/read ack; list does not consume. Failures do not emit “no changes”; lost coverage is its own event. Preserve event data for next process even after closed chat. Include run origin/hash and configured retry cap/backoff.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_monitor_events_eval",
+        "run_watchlist_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4B",
+      "checkbox": 6,
+      "original_line": 74,
+      "original_text": "- [ ] Run monitor/watchlist/diff evals; verify same event seen after crash with same id, never counted as new, and no lost acknowledged event in declared fixture campaign. Document at-least-once transport and receiver idempotency; do not claim exactly-once external delivery.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_monitor_events_eval",
+        "run_watchlist_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4C",
+      "checkbox": 7,
+      "original_line": 82,
+      "original_text": "- [ ] Parse generated XML/plist with stdlib, round-trip quoting for paths with spaces/ampersands, validate no credentials and no environment dump; mock scheduler commands to raise if called. Windows Task Scheduler has StartWhenAvailable, bounded execution time and IgnoreNew multiple-instance policy.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_schedule_plan_eval",
+        "run_monitor_events_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4C",
+      "checkbox": 8,
+      "original_line": 94,
+      "original_text": "- [ ] Run red; extend existing schedule generators instead of daemon. Example n8n reads local JSON event, idempotency event_id and explicit ack only after host action; placeholders are input configuration fields, no embedded secrets or preconfigured recipients. Documentation shows dry-run then user-owned install; no auto notification.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_schedule_plan_eval",
+        "run_monitor_events_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 4,
+      "task": "4C",
+      "checkbox": 9,
+      "original_line": 95,
+      "original_text": "- [ ] Run scheduler eval on all OS CI, Windows native-host process tests, event queue E2E. Actual OS registration/run is a separate operator acceptance row; generated valid XML alone is not that evidence.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_schedule_plan_eval",
+        "run_monitor_events_eval",
+        "run_native_host_windows"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5A",
+      "checkbox": 1,
+      "original_line": 35,
+      "original_text": "- [ ] Write tests for text PDF, image-only PDF, encrypted/broken PDF, missing extra/Tesseract, overlarge/too-many-page input, OCR timeout, checksum mismatch and multiple own-company/bank/supplier identifiers.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_document_input_eval",
+        "run_extract_eval",
+        "run_workflow_feature_mcp_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5A",
+      "checkbox": 2,
+      "original_line": 51,
+      "original_text": "- [ ] Run `python3 eval/run_document_input_eval.py` red. Implement lazy optional imports; stdlib extraction unchanged. `pdf` extra uses a compatible bounded pypdf version selected against official documentation at execution; OCR invokes explicitly configured local renderer/Tesseract via argv list with timeout and descendant cancellation. Fixed limits: 20 MiB, 100 pages, 60 seconds. No network OCR; output content is untrusted data.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_document_input_eval",
+        "run_extract_eval",
+        "run_workflow_feature_mcp_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5A",
+      "checkbox": 3,
+      "original_line": 52,
+      "original_text": "- [ ] Add CLI `document extract <file> [--ocr] --json` and `document select <candidates.json> --role supplier --candidate <id> --json`. MCP accepts text or existing managed artifact id; arbitrary page-controlled filesystem paths remain forbidden. A selected subject can start a run only through explicit run start/check command, not extraction side effect.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_document_input_eval",
+        "run_extract_eval",
+        "run_workflow_feature_mcp_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5A",
+      "checkbox": 4,
+      "original_line": 53,
+      "original_text": "- [ ] Run extract/document/process safety evals both with and without extras. Measure candidate recall, silent wrong-party checks (target 0 on declared corpus), manual selection rate and extraction failures separately. The 20 real consented documents require actual acquisition/review in Phase 7; 20 synthetic PDFs do not fulfil that experiment.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_document_input_eval",
+        "run_extract_eval",
+        "run_workflow_feature_mcp_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5B",
+      "checkbox": 5,
+      "original_line": 61,
+      "original_text": "- [ ] Add refusal/exhaustion tests before adapter implementation:",
+      "disposition": "software_contract",
+      "checks": [
+        "run_provider_policy_eval",
+        "run_provider_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5B",
+      "checkbox": 6,
+      "original_line": 81,
+      "original_text": "- [ ] Run red. Validate all requested/exportable fields against explicit allowlists. Reserve before dispatch and count ambiguous timeout conservatively. Implement one explicit quota/unavailability fallback from Checko to DaData when enabled, field supported and total request/cost budget remains. 401/403 no retries; configured transient retry at most 1 and inside budget. Persist safe transfer history (provider/field names/time), never key or HTTP auth. No policy -> existing single-provider selection remains with no surprise fallback.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_provider_policy_eval",
+        "run_provider_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5B",
+      "checkbox": 7,
+      "original_line": 82,
+      "original_text": "- [ ] Apply budget to graph calls as well; preserve <=25 graph ceiling. Export filtering applies to derived documents and raw package (redacted omissions are labelled; original restricted local raw is not copied into permitted export). Provenance retains provider/origin distinction; inability to export does not fabricate missingness or erase original restricted run internally.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_provider_policy_eval",
+        "run_provider_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5B",
+      "checkbox": 8,
+      "original_line": 83,
+      "original_text": "- [ ] Run provider, fetch, graph, dossier/evidence pack evals; concurrent reservation test must not overspend. Secret sentinel and forbidden field tests scan all output channels. Document user-configured policy vs actual provider legal terms; do not invent commercial price/licence claims.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_provider_policy_eval",
+        "run_provider_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5C",
+      "checkbox": 9,
+      "original_line": 91,
+      "original_text": "- [ ] Add mismatched profile/date fixtures, incomplete company vs complete company, common address vs ownership, and depth/request truncation. Refuse one or six subjects, duplicate subject IDs and future-only revisions.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_compare_eval",
+        "run_graph_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5C",
+      "checkbox": 10,
+      "original_line": 107,
+      "original_text": "- [ ] Run red. Compare saved evidence only, select revisions available by as_of, surface actual fact periods and coverage. Different goals reject rather than compare unlike decisions. Unknown cannot appear as a favourable metric or better rank. Graph associations remain named: address never ownership; causal/beneficial ownership conclusions require supported ownership chain.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_compare_eval",
+        "run_graph_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 5,
+      "task": "5C",
+      "checkbox": 11,
+      "original_line": 108,
+      "original_text": "- [ ] Run compare/graph/dossier/profiles evals; no network for comparison. Record frontier when max_nodes/max_depth/provider budget stops traversal. Real users explaining a choice are empirical Phase 7 evidence, not inferred from correct JSON.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_compare_eval",
+        "run_graph_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "installed"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6A",
+      "checkbox": 1,
+      "original_line": 35,
+      "original_text": "- [ ] Fix rubric and hashes before run. Cases cover full/simplified/IP/bank/NPO/restricted, known positive/complete negative/unknown, current/repaid debt, bankruptcy subject roles, conflicts, mixed periods, missing required risk, manual refusal, incomplete pages/index and raw loss. Case stores source hashes/licence, expected atomic claims, evidence scope, oracle status, independent review/adjudication fields.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_gate_eval",
+        "run_workflow_e2e_eval",
+        "run_knowledge_invariants_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6A",
+      "checkbox": 2,
+      "original_line": 36,
+      "original_text": "- [ ] Add mutation tests for removed necessary leaf, mirrored source duplication, provider order reversal, consistent unit conversion, reload of annual data, timeout, truncation, unknown enum and incomplete index. Keep minimal failing input with fixed seed/clock.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_gate_eval",
+        "run_workflow_e2e_eval",
+        "run_knowledge_invariants_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6A",
+      "checkbox": 3,
+      "original_line": 50,
+      "original_text": "- [ ] Run all new evals red, then implement harness and actual serialized-output assertions. Interpret “less evidence cannot increase certainty” correctly: red may become unknown; do not require a colour monotonicity false invariant. Match each affirmative recommendation sentence to claim ids in rendered dossier model and text. Distinguish transport errors/unsupported features/missing oracle/factual disagreement.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_gate_eval",
+        "run_workflow_e2e_eval",
+        "run_knowledge_invariants_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6A",
+      "checkbox": 4,
+      "original_line": 51,
+      "original_text": "- [ ] Run new evals, existing calibration/benchmark/svetofor evals to preserve old published results. Publish counts, exclusions and matched-input coverage/abstention comparison, not only a zero-error headline. Synthetic target corpus is separate from representative measured frequency.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_decision_gate_eval",
+        "run_workflow_e2e_eval",
+        "run_knowledge_invariants_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6B",
+      "checkbox": 5,
+      "original_line": 59,
+      "original_text": "- [ ] Add synthetic 2021 financial form first observed after 2022 cutoff; it must not enter eligible historic data. Add later corrected edition; original replay remains byte-equal. Change threshold in temporary fixture resource and assert new current-rules manifest differs without rewriting original.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_historical_replay_eval",
+        "run_retro_eval",
+        "run_offline_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6B",
+      "checkbox": 6,
+      "original_line": 72,
+      "original_text": "- [ ] Run red. Do not equate reporting year/actualBfoDate to proven public availability without documented semantics. Original returns stored decision; current_rules is an explicit replay artifact, not original historical outcome. Claims with unknown publication/observation are excluded or clearly unverified. Persist later vintages prospectively; no fictional reconstruction of missing archive.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_historical_replay_eval",
+        "run_retro_eval",
+        "run_offline_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6B",
+      "checkbox": 7,
+      "original_line": 73,
+      "original_text": "- [ ] Run replay/retro/snapshot/evidence evals with no-network audit hook. Obtain two genuinely dated editions when available, retain permission/hash provenance; until then mark real-vintage validation awaiting_external_evidence, not complete from synthetic correction.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_historical_replay_eval",
+        "run_retro_eval",
+        "run_offline_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6C",
+      "checkbox": 8,
+      "original_line": 81,
+      "original_text": "- [ ] Register sampling frame, target CI width/event requirement, confidence method, freeze date/hashes, disjoint subject/group split, attrition, weights, form/size/sector/no-reporting strata and adjudication before reading outcomes. Seed fixtures have synthetic:true and cannot be included in real report. Require two independent reviewers for disputed critical facts and adjudicator when disagreeing.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6C",
+      "checkbox": 9,
+      "original_line": 91,
+      "original_text": "- [ ] Add censored horizon cannot be marked survived; missing outcome oracle excluded with reason; leakage cutoff and repeated group split fail. Run `python3 eval/run_outcome_protocol_eval.py` red then implement validator/metrics with stdlib math/random, documented uncertainty and no training on held-out labels.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6C",
+      "checkbox": 10,
+      "original_line": 92,
+      "original_text": "- [ ] Implement schema/protocol and synthetic evaluator tests now. Actual independent labels, sufficient events, elapsed horizons and external reviewers remain E-ORACLE/E-OUTCOME experiments in ledger. Empty/immature input emits `insufficient_evidence`, never zero default risk. No live bankruptcies, interviews or consent are fabricated by tests.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 6,
+      "task": "6C",
+      "checkbox": 11,
+      "original_line": 93,
+      "original_text": "- [ ] Run focused eval and independent review of statistical definitions. Publish old calibration and new prospective mechanism separately; numerical transferability is not claimed until external evidence exists.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7A",
+      "checkbox": 1,
+      "original_line": 35,
+      "original_text": "- [ ] Add packaging test that builds wheel and release ZIP, installs outside checkout with empty HOME and asserts module origins under venv. Confirm every documented command is available through installed executable, not PYTHONPATH backdoor.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_installed_workflow_eval",
+        "run_capability_parity_eval",
+        "run_version_gate",
+        "run_workflows_gate"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7A",
+      "checkbox": 2,
+      "original_line": 52,
+      "original_text": "- [ ] Run red; include new modules/data and entry point. Align Checko/DaData/proxy/run-store config across plugin, MCPB, plain MCP, Docker and CLI, or mark channel's unsupported setting explicitly in matrix. Secret placeholders never become persisted values. Version derives from the current project source; use next version chosen by release owner, not a fabricated published release.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_installed_workflow_eval",
+        "run_capability_parity_eval",
+        "run_version_gate",
+        "run_workflows_gate"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7A",
+      "checkbox": 3,
+      "original_line": 53,
+      "original_text": "- [ ] Test installed synthetic route: doctor/cache plan → start with injected recorded transport → new process → manual → resume → document → snapshot → selected refresh → diff → event ack/retry → replay. Installed transport fixture is a test-only adapter, not public arbitrary executable/config escape. Test CLI and stdio tools; verify read/resume have 0 source calls and same materialized revision.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_installed_workflow_eval",
+        "run_capability_parity_eval",
+        "run_version_gate",
+        "run_workflows_gate"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7A",
+      "checkbox": 4,
+      "original_line": 54,
+      "original_text": "- [ ] Add Linux/macOS/Windows × Python 3.10/3.12 core matrix; bounded MCP SDK supported/no-SDK/incompatible matrix. Existing wheel/uvx/MCPB/Docker checks remain. Windows timeout descendant test must run on Windows. Canary is separate live job with geographic/source coverage and skip reasons; network failure does not masquerade as schema failure or offline pass.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_installed_workflow_eval",
+        "run_capability_parity_eval",
+        "run_version_gate",
+        "run_workflows_gate"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7A",
+      "checkbox": 5,
+      "original_line": 55,
+      "original_text": "- [ ] Run new evals, complete compatible existing eval suite, ruff, skill/workflow/version gates once after final changes. Build artifacts, inspect names/content/hashes and scan secret sentinels. Record local vs CI vs real-host evidence; missing platforms remain not_run, not assumed pass.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_installed_workflow_eval",
+        "run_capability_parity_eval",
+        "run_version_gate",
+        "run_workflows_gate"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7B",
+      "checkbox": 6,
+      "original_line": 63,
+      "original_text": "- [ ] Add doc gate using command parser checks and link resolution. Remove “fact = three sources” and universal “all tools read-only”; explain primary/mirror lineage, partial decisions and actual writes. Distinguish ordinary report, signed official extract and byte-integrity archive. Explicitly label expert rules vs validated probabilities.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_docs_gate",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7B",
+      "checkbox": 7,
+      "original_line": 64,
+      "original_text": "- [ ] Verify examples below end to end with real output ids in temporary installation; document retrieval of ids, operation UUID creation, safe optional keys and blocked source next action.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_docs_gate",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7B",
+      "checkbox": 8,
+      "original_line": 75,
+      "original_text": "- [ ] Run recovery drill: copy a quiescent run directory with committed HEAD, restore into new root, verify all revision/raw/artifact hashes, replay original without network. Roll back the package in a temporary venv and prove the store remains byte-identical. The previous 1.12.3 source release has no workflow API: verify the old one-shot CLI remains usable and the workflow entry point is unavailable, reporting unsupported-client rather than inventing an unsupported_schema response. Separately verify a schema-capable reader rejects an unknown future schema with unsupported_schema and no mutation. Record the real downgrade and any simulated older-schema reader as distinct evidence. Document retained raw vs retention TTL, concurrent-writer constraints, storage failure and lock cleanup.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_docs_gate",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7B",
+      "checkbox": 9,
+      "original_line": 76,
+      "original_text": "- [ ] Independent code/security review must cover path/argv injection, secrets, hostile document/page text, paid budget and descendant cancellation. Native host owns filesystem root, not page; annotations are hints. Address findings, run affected checks once, update acceptance evidence. No unsolicited schedule, external notification, publication or release upload.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_docs_gate",
+        "run_export_integrity_eval",
+        "run_installed_workflow_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 10,
+      "original_line": 84,
+      "original_text": "- [ ] Test disabled record produces zero file writes; unexpected fields containing subject/credentials rejected; duration nonnegative and active/wait separate; failed install and abandonment included in denominator.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 11,
+      "original_line": 98,
+      "original_text": "- [ ] Run red; implement strict allowlist, append-safe local metrics, pseudonymous session IDs and aggregate export only by explicit command. No automatic enrolment. Freeze pilot protocol and content-review rubric before sessions.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 12,
+      "original_line": 99,
+      "original_text": "- [ ] Protocol E-HUMAN: eight observed recent-task interviews, voluntary four-week use; count all starts/dropoffs. Ten new installations target eight users explaining refusal/next step unaided; five actual courts/FSSP resume scenarios after client close; three independent users repeat on a second real task. Record active vs wait time, app switches/manual transfers, final artifact/reasons stopped, traceable claims, coverage and refusals. Target values are organizational acceptance hypotheses, not powered population estimates.",
+      "disposition": "implemented_protocol; observed_count=0",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 13,
+      "original_line": 100,
+      "original_text": "- [ ] Protocol E-DOCS: 20 consented anonymized real invoices/contracts; two reviewers identify intended side, per-page candidate truth and roles; report silent wrong-subject checks (target 0 on corpus), extraction errors and manual-selection fraction. Test output does not attest consent or supply reviewers.",
+      "disposition": "implemented_protocol; observed_count=0",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 14,
+      "original_line": 101,
+      "original_text": "- [ ] Protocol E-EXPLAIN: reviewers recover every decisive dossier signal from raw refs without model assistance; users explain comparison choice with evidence and coverage. Do not infer human comprehension from presence of fields.",
+      "disposition": "implemented_protocol; observed_count=0",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 15,
+      "original_line": 102,
+      "original_text": "- [ ] E-ORACLE/E-VINTAGE/E-OUTCOME follow Phase 6. Save consent-safe observed records when real sessions occur; until then experiment status is `awaiting_external_evidence` with zero observed count. Software can be complete while full empirical validation remains pending; final report states both without collapsing them.",
+      "disposition": "implemented_protocol; observed_count=0",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 16,
+      "original_line": 106,
+      "original_text": "- [ ] Requirements matrix has a test/evidence link for every M1–M8, R1–R9, W1–W8, P1–P7, H1–H5/M1–M3 audit row, with no hidden deferred software.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 17,
+      "original_line": 107,
+      "original_text": "- [ ] Full software validation done on final revision; each unsupported/unrun platform/host explicitly listed. Code review findings resolved or recorded as blocking.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 18,
+      "original_line": 108,
+      "original_text": "- [ ] Installed artifacts and readable documents inspected; extension UI reviewed for readable labels/errors, themes and no clipping. Site claims match actual capabilities; no unrelated visual redesign.",
+      "disposition": "software_contract",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 19,
+      "original_line": 109,
+      "original_text": "- [ ] Update `status.md` with commands, exact git hash, timestamps, artifact SHA-256, platform, observed result and limitations. Mark software tasks complete only with execution evidence; keep real-world experiments separate.",
+      "disposition": "software_only; explicit_external_clause_pending",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark"
+      ],
+      "status": "verified_software"
+    },
+    {
+      "phase": 7,
+      "task": "7C",
+      "checkbox": 20,
+      "original_line": 110,
+      "original_text": "- [ ] Root supplies final user report of changes, relevant verification, remaining empirical evidence and artifact/branch location. Publishing/installing schedulers or sending third-party messages requires its own already-authorized action; this plan does not perform them.",
+      "disposition": "prepare_portable_handoff; root_delivers_final_message",
+      "checks": [
+        "run_workflow_metrics_eval",
+        "run_workflow_metrics_cli_eval",
+        "run_outcome_protocol_eval"
+      ],
+      "final_gates": [
+        "local_composite",
+        "review",
+        "ci",
+        "installed",
+        "benchmark",
+        "handoff_prepared"
+      ],
+      "status": "verified_software"
+    }
+  ]
+}

@@ -1,12 +1,12 @@
 // background.js — service worker: пункт контекстного меню «Проверить ИНН».
 // Страницу не читает: берёт только выделенный пользователем текст из события
-// клика. Результат кладёт в chrome.storage.session (окно могло быть закрыто к
+// клика. Результат кладёт в хранилище("session") (окно могло быть закрыто к
 // концу проверки) и помечает значок.
-import { ХОСТ, иннИзТекста, новаяОперация, своёОкно } from "./lib.js";
+import { ХОСТ, иннИзТекста, новаяОперация, своёОкно, хранилище } from "./lib.js";
 
 const ТАЙМАУТ_МС = 120000;
 
-chrome.runtime.onInstalled.addListener(() => {
+globalThis.chrome?.runtime?.onInstalled?.addListener(() => {
   chrome.contextMenus.create({
     id: "inn-check",
     title: "Проверить ИНН в inn-check-ru",
@@ -49,13 +49,13 @@ function спроситьХост(сообщение) {
 
 async function сохранить(запись) {
   try {
-    await chrome.storage.session.set({ последняя: запись });
+    await хранилище("session").set({ последняя: запись });
   } catch (e) {
     console.warn("[inn-check-ru] storage.session недоступен:", e);
   }
 }
 
-chrome.contextMenus.onClicked.addListener(async (info) => {
+globalThis.chrome?.contextMenus?.onClicked?.addListener(async (info) => {
   if (info.menuItemId !== "inn-check") return;
   const инн = иннИзТекста(info.selectionText);
   if (!инн) {
@@ -66,7 +66,7 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
   chrome.action.setBadgeText({ text: "…" });
   let профиль = "нейтрально";
   try {
-    профиль = (await chrome.storage.local.get("профиль")).профиль || профиль;
+    профиль = (await хранилище("local").get("профиль")).профиль || профиль;
   } catch (e) {
     console.warn("[inn-check-ru] storage.local недоступен:", e);
   }
@@ -94,18 +94,35 @@ async function записать(сообщение, снимок) {
     итог = { ...итог, снимок: ев };
   }
   try {
-    await chrome.storage.session.set({ сохранение: итог });
+    await хранилище("session").set({ сохранение: итог });
   } catch (e) {
     console.warn("[inn-check-ru] storage.session недоступен:", e);
   }
   return итог;
 }
 
-chrome.runtime.onMessage.addListener((запрос, отправитель, ответить) => {
+globalThis.chrome?.runtime?.onMessage?.addListener((запрос, отправитель, ответить) => {
   const своё = своёОкно(отправитель, chrome.runtime.id, chrome.runtime.getURL("popup.html"));
+  if (своё && запрос?.тип === "run" && ["run_read", "run_manual"].includes(запрос.сообщение?.команда)) {
+    выполнитьRun(запрос.сообщение).then(ответить).catch(() => ответить({ ok: false, ошибка: "Не удалось сохранить запрос" }));
+    return true;
+  }
   if (!своё || запрос?.тип !== "записать" || запрос.сообщение?.команда !== "ручной_блок") {
     return false;
   }
   записать(запрос.сообщение, запрос.снимок || null).then(ответить);
   return true;   // ответ асинхронный
 });
+
+
+async function выполнитьRun(сообщение) {
+  if (сообщение.команда === "run_manual") {
+    const key = "run-operation-" + сообщение.run_id;
+    const signature = JSON.stringify({ ...сообщение, operation_id: null });
+    const previous = (await хранилище("session").get(key))[key];
+    // Lost response / popup closure: exact retries retain the operation id.
+    if (previous?.signature === signature) сообщение = { ...сообщение, operation_id: previous.operation_id };
+    await хранилище("session").set({ [key]: { signature, operation_id: сообщение.operation_id } });
+  }
+  return спроситьХост(сообщение);
+}

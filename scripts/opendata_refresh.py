@@ -80,7 +80,11 @@ def _ssl_context():
 
 
 CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru"))
-OPENDATA_DIR = os.path.join(CACHE_DIR, "opendata")
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+OPENDATA_DIR = str(dataset_root("opendata_refresh"))
 TIMEOUT = 300
 UA = "inn-check-ru/1.9 (opendata_refresh)"
 ЧАНК = 1 << 20

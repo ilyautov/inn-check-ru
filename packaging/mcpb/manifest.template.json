@@ -4,7 +4,7 @@
   "display_name": "INN Check RU",
   "version": "{version}",
   "description": "Проверка контрагента РФ по ИНН: светофор риска по открытым реестрам, финансы и санкции кодом.",
-  "long_description": "Проверка российской компании или ИП по ИНН перед сделкой: ЕГРЮЛ/ЕГРИП, риск-флаги ФНС, реестр МСП, отчётность ГИР БО, санкционные перечни РФМ/OFAC/ЕС, РНП. Недоступный источник — «не проверено», а не «чисто»: зелёный свет из пустых данных не выдаётся. Финансовые флаги считает код, пороги откалиброваны на 30 006 компаниях. Часть реестров отвечает только российским IP — для них есть поле «прокси» (только своя нода: узел видит проверяемые ИНН).",
+  "long_description": "Проверка российской компании или ИП по ИНН перед сделкой: ЕГРЮЛ/ЕГРИП, риск-флаги ФНС, реестр МСП, отчётность ГИР БО, санкционные перечни РФМ/OFAC/ЕС, РНП. Недоступный источник — «не проверено», а не «чисто»: зелёный свет из пустых данных не выдаётся. Финансовые флаги считает код по экспертным правилам. Эти пороги не являются валидированной вероятностью банкротства или доказательством правонарушения. Часть реестров отвечает только российским IP — для них есть поле «прокси» (только своя нода: узел видит проверяемые ИНН).",
   "author": {
     "name": "Ilya Utov",
     "url": "https://github.com/ilyautov"
@@ -21,10 +21,16 @@
     "entry_point": "src/server.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run", "--directory", "${__dirname}", "src/server.py"],
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "src/server.py"
+      ],
       "env": {
         "CHECKO_API_KEY": "${user_config.checko_api_key}",
-        "INN_CHECK_PROXY": "${user_config.proxy}"
+        "INN_CHECK_PROXY": "${user_config.proxy}",
+        "DADATA_API_KEY": "${user_config.dadata_api_key}"
       }
     }
   },
@@ -42,15 +48,36 @@
       "description": "http(s)://host:порт вашей ноды в России: часть реестров отвечает только РФ-IP. Узел видит проверяемые ИНН — только своя нода, не публичный прокси.",
       "sensitive": true,
       "required": false
+    },
+    "dadata_api_key": {
+      "type": "string",
+      "title": "Ключ DaData (необязательно)",
+      "description": "Резервный источник по явно разрешённой политике.",
+      "sensitive": true,
+      "required": false
     }
   },
   "compatibility": {
-    "platforms": ["darwin", "linux", "win32"],
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ],
     "runtimes": {
       "python": ">=3.10"
     }
   },
-  "keywords": ["inn", "egrul", "counterparty", "due-diligence", "kyc", "sanctions", "russia"],
+  "keywords": [
+    "inn",
+    "egrul",
+    "counterparty",
+    "due-diligence",
+    "kyc",
+    "sanctions",
+    "russia"
+  ],
   "license": "Apache-2.0",
-  "privacy_policies": ["https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md"]
+  "privacy_policies": [
+    "https://github.com/ilyautov/inn-check-ru/blob/main/PRIVACY_POLICY.md"
+  ]
 }

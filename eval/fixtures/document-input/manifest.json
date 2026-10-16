@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "corpus": "synthetic-only",
+  "license": "CC0-1.0",
+  "consent": "Original synthetic fixtures authored for this evaluation; no client documents or personal records acquired. Public checksum-valid sample identifiers are test strings, not claims about real transactions or roles.",
+  "real_consented_documents": 0,
+  "generator": "run_document_input_eval.py pdf() and local pdftoppm rasterization; scan PDF assembled with pypdf 6.21.0; no external images.",
+  "files": [
+    {
+      "file": "parties.txt",
+      "synthetic": true,
+      "sha256": "cd45e4ea9f64f4693eb657b0b64ceb1986f289f0783c4eb96e986ff4537ebab4",
+      "expected_inns_without_ocr": [
+        "7707083893",
+        "7702070139",
+        "7736050003"
+      ],
+      "expected_inns_with_ocr": [
+        "7707083893",
+        "7702070139",
+        "7736050003"
+      ],
+      "expected_failure": false
+    },
+    {
+      "file": "single.html",
+      "synthetic": true,
+      "sha256": "9b9f7c38b8793a6091844d3eec8b91c6c417a393bc652bbb251d0790233ac6a7",
+      "expected_inns_without_ocr": [
+        "7707083893"
+      ],
+      "expected_inns_with_ocr": [
+        "7707083893"
+      ],
+      "expected_failure": false
+    },
+    {
+      "file": "text.pdf",
+      "synthetic": true,
+      "sha256": "a93367196da194e27e685e5ef5e67303e029a0a1d3321173a729f38ec2226c2d",
+      "expected_inns_without_ocr": [
+        "7707083893",
+        "7702070139"
+      ],
+      "expected_inns_with_ocr": [
+        "7707083893",
+        "7702070139"
+      ],
+      "expected_failure": false
+    },
+    {
+      "file": "scan.pdf",
+      "synthetic": true,
+      "sha256": "07b777902c1703b725a0b9742f8953e4bcbcdb85de483f4cf1c802a624ccfd85",
+      "expected_inns_without_ocr": [],
+      "expected_inns_with_ocr": [
+        "7707083893"
+      ],
+      "expected_failure": false
+    },
+    {
+      "file": "broken.pdf",
+      "synthetic": true,
+      "sha256": "3429f4d34cb591f7c2b15da04e253f3a7f22dd637a4346ab8c107b4d5b67d136",
+      "expected_inns_without_ocr": [],
+      "expected_inns_with_ocr": [],
+      "expected_failure": true
+    }
+  ]
+}

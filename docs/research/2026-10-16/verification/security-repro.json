@@ -1,0 +1,54 @@
+{
+  "revision": "3e06046",
+  "scope": "read-only review; all repro writes were confined to disposable temporary directories; no network registry calls",
+  "findings": [
+    {
+      "id": "mcp-batch-argument-injection",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "location": "mcp/tools_impl.py:265-274",
+      "downstream": "scripts/batch_check.py:881-900,904-914,976-982; Журнал._дописать writes with append at 792-796",
+      "trigger": {
+        "inns": [
+          "--resume",
+          "<temporary>/unexpected.csv",
+          "bogus"
+        ]
+      },
+      "evidence": {
+        "returned_status": "ок",
+        "unexpected_file_created": true,
+        "created_file_has_csv_header": true,
+        "existing_config_was_modified": true,
+        "existing_config_initial_bytes_preserved": true,
+        "existing_config_gained_csv_header": true,
+        "single_path_item_read_and_expanded_to_result_rows": 51
+      },
+      "impact": "The public INN-list tool unexpectedly enables local CSV file reads and writes outside its declared save/evidence arguments, and bypasses its 50-ID cap. Existing non-result files are appended to. No shell execution or remote unauthenticated exploit was established. This is not the documented snapshot-cache feature: flags and destination path are smuggled in inns.",
+      "fix": "Validate each item as an INN before constructing argv; explicitly reject paths and option-like input, or send validated IDs through --stdin. If preserving invalid-ID rows, reject non-ID strings without invoking CLI parsing. Add no-write/no-path-expansion regression tests."
+    },
+    {
+      "id": "mcp-timeout-descendant-survives",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "location": "mcp/tools_impl.py:108-117; scripts/batch_check.py:248-250",
+      "trigger": "counterparty_verdict with INN_CHECK_MCP_TIMEOUT=0.15 and an offline test engine sleeping 0.8 seconds",
+      "evidence": {
+        "wrapper_returned_seconds": 0.15,
+        "wrapper_status": "не проверено",
+        "grandchild_completed_and_created_marker_after_timeout": true
+      },
+      "impact": "subprocess.run terminates batch_check only; in-flight fetch children continue consuming process/network resources after MCP reports timeout. The test uses the existing INN_CHECK_BATCH_ENGINE test seam, not an arbitrary-engine parameter exposed by MCP. Production impact depends on a timeout occurring; no indefinite runaway was demonstrated.",
+      "fix": "Start each tool run in its own process group/session and terminate/reap the entire descendant group on timeout (with a Windows equivalent), or implement explicit child cancellation in batch_check."
+    }
+  ],
+  "verification": {
+    "npm_audit": "npm audit --audit-level=high --ignore-scripts --json: 0 vulnerabilities, 48 dependencies",
+    "pip_audit": "uvx pip-audit --strict -r mcp/requirements.txt --format json: No known vulnerabilities found; 29 resolved packages",
+    "local_security_hooks": "forbid_sensitive_files.py --all and scan_mcp_config.py exited 0",
+    "mcp_smoke": "tools_impl passed; SDK and live stdio skipped in host Python because mcp not installed",
+    "native_host_eval": "all 7 cases passed",
+    "extension_eval": "all 3 cases passed",
+    "unverified": "Real browser native-host installation, Windows browser behavior, live registry and paid API behavior, full-history secrets scan."
+  }
+}
