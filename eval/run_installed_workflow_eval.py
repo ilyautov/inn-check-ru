@@ -185,9 +185,9 @@ def main():
                                                  env=env, text=True).split('\0'))
             inputs = {'pyproject.toml', 'README.md', 'LICENSE', 'data/__init__.py'}
             inputs.update('scripts/' + module + '.py' for module in modules)
-            inputs.update(str(path.relative_to(ROOT)) for path in (ROOT / 'mcp').glob('*.py'))
+            inputs.update(path.relative_to(ROOT).as_posix() for path in (ROOT / 'mcp').glob('*.py'))
             inputs.update('data/' + filename for filename in data)
-            inputs.update(str(path.relative_to(ROOT)) for path in (ROOT / 'data/ca').glob('*.pem'))
+            inputs.update(path.relative_to(ROOT).as_posix() for path in (ROOT / 'data/ca').glob('*.pem'))
             build_source = scratch / 'wheel-source'
             build_source.mkdir()
             for filename in sorted(inputs):
