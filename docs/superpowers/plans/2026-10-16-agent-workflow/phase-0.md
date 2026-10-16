@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 0 Audit regressions and execution safety
 
@@ -19,15 +19,21 @@ Ownership: scripts/fin_scoring.py, scripts/profiles.py, their existing evals and
 
 Ownership: mcp/tools_impl.py, mcp test files, scripts/check_access.py, eval/run_access_eval.py, eval/run_fetch_eval.py, README.md, README.en.md, and a new safety regression eval. Do not edit the financial ownership files.
 
-- [ ] Reproduce option/path injection and cap bypass with disposable files; add failing tests that require no unexpected writes, file expansion or network calls.
-- [ ] Validate every batch input as an INN before invocation; distinguish API misuse from an ordinary invalid-ID response. Enforce the real input count limit.
-- [ ] Cancel/reap the complete subprocess group on timeout, with Windows handling and no surviving fetch child.
-- [ ] Fix parallel spy to retain actual opener references, preventing identity reuse false positives.
-- [ ] Respect cache/source availability in canaries: absent index is an explicit non-run/coverage reason, schema violation is failure; preserve meaningful failure for sources that should have answered.
-- [ ] Correct manual installation to include data/ and test copied installation outside checkout.
-- [ ] Run relevant evals and ruff; record negative-path evidence.
-- [ ] Independent security/code review before completion.
+- [x] Reproduce option/path injection and cap bypass with disposable files; add failing tests that require no unexpected writes, file expansion or network calls.
+- [x] Validate every batch input as an INN before invocation; distinguish API misuse from an ordinary invalid-ID response. Enforce the real input count limit.
+- [x] Cancel/reap the complete subprocess group on timeout, with Windows handling and no surviving fetch child.
+- [x] Fix parallel spy to retain actual opener references, preventing identity reuse false positives.
+- [x] Respect cache/source availability in canaries: absent index is an explicit non-run/coverage reason, schema violation is failure; preserve meaningful failure for sources that should have answered.
+- [x] Correct manual installation to include data/ and test copied installation outside checkout.
+- [x] Run relevant evals and ruff; record negative-path evidence.
+- [x] Independent security/code review before completion.
 
 ## Exit evidence
 
 Both tasks independently reviewed, all prior compatible evals pass, all original audit repros fail to reproduce the defect, no regression of wire contracts or offline guarantees. CI edits, if required, must include the new regressions. Full objective continues with Phase 1.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Исправления аудита, контроль входных данных и дерева процессов проверяются отдельно от доступности реестров по сети. Работа Windows подтверждается только фактическим Windows CI, указанным в отчёте о приёмке.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).

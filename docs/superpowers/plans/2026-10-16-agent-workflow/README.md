@@ -32,14 +32,14 @@ The complete software scope includes all seven subsequent phases. Human adoption
 
 ## Phases
 
-- [ ] [Phase 0: Audit regressions and execution safety](phase-0.md)
-- [ ] [Phase 1: Evidence, time, applicability and decision contracts](phase-1.md)
-- [ ] [Phase 2: Persisted runs and human handoff](phase-2.md)
-- [ ] [Phase 3: Installed diagnostics and cache policies](phase-3.md)
-- [ ] [Phase 4: Agent contracts and monitoring events](phase-4.md)
-- [ ] [Phase 5: Optional PDF/OCR, provider policy and explainable comparison](phase-5.md)
-- [ ] [Phase 6: End-to-end evaluation, historical replay and extended benchmark](phase-6.md)
-- [ ] [Phase 7: Packaging, documentation, independent review and acceptance](phase-7.md)
+- [x] [Phase 0: Audit regressions and execution safety](phase-0.md)
+- [x] [Phase 1: Evidence, time, applicability and decision contracts](phase-1.md)
+- [x] [Phase 2: Persisted runs and human handoff](phase-2.md)
+- [x] [Phase 3: Installed diagnostics and cache policies](phase-3.md)
+- [x] [Phase 4: Agent contracts and monitoring events](phase-4.md)
+- [x] [Phase 5: Optional PDF/OCR, provider policy and explainable comparison](phase-5.md)
+- [x] [Phase 6: End-to-end evaluation, historical replay and extended benchmark](phase-6.md)
+- [x] [Phase 7: Packaging, documentation, independent review and acceptance](phase-7.md)
 
 ## Dependency order and ownership
 
@@ -47,6 +47,6 @@ Phase 0 review gates changes to its financial/safety modules. Phase 1A may begin
 
 Each phase file defines exact file ownership, public interfaces, executable usage and representative red/green tests. Shared CLI/MCP/manifests are coordinated by root; workers do not revert another worker's changes. No production changes or commits were made by the specification owner.
 
-## Progress
+## Ход выполнения
 
-2026-10-16: original baseline 3e06046 independently tested: 43 compatible evals PASS, Windows-only evaluation skipped. Root also reports 45 current compatible evaluations PASS before review corrections. Phase 0 implementation is under independent review with two corrections; it is not marked completed. Full design, phase files 1–7, requirements matrix and durable ledger are written. The full software objective remains active; empirical experiments have no newly observed results.
+2026-10-16: статус программной части `completed`; проверенный коммит реализации `6d4310efb7169cb358fa111d5741866fb8f7df96`. [Отчёт о приёмке](acceptance.md) содержит все 41 программное требование, общий локальный прогон на зафиксированных файлах, окончательные проверки изменённых областей, хеши установленных артефактов и исходных файлов, области независимого ревью и ссылки на фактические запуски/задания CI. Во всех восьми эмпирических проверках новых наблюдений 0; E-HOST `not_run`, остальные семь `awaiting_external_evidence`. Версия 1.13.0 не опубликована; PR #10 остаётся в состоянии draft.

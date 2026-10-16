@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 2: Persisted runs and human handoff Implementation Plan
 
@@ -64,7 +64,7 @@ with tempfile.TemporaryDirectory() as temporary:
 
 - [x] Run `python3 eval/run_run_store_eval.py` red; add subprocess restart, simultaneous writers (barrier), killed writer before/after revision replace and before HEAD replace, corrupt HEAD/hash, operation id collision with different bytes, oversized JSON and traversal/symlink tests.
 - [x] Implement UUID validation, root confinement, stdlib OS locks, canonical redaction, temp/fsync/replace and hash-linked revisions exactly as design. read never mkdir/writes. CAS errors return no partial visible HEAD; orphan revisions stay uncommitted. Retry matching operation succeeds even with stale expected revision. Keep operation index derived from committed history.
-- [ ] Run focused eval on Linux/macOS/Windows CI; record local platform only until CI exists. Verify redaction sentinels in every file, including `_token_pb`, Authorization and proxy URL userinfo. Root coordinates review/commit.
+- [x] Run focused eval on Linux/macOS/Windows CI; record local platform only until CI exists. Verify redaction sentinels in every file, including `_token_pb`, Authorization and proxy URL userinfo. Root coordinates review/commit.
 
 ## Task 2B: Workflow orchestration and explicit exports
 
@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory() as temporary:
 
 **Consumes:** store and evaluate contracts. **Produces:** start/resume/import_manual/refresh/render/export/save_snapshot signatures in design; JSON envelope with `data=materialized payload` for start/resume/import/refresh, `data={format, content, source_revision}` for render, `data={artifact_id, format, sha256, source_revision}` for export.
 
-- [ ] Test a collector stub returning recorded source data with raw capture. Persist start, exit child, import existing manual validator output in a new child, render and snapshot. Patch all network entry points to raise during resume/render/import. Assert 0 calls, unchanged original raw/evidence digests and retained run id.
+- [x] Test a collector stub returning recorded source data with raw capture. Persist start, exit child, import existing manual validator output in a new child, render and snapshot. Patch all network entry points to raise during resume/render/import. Assert 0 calls, unchanged original raw/evidence digests and retained run id.
 
 ```python
 import run_workflow
@@ -89,8 +89,8 @@ def test_resume_never_collects(run_id, root):
 
 The eval harness creates run_id/root before calling this function; no pytest fixture dependency is introduced.
 
-- [ ] Run new eval red. Implement orchestration via actual score/resolve/manual/dossier, not subprocess recollection for every operation. start persists collecting then completion/cancellation; existing raw capture writes a package under managed storage with real response ids. refresh resolves requested sources plus explicit prerequisites and returns their list; never silently calls full collect. Declined/incomplete actions persist as new revision but remain gaps.
-- [ ] Add CLI commands and validate public usage below in an isolated temp store; an id is data, never an argv fragment.
+- [x] Run new eval red. Implement orchestration via actual score/resolve/manual/dossier, not subprocess recollection for every operation. start persists collecting then completion/cancellation; existing raw capture writes a package under managed storage with real response ids. refresh resolves requested sources plus explicit prerequisites and returns their list; never silently calls full collect. Declined/incomplete actions persist as new revision but remain gaps.
+- [x] Add CLI commands and validate public usage below in an isolated temp store; an id is data, never an argv fragment.
 
 ```bash
 python3 -m workflow_cli doctor --profile нейтрально --json
@@ -106,7 +106,7 @@ python3 -m workflow_cli run refresh "$RUN_ID" --source риски --expected-rev
 
 `RUN_ID`, `OPERATION_ID`, `REFRESH_ID` are outputs/new UUIDs; examples in docs explain obtaining them from JSON. Tests invoke argv lists directly, not shell substitution. `--store` is optional local CLI root; MCP never exposes it. Existing `inn-check-ru` entry point remains unchanged.
 
-- [ ] Run new eval, existing manual/evidence_pack/dossier/watchlist/retro evals. Test render no artifact write, explicit export atomic write, cancel leaves recoverable state, stale run shows refresh action without refreshing. Review integration.
+- [x] Run new eval, existing manual/evidence_pack/dossier/watchlist/retro evals. Test render no artifact write, explicit export atomic write, cancel leaves recoverable state, stale run shows refresh action without refreshing. Review integration.
 
 ## Task 2C: Shared pending actions and browser run binding
 
@@ -114,7 +114,7 @@ python3 -m workflow_cli run refresh "$RUN_ID" --source риски --expected-rev
 
 **Consumes:** run id/revision, pending_actions, native host allowlisted URL/INN validation. **Produces:** native commands `run_read` and `run_manual`, fixed field allowlists; existing commands remain. `run_manual` takes run_id, expected_revision, operation_id and validated block payload, never root/path/executable.
 
-- [ ] Add tests for unknown run, mismatch INN, disallowed URL, explicitly expired expires_at, incomplete pagination, refusal, retry identical operation and revision conflict. Page content including shell/HTML instructions is rendered as text and rejected as command fields.
+- [x] Add tests for unknown run, mismatch INN, disallowed URL, explicitly expired expires_at, incomplete pagination, refusal, retry identical operation and revision conflict. Page content including shell/HTML instructions is rendered as text and rejected as command fields.
 
 ```python
 request = {"команда": "run_read", "run_id": run_id}
@@ -127,9 +127,15 @@ assert "root" not in response
 
 `roundtrip` is the existing native-host framed test helper or a local eval wrapper; it uses actual host subprocess stdin/stdout.
 
-- [ ] Run manual handoff eval red. Show selected run subject/name/profile/revision and source URL before the user confirms attachment. On conflict reload and ask explicit run selection in UI, never silently attach to latest unrelated run. Use storage fallback outside extension context. Keep PNG manifest icons.
-- [ ] Run native-host/extension evals plus real browser check when available: start from copied extension/native package, attach a block, close client, reopen and resume via MCP/CLI. Record real UI evidence separately from JS/headless checks. Visually review popup layout, long names, readable error/conflict states and light/dark consistency; report observed limits.
+- [x] Run manual handoff eval red. Show selected run subject/name/profile/revision and source URL before the user confirms attachment. On conflict reload and ask explicit run selection in UI, never silently attach to latest unrelated run. Use storage fallback outside extension context. Keep PNG manifest icons.
+- [x] Run native-host/extension evals plus real browser check when available: start from copied extension/native package, attach a block, close client, reopen and resume via MCP/CLI. Record real UI evidence separately from JS/headless checks. Visually review popup layout, long names, readable error/conflict states and light/dark consistency; report observed limits.
 
 ## Exit evidence
 
 The five scripted courts/FSSP resume cases survive restart without lost work or hidden fetch; wrong INN refused, partial results remain partial, original evidence hash unchanged. Five actual user scenarios are a separate empirical gate in Phase 7. No claim of real Chrome/MCP host acceptance from framed-protocol tests alone.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Проверены пять сценариев передачи ручных результатов и 18 имитируемых состояний popup в светлой/тёмной теме при ширине 360px. Фактический путь через установленный Chrome, native-host и агентский клиент не выполнялся: E-HOST not_run; пользовательские задачи E-HUMAN ожидают внешних свидетельств.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).

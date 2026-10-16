@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 6: Actual resolver evaluation, fault campaigns and replay Implementation Plan
 
@@ -32,8 +32,8 @@ status: in_progress
 
 **Consumes:** actual score → resolve → workflow CLI/MCP → snapshot/dossier, existing recorded source fixtures. **Produces:** JSON report `schema_version,engine_hash,rules_hash,corpus_hash,seed,clock,counts,metrics,exclusions,cases`; denominator for each metric. `decision_bench.evaluate(cases: list[dict], *, now: str)->dict` must call production APIs, not calibration/measured_svetofor.
 
-- [ ] Fix rubric and hashes before run. Cases cover full/simplified/IP/bank/NPO/restricted, known positive/complete negative/unknown, current/repaid debt, bankruptcy subject roles, conflicts, mixed periods, missing required risk, manual refusal, incomplete pages/index and raw loss. Case stores source hashes/licence, expected atomic claims, evidence scope, oracle status, independent review/adjudication fields.
-- [ ] Add mutation tests for removed necessary leaf, mirrored source duplication, provider order reversal, consistent unit conversion, reload of annual data, timeout, truncation, unknown enum and incomplete index. Keep minimal failing input with fixed seed/clock.
+- [x] Fix rubric and hashes before run. Cases cover full/simplified/IP/bank/NPO/restricted, known positive/complete negative/unknown, current/repaid debt, bankruptcy subject roles, conflicts, mixed periods, missing required risk, manual refusal, incomplete pages/index and raw loss. Case stores source hashes/licence, expected atomic claims, evidence scope, oracle status, independent review/adjudication fields.
+- [x] Add mutation tests for removed necessary leaf, mirrored source duplication, provider order reversal, consistent unit conversion, reload of annual data, timeout, truncation, unknown enum and incomplete index. Keep minimal failing input with fixed seed/clock.
 
 ```python
 from benchmark.decision_bench import evaluate
@@ -47,8 +47,8 @@ assert "abstention" in report["metrics"]
 
 `cases` comes from the frozen manifest; exclusions are separately counted, not silently removed from denominator. Add a deliberate runtime mutation adapter that converts unknown to absent and one dropping evidence: each must make the above gate fail. Restore production logic after mutation test automatically.
 
-- [ ] Run all new evals red, then implement harness and actual serialized-output assertions. Interpret “less evidence cannot increase certainty” correctly: red may become unknown; do not require a colour monotonicity false invariant. Match each affirmative recommendation sentence to claim ids in rendered dossier model and text. Distinguish transport errors/unsupported features/missing oracle/factual disagreement.
-- [ ] Run new evals, existing calibration/benchmark/svetofor evals to preserve old published results. Publish counts, exclusions and matched-input coverage/abstention comparison, not only a zero-error headline. Synthetic target corpus is separate from representative measured frequency.
+- [x] Run all new evals red, then implement harness and actual serialized-output assertions. Interpret “less evidence cannot increase certainty” correctly: red may become unknown; do not require a colour monotonicity false invariant. Match each affirmative recommendation sentence to claim ids in rendered dossier model and text. Distinguish transport errors/unsupported features/missing oracle/factual disagreement.
+- [x] Run new evals, existing calibration/benchmark/svetofor evals to preserve old published results. Publish counts, exclusions and matched-input coverage/abstention comparison, not only a zero-error headline. Synthetic target corpus is separate from representative measured frequency.
 
 ## Task 6B: Historical vintages and two replay modes
 
@@ -56,7 +56,7 @@ assert "abstention" in report["metrics"]
 
 **Consumes:** immutable run revisions, manifest/raw hashes, published_at/first_observed_at, current rules. **Produces:** `replay(run_id: str, *, mode: str, cutoff: str, root=None)->dict`; mode `original|current_rules`. Result includes source_revision, original_rules_version, applied_rules_version, cutoff, exclusions, data and point_in_time_status.
 
-- [ ] Add synthetic 2021 financial form first observed after 2022 cutoff; it must not enter eligible historic data. Add later corrected edition; original replay remains byte-equal. Change threshold in temporary fixture resource and assert new current-rules manifest differs without rewriting original.
+- [x] Add synthetic 2021 financial form first observed after 2022 cutoff; it must not enter eligible historic data. Add later corrected edition; original replay remains byte-equal. Change threshold in temporary fixture resource and assert new current-rules manifest differs without rewriting original.
 
 ```python
 from historical_replay import replay
@@ -69,8 +69,8 @@ assert original["point_in_time_status"] in {"verified", "partial", "unverified"}
 assert network_calls == 0
 ```
 
-- [ ] Run red. Do not equate reporting year/actualBfoDate to proven public availability without documented semantics. Original returns stored decision; current_rules is an explicit replay artifact, not original historical outcome. Claims with unknown publication/observation are excluded or clearly unverified. Persist later vintages prospectively; no fictional reconstruction of missing archive.
-- [ ] Run replay/retro/snapshot/evidence evals with no-network audit hook. Obtain two genuinely dated editions when available, retain permission/hash provenance; until then mark real-vintage validation awaiting_external_evidence, not complete from synthetic correction.
+- [x] Run red. Do not equate reporting year/actualBfoDate to proven public availability without documented semantics. Original returns stored decision; current_rules is an explicit replay artifact, not original historical outcome. Claims with unknown publication/observation are excluded or clearly unverified. Persist later vintages prospectively; no fictional reconstruction of missing archive.
+- [x] Run replay/retro/snapshot/evidence evals with no-network audit hook. Obtain two genuinely dated editions when available, retain permission/hash provenance; until then mark real-vintage validation awaiting_external_evidence, not complete from synthetic correction.
 
 ## Task 6C: Independent reference corpus and prospective outcome protocol
 
@@ -78,7 +78,7 @@ assert network_calls == 0
 
 **Consumes:** fixed engine/rules manifests and voluntarily acquired primary documents. **Produces:** `validate_cohort(rows: list[dict], protocol: dict)->list[dict]`, `evaluate_outcomes(rows: list[dict], protocol: dict)->dict`. Outcome labels distinct: case_filed/procedure_opened/liquidation/client_loss, timestamps, horizon_end, censoring, reference evidence. Report two different metrics P(outcome|green) and P(green|outcome), never relabel one as the other.
 
-- [ ] Register sampling frame, target CI width/event requirement, confidence method, freeze date/hashes, disjoint subject/group split, attrition, weights, form/size/sector/no-reporting strata and adjudication before reading outcomes. Seed fixtures have synthetic:true and cannot be included in real report. Require two independent reviewers for disputed critical facts and adjudicator when disagreeing.
+- [x] Register sampling frame, target CI width/event requirement, confidence method, freeze date/hashes, disjoint subject/group split, attrition, weights, form/size/sector/no-reporting strata and adjudication before reading outcomes. Seed fixtures have synthetic:true and cannot be included in real report. Require two independent reviewers for disputed critical facts and adjudicator when disagreeing.
 
 ```python
 from benchmark.evaluate_outcomes import validate_cohort
@@ -88,10 +88,16 @@ errors = validate_cohort(rows, protocol)
 assert any(error["code"] == "subject_split_overlap" for error in errors)
 ```
 
-- [ ] Add censored horizon cannot be marked survived; missing outcome oracle excluded with reason; leakage cutoff and repeated group split fail. Run `python3 eval/run_outcome_protocol_eval.py` red then implement validator/metrics with stdlib math/random, documented uncertainty and no training on held-out labels.
-- [ ] Implement schema/protocol and synthetic evaluator tests now. Actual independent labels, sufficient events, elapsed horizons and external reviewers remain E-ORACLE/E-OUTCOME experiments in ledger. Empty/immature input emits `insufficient_evidence`, never zero default risk. No live bankruptcies, interviews or consent are fabricated by tests.
-- [ ] Run focused eval and independent review of statistical definitions. Publish old calibration and new prospective mechanism separately; numerical transferability is not claimed until external evidence exists.
+- [x] Add censored horizon cannot be marked survived; missing outcome oracle excluded with reason; leakage cutoff and repeated group split fail. Run `python3 eval/run_outcome_protocol_eval.py` red then implement validator/metrics with stdlib math/random, documented uncertainty and no training on held-out labels.
+- [x] Implement schema/protocol and synthetic evaluator tests now. Actual independent labels, sufficient events, elapsed horizons and external reviewers remain E-ORACLE/E-OUTCOME experiments in ledger. Empty/immature input emits `insufficient_evidence`, never zero default risk. No live bankruptcies, interviews or consent are fabricated by tests.
+- [x] Run focused eval and independent review of statistical definitions. Publish old calibration and new prospective mechanism separately; numerical transferability is not claimed until external evidence exists.
 
 ## Exit evidence
 
 Declared corpus gates final statements, unknown preservation and traceability; intentional faults are detected. Historical replay preserves bytes and dates, and outcome instrumentation enforces no leakage/censoring mistakes. Independent empirical accuracy is separately pending until required observations and references are obtained.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Все 29 случаев явно синтетические. Замкнутая типизированная схема, независимый эталон и исполнимые мутации проверяют этот конечный корпус; частота ошибок в популяции не измерена. Изменён только документированный синтетический вход mixed_years: revenue 120000→500000 и связанные raw-хеши; все метки и остальные 28 случаев сохранены. Реальные редакции, независимые проверяющие и завершённые горизонты наблюдения ожидаются отдельно.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).

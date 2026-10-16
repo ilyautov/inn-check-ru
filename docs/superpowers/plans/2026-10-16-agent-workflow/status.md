@@ -1,48 +1,42 @@
-# Статус реализации и границы проверки
+# Статус выполнения полного плана
 
-Обновлено 2026-10-16. Цель — полностью реализовать программные фазы0–7 текущего open-source инструмента для агентов. Версия1.13.0 не опубликована. Рабочая ветка `feat/reproducible-agent-workflow`, draft PR [#10](https://github.com/ilyautov/inn-check-ru/pull/10). Последний отправленный commit `170a0e0b7302bd0fe7026650511aca66da92d00c`; последующая реализация пока находится в рабочем дереве и проходит заключительный review. Не считать этот commit проверкой новых возможностей.
+Дата: 2026-10-16. Статус программной части: `completed`. Цель пользователя — полностью реализовать программные фазы 0–7 текущего open-source инструмента для агентов. Версия 1.13.0 не опубликована. [Черновик PR #10](https://github.com/ilyautov/inn-check-ru/pull/10), ветка `feat/reproducible-agent-workflow`.
 
-## Программная реализация
+Проверенный коммит реализации: `6d4310efb7169cb358fa111d5741866fb8f7df96`. Исходная база: `3e06046995860b5360df5dd3a6110bd7108d36a3`. [acceptance.md](acceptance.md) и [acceptance.json](acceptance.json) содержат переносимые команды/результаты, снимки исходных файлов, хеши артефактов, фактические результаты CI и полную матрицу 41 требований. Более поздний коммит только с документацией приёмки не выдаётся за ревизию, на которой выполнены эти проверки.
 
-| Фаза | Реализовано и проверено в пределах отдельных задач | Оставшаяся приёмка |
-|---|---|---|
-| 0 | Исправления финансовой неизвестности/смежных лет, MCP input bounds, отмена дерева процессов, данные ручной установки. Независимые замечания закрыты | Итоговые regression/platform проверки после интеграции |
-| 1 | Versioned evidence, реальные raw locators/hashes, temporal/applicability/conflict/family contract, sufficient financial support, frozen decision/rendering. Независимые замечания закрыты | Финальный whole-branch и output gate |
-| 2 | Immutable revisions/CAS/idempotency, ручное дополнение/resume, CLI/native extension handoff. Проверены18mock состояний интерфейса в светлой/тёмной теме при360px | Новое замечание review: сохранять acquisition dates неизменённых unmapped claims при manual/selected refresh; исправление назначено. Real installed host отдельно |
-| 3 | Все14updaters в policy, offline status/plan, bounded transactional cache update, doctor, per-TTL schedules. Шесть прежних замечаний закрыты; named environment fix прошёл Python3.10/3.12 и skill gate | Standalone ZIP process dependency fix, итоговый review/installed run |
-| 4 | 33 MCP tools/schema/effects, parent-owned legacy async/cancellation, durable event claim/ack/retry, coverage-loss events, host plans. Scoped security/process reviews выполнены | Shared process runtime move и финальные stdio/OS проверки |
-| 5 | Optional PDF/local OCR, explicit candidate+role selection, immutable provider budget/export policy, graph frontier/explainable comparison. Scoped findings закрыты | Итоговый packaging/whole-branch review; real20consented documents не получены |
-| 6 | Frozen29-case synthetic corpus, final-output gate, knowledge mutations, original/current_rules replay, outcome protocol/validators. Financial/replay/protocol closure одобрен | Benchmark closure выявил self-oracle prose и неполную expiry/heading metric проверку; fresh fixer работает. Полный29/E2E/invariants ждёт runtime freeze |
-| 7 | Packaging/capability/settings matrix,6OS×Python jobs, все29новых eval включены в CI, public docs/recovery, opt-in metrics. Четыре intermediate installed variants3.10/3.12 core/SDK и отдельный installedPDF smoke прошли | Final coherent wheel/ZIP, whole-branch code/security review, полный suite, фактический новый CI, requirement ledger |
+## Программные фазы
 
-Новые интеграционные замечания являются блокирующими, а не принятыми ограничениями. Whole-branch review продолжается. Source ZIP проверялся по inventory, но его самостоятельное исполнение выявило зависимость document/doctor/monitor от отсутствующего `mcp/`; общий stdlib process runtime и настоящий unpacked-ZIP test назначены отдельному исполнителю. Root render реального DOCX показал выход колонок таблиц за страницу; DOCX-only layout fix также входит в обязательную приёмку.
+| Фаза | Статус программной части | Реализованный объём | Свидетельства |
+|---|---|---|---|
+| 0 | completed | Финансовая неизвестность, соседние годы, ограничения входов MCP, единое владение деревом процессов и ручная установка с данными. | [проверки](phase-0.md), [отчёт](acceptance.md) |
+| 1 | completed | Версионируемые доказательства и идентичность raw-ответов, время, применимость, семейства источников/конфликты, достаточные зависимости и зафиксированное решение/представление. | [проверки](phase-1.md), [отчёт](acceptance.md) |
+| 2 | completed | Неизменяемые запуски, CAS и идемпотентность; контрольные точки, перезапуск, ручное дополнение, выборочное обновление, явный экспорт и привязка передачи из расширения. | [проверки](phase-2.md), [отчёт](acceptance.md) |
+| 3 | completed | Правила всех 14 обновляющих скриптов, готовность/план без сети, ограниченные транзакционные обновления и установленный doctor. | [проверки](phase-3.md), [отчёт](acceptance.md) |
+| 4 | completed | 33 инструмента реального SDK, ограниченная отмена дерева процессов под контролем родителя, сохранённые события со сроками владения/подтверждениями/повторами и планы для хоста. | [проверки](phase-4.md), [отчёт](acceptance.md) |
+| 5 | completed | Необязательные локальные документы/PDF/OCR с выбором стороны, сохранённые бюджеты и правила экспорта провайдеров, объяснимые граф и сравнение. | [проверки](phase-5.md), [отчёт](acceptance.md) |
+| 6 | completed | Зафиксированный корпус из 29 синтетических случаев с проверкой конечной выдачи, мутации знаний, воспроизведение original/current_rules и протокол проспективного изучения исходов. | [проверки](phase-6.md), [отчёт](acceptance.md) |
+| 7 | completed | Согласованные пакеты, возможности, документация и восстановление; выключенные по умолчанию локальные метрики, независимое ревью и итоговая программная приёмка. | [проверки](phase-7.md), [отчёт](acceptance.md) |
 
-## Сохранённые свидетельства
+Смысл отметок: реализованы программные контракты и написаны/проверены протоколы; отметки не означают проведённого пользовательского эксперимента. Исходные замечания к автономному ZIP/среде выполнения, сохранению правил экспорта в снимках, датам получения данных и вёрстке DOCX закрыты ревью соответствующих областей. Состояние окончательных проверок бенчмарка, локальной сводки и платформ приведено ниже; промежуточные ошибки не переименованы в PASS.
 
-Подробные red/green logs, hashes и независимые отчёты пока лежат вне репозитория в родительском workspace `work/implementation-reports/`. Они не являются переносимыми ссылками репозитория; итоговый acceptance record будет собран после всех проверок.
+Проверка состава пакета навыка с реальным Git-индексом закрыла пробел временного индекса: тот не включал новые каталоги, не поставляемые с навыком. Исправление `.skillignore`, явный UTF-8 в дочерних процессах теста SDK и уточнение синтетического входа replay относятся к тестам и правилам состава пакета навыка. Отдельно исправлено сопоставление путей в Windows: два селектора входных файлов в тесте установленных пакетов используют `.as_posix()`, чтобы относительные пути совпадали с ключами Git. Хеш рабочего движка остался `b227ad8fc7d41254d7ca16c9306e7ddb47605bc1524cca944e7c5629166f9b05`; 79 исходных файлов wheel и все 92 элемента ZIP не изменились. Результаты новых запусков CI учитываются отдельно после их завершения.
 
-- Baseline `3e06046`:43совместимых eval PASS; Windows-only не выполнялся на локальном macOS.
-- Phase0 immutable `cacfc2c`:45совместимых eval PASS; source unchanged, actual MCP stdio PASS; Ubuntu wheel/MCPB/Docker CI PASS.
-- Actual Windows `170a0e0`:native host и34process-safety tests PASS, затем упал nested profiles CLI CP1252. Boundary UTF-8 fix воспроизведён локально; нужен новый Windows CI.
-- Intermediate installed routes на macOS Python3.10/3.12, безSDK и сSDK1.30:4/4PASS, включая actual33-tool stdio там, где SDK установлен. Это четыре конкретных WIP-снимка, не итоговая сборка после более поздних изменений.
-- Installed PDF extra6.21.0 smoke:реальный текстовый synthetic PDF, два ожидаемых ИНН; core/noSDK и OCR отдельно.
-- Public docs gate:66parser examples/125relative links PASS. Это проверка команд/ссылок, не подтверждение успешного live-сбора каждым примером.
-- Hermes environment fix:cache16,doctor9,actualSDKfeature13 на каждом из Python3.10/3.12;16skill gates PASS. Ограниченные env и strict version banners, ещё требуется финальный review после переноса runtime.
-- Metrics:независимо проверены100000-event cap и отказ повреждённому storage, disabled-default/no-write, aggregate-only explicit CLI. Никакой автоматической телеметрии.
-- Root DOCX render:7страниц,40evidence rows; FAIL layout — raw/period/scope колонки за границей страницы. Исправление и повторный render обязательны.
+## Приёмочные проверки
 
-Security CI на `170a0e0` находил4unverified URI matches/0verified в reserved-domain synthetic fixtures. Только четыре точные строки получили документированный `trufflehog:ignore` после реального3.99.2positive-control proof (4unannotated→4,4annotated→0,mixed8→4controls,actual2files→0). Детекторы и workflow не ослаблены. Старые commits ещё содержат неаннотированные примеры; итоговый history scan остаётся открытым до безопасного сохранения/очистки только собственной unmerged истории и нового CI.
+| Проверка | Статус |
+|---|---|
+| benchmark | passed |
+| local_composite | passed |
+| installed | passed |
+| ci | passed |
+| review | passed |
+| format | passed |
+| handoff_prepared | passed |
 
-## Внешние эксперименты
+В отчёте о приёмке разделены полный локальный прогон, последующие выбранные проверки изменённых областей и фактический CI. Неизменность исходных файлов/AST подтверждается явно; наличие YAML CI, собранного wheel, HTTP 200 или успешного модульного теста не считается приёмкой конечной пользовательской задачи. Все 34 новых оценочных скрипта включены в CI; всего их 78, новых скриптов вне CI — 0.
 
-Все8эмпирических gates остаются с нулём новых наблюдений: E-HUMAN, E-DOCS, E-EXPLAIN, E-FORMS, E-ORACLE, E-VINTAGE, E-OUTCOME — `awaiting_external_evidence`; E-HOST — `not_run`. Протоколы, валидаторы и добровольные локальные метрики реализованы. Синтетические случаи не заменяют реальные документы, независимых reviewers, dated editions, matured outcomes или работу конкретного agent client.
+## Внешние эксперименты и ограничения
 
-Actual scheduler installation, external notification, publication, merge и релизные uploads этой реализацией не выполняются. Generated cron/plist/XML — только план. Нет вывода о live-доступности всех реестров, качестве конкретного контрагента или превосходстве над коммерческими продуктами из offline tests.
+Во всех восьми направлениях эмпирической проверки новых наблюдений 0. E-HUMAN, E-DOCS, E-EXPLAIN, E-FORMS, E-ORACLE, E-VINTAGE, E-OUTCOME — `awaiting_external_evidence`; E-HOST — `not_run`. [experiment-status.json](../../../research/2026-10-16/experiment-status.json) хранит этот отдельный реестр. Реальные интервью, документы с согласием владельцев, независимые проверяющие, датированные редакции, завершённые горизонты наблюдения и путь через установленный агентский клиент/браузер/native-host не получены из синтетических тестов.
 
-## Финальный gate
-
-1. Закрыть все подтверждённые integration/review findings и повторно проверить затронутые контракты.
-2. На неизменном source snapshot выполнить каждый совместимый eval,29-case report/E2E/invariants, ruff/version/skill/workflow/capability/docs gates и actual stdio.
-3. Построить финальные wheel/ZIP, реально исполнить оба вне checkout; проверить inventories/resources/hashes/secrets/recovery/downgrade.
-4. Получить новый фактический Linux/macOS/Windows×3.10/3.12 CI и существующие distribution/security checks.
-5. Закрыть41software requirement row ссылками на проверки и конкретный итоговый evidence record; сохранить внешний empirical status без вымышленных наблюдений.
+Просмотрены 18 имитируемых состояний окна расширения в светлой/тёмной теме и 18 отрендеренных страниц DOCX; границы визуальной проверки указаны в отчёте о приёмке. Встроенный модуль рендеринга DOCX может опускать цветные кружки emoji, поэтому сохранены явные текстовые названия цветов. Системные расписания только генерируются; n8n дан как пример конфигурации. Регистрация планировщика, внешние уведомления, публикация, слияние ветки и загрузка релизных файлов не выполнялись. Доступность всех реестров по сети и превосходство над коммерческими продуктами не заявлены.

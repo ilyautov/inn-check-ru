@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 3: Installed diagnostics and cache policies Implementation Plan
 
@@ -32,7 +32,7 @@ status: in_progress
 
 **Consumes:** Existing 14 updater definitions and actual cache metadata/TTL constants, profile source requirements. **Produces:** `status(profile, *, now, root=None)->dict`, `plan(profile, *, now, root=None)->dict`, `execute(dataset_ids, *, profile, max_bytes, timeout_seconds, root=None)->dict`.
 
-- [ ] Add a table-driven inventory test for every registered updater: state, metadata source, TTL rationale/version, size known or unknown, RF network requirement, applicable profiles and exact argv. Unknown values remain null with reason.
+- [x] Add a table-driven inventory test for every registered updater: state, metadata source, TTL rationale/version, size known or unknown, RF network requirement, applicable profiles and exact argv. Unknown values remain null with reason.
 
 ```python
 from cache_policy import status, plan
@@ -50,8 +50,8 @@ with tempfile.TemporaryDirectory() as root:
     assert all(isinstance(action["argv"], list) for action in preparation["actions"])
 ```
 
-- [ ] Run focused eval red. Implement pure reads and profile-specific plans. Keep large optional datasets separate from minimal scenario; plan never enables a disabled source. TTL sanctions <=7d, schedule with 1d margin; probe 24h and network fingerprint stays separate. Annual observation period is unaffected by update frequency. Unknown size must not bypass max_bytes during download.
-- [ ] Test boundary times, repeated status no filesystem changes, mixed 7d/monthly datasets and explicit stale current negatives. Run `eval/run_refresh_indexes_eval.py`, sanctions eval and cache eval. Review policy rationales; no unsupported freshness number is invented.
+- [x] Run focused eval red. Implement pure reads and profile-specific plans. Keep large optional datasets separate from minimal scenario; plan never enables a disabled source. TTL sanctions <=7d, schedule with 1d margin; probe 24h and network fingerprint stays separate. Annual observation period is unaffected by update frequency. Unknown size must not bypass max_bytes during download.
+- [x] Test boundary times, repeated status no filesystem changes, mixed 7d/monthly datasets and explicit stale current negatives. Run `eval/run_refresh_indexes_eval.py`, sanctions eval and cache eval. Review policy rationales; no unsupported freshness number is invented.
 
 ## Task 3B: Transactional updates and schedule generation
 
@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as root:
 
 **Consumes:** exact selected dataset ids and max_bytes/timeout_seconds. **Produces:** update report `datasets, bytes_downloaded, elapsed_seconds, preserved_previous, errors`; generated cron/plist/Windows XML through shared schedule helper used in Phase 4.
 
-- [ ] Add download fault at byte boundary, schema validation failure, disk full simulation, timeout and two competing updates. Last-known-good cache digest must remain unchanged; orphan staging directories are not treated as valid.
+- [x] Add download fault at byte boundary, schema validation failure, disk full simulation, timeout and two competing updates. Last-known-good cache digest must remain unchanged; orphan staging directories are not treated as valid.
 
 ```python
 before = cache_file.read_bytes()
@@ -72,8 +72,8 @@ assert cache_file.read_bytes() == before
 
 The eval creates cache_file/cache_root/dataset_id with a registered updater fixture and injects a bounded failing local transport; it never contacts a live registry.
 
-- [ ] Run red. Reuse updater functions with staging destination, validate then atomic promotion. root must route both status reads and every updater write to that root through supported flags or a narrowly scoped child environment; never mutate process HOME or silently use the user cache. Add a sentinel test proving no writes escape the temp root; enforce total and per-dataset budgets and cancellation. No shell command from URL/metadata. Schedule output only, no actual scheduler registration. Earliest due time accounts for TTL margin, not a universal monthly day.
-- [ ] Run focused eval and existing affected updater evals once; verify schedule next occurrence precedes sanctions expiration across a month boundary. Record emitted commands for Linux/macOS/Windows and review escaping.
+- [x] Run red. Reuse updater functions with staging destination, validate then atomic promotion. root must route both status reads and every updater write to that root through supported flags or a narrowly scoped child environment; never mutate process HOME or silently use the user cache. Add a sentinel test proving no writes escape the temp root; enforce total and per-dataset budgets and cancellation. No shell command from URL/metadata. Schedule output only, no actual scheduler registration. Earliest due time accounts for TTL margin, not a universal monthly day.
+- [x] Run focused eval and existing affected updater evals once; verify schedule next occurrence precedes sanctions expiration across a month boundary. Record emitted commands for Linux/macOS/Windows and review escaping.
 
 ## Task 3C: Doctor from installed resources and CLI
 
@@ -81,7 +81,7 @@ The eval creates cache_file/cache_root/dataset_id with a registered updater fixt
 
 **Consumes:** cache status/plan, importlib.resources and package metadata, sources/profile registry. **Produces:** `inspect(profile="нейтрально", *, probe=False, now=None)->dict`; `doctor`, `cache status`, `cache plan`, `cache update` CLI subcommands.
 
-- [ ] Add no-SDK/core-only test, optional missing key, incompatible SDK and broken FastMCP import. Create isolated wheel environment outside checkout; report core_ready independently from sdk_ready.
+- [x] Add no-SDK/core-only test, optional missing key, incompatible SDK and broken FastMCP import. Create isolated wheel environment outside checkout; report core_ready independently from sdk_ready.
 
 ```python
 from workflow_doctor import inspect
@@ -93,8 +93,8 @@ assert report["network"]["probed"] is False
 assert "next_actions" in report
 ```
 
-- [ ] Run red; implement explicit SDK version/import checks without importing SDK for core diagnostics. Use actual installed resources, not `repo/scripts` assumptions. Report presence/source of key only; redact sentinel key values and proxy userinfo even in exception messages. `--probe` alone enables network and cache writing.
-- [ ] Verify commands below in clean HOME/temp venv Python 3.10/3.12, with/without extra and incompatible SDK fixture. Core functionality passes without API key; executable next actions identify OS and missing optional binary.
+- [x] Run red; implement explicit SDK version/import checks without importing SDK for core diagnostics. Use actual installed resources, not `repo/scripts` assumptions. Report presence/source of key only; redact sentinel key values and proxy userinfo even in exception messages. `--probe` alone enables network and cache writing.
+- [x] Verify commands below in clean HOME/temp venv Python 3.10/3.12, with/without extra and incompatible SDK fixture. Core functionality passes without API key; executable next actions identify OS and missing optional binary.
 
 ```bash
 python3 -m workflow_cli doctor --profile нейтрально --json
@@ -108,3 +108,9 @@ Dataset tokens must come from plan output; the `sanctions` example is bound to t
 ## Exit evidence
 
 Installed package can explain minimal readiness, optional gaps and exact safe preparation commands. Interrupted update preserves cache; per-dataset schedule respects TTL. This proves local preparation policy, not registry publication latency or live geographic reachability.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Правила охватывают все 14 зарегистрированных обновляющих скриптов. Проверка готовности и плана без сети и транзакционное обновление не устанавливают задержку публикации реестров или доступность из конкретной географии.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).

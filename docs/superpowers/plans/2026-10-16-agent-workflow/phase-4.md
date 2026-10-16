@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 4: Stable agent contracts and monitoring delivery Implementation Plan
 
@@ -34,7 +34,7 @@ status: in_progress
 
 Tool args mirror Python API except root omitted, format literals enforced, revision optional positive int; manual receives blocks object plus expected_revision/operation_id. Doctor tool is offline; separate `counterparty_probe` performs explicit network diagnostics. Existing access_check retains behavior and writable annotation. Errors are envelope, not string traceback.
 
-- [ ] Snapshot tools/list names, input schemas and annotations, including legacy optional save/export effects. Assert pure tools create no files. Run actual stdio initialize → tools/list → run read → render; fake SDK/unit decorator tests alone do not satisfy protocol gate.
+- [x] Snapshot tools/list names, input schemas and annotations, including legacy optional save/export effects. Assert pure tools create no files. Run actual stdio initialize → tools/list → run read → render; fake SDK/unit decorator tests alone do not satisfy protocol gate.
 
 ```python
 request = {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
@@ -48,8 +48,8 @@ assert payload["data"]["metadata"]["decision"] == expected_decision
 
 client/decode_tool_json are explicit eval helpers over the existing handshake framing; the saved run comes from Phase 2 fixture factory.
 
-- [ ] Run red; implement transport wrappers, input validation and ToolAnnotations supported by pinned SDK1. No dynamic readOnly claim for optional save; read-only tools read, write tools mutate local state explicitly. Reuse Phase 0 subprocess group cancellation; async wrapper cancellation must terminate child work, not merely stop waiting for a background thread.
-- [ ] Add real notifications/cancelled test with descendant marker delayed past cancel; assert no marker, no orphan fetch and cancelled/interrupted run. Run mcp/test_server.py plus MCP sdk/handshake/phase0 safety evals. No SDK2 or Tasks prerequisite.
+- [x] Run red; implement transport wrappers, input validation and ToolAnnotations supported by pinned SDK1. No dynamic readOnly claim for optional save; read-only tools read, write tools mutate local state explicitly. Reuse Phase 0 subprocess group cancellation; async wrapper cancellation must terminate child work, not merely stop waiting for a background thread.
+- [x] Add real notifications/cancelled test with descendant marker delayed past cancel; assert no marker, no orphan fetch and cancelled/interrupted run. Run mcp/test_server.py plus MCP sdk/handshake/phase0 safety evals. No SDK2 or Tasks prerequisite.
 
 ## Task 4B: Durable events, leases and idempotent receipts
 
@@ -57,7 +57,7 @@ client/decode_tool_json are explicit eval helpers over the existing handshake fr
 
 **Consumes:** existing watchlist reports, run revision ids and coverage diff. **Produces:** `ingest(report: dict, *, root=None)->list[dict]`, list_events/claim_events/ack_events/retry_events signatures in design. Add MCP `counterparty_events_list`, `counterparty_events_claim`, `counterparty_events_ack` with matching annotations; ack accepts ids, never file paths.
 
-- [ ] Add ten synthetic events covering company_changed, coverage_lost, coverage_restored and refresh_failed. Test ingest twice, claim then crash, lease expiry, retry, duplicate ack, foreign consumer and concurrent consumers.
+- [x] Add ten synthetic events covering company_changed, coverage_lost, coverage_restored and refresh_failed. Test ingest twice, claim then crash, lease expiry, retry, duplicate ack, foreign consumer and concurrent consumers.
 
 ```python
 from monitor_events import ingest, list_events, claim_events, ack_events
@@ -70,8 +70,8 @@ ack_events([e["event_id"] for e in leased], consumer_id="agent-a", root=queue_ro
 assert list_events(state="pending", root=queue_root) == []
 ```
 
-- [ ] Run red. Persist stable content IDs and delivery states atomically. Separate transport delivered/read ack; list does not consume. Failures do not emit “no changes”; lost coverage is its own event. Preserve event data for next process even after closed chat. Include run origin/hash and configured retry cap/backoff.
-- [ ] Run monitor/watchlist/diff evals; verify same event seen after crash with same id, never counted as new, and no lost acknowledged event in declared fixture campaign. Document at-least-once transport and receiver idempotency; do not claim exactly-once external delivery.
+- [x] Run red. Persist stable content IDs and delivery states atomically. Separate transport delivered/read ack; list does not consume. Failures do not emit “no changes”; lost coverage is its own event. Preserve event data for next process even after closed chat. Include run origin/hash and configured retry cap/backoff.
+- [x] Run monitor/watchlist/diff evals; verify same event seen after crash with same id, never counted as new, and no lost acknowledged event in declared fixture campaign. Document at-least-once transport and receiver idempotency; do not claim exactly-once external delivery.
 
 ## Task 4C: Host plan, OS schedulers and sample integration
 
@@ -79,7 +79,7 @@ assert list_events(state="pending", root=queue_root) == []
 
 **Consumes:** cache next_due_at and fetch/batch/graph budgets. **Produces:** `host_plan(profile: str, *, now: str, platform: str, root=None)->dict` in monitor_events; contains argv, next_run_at, timeout, max_subjects, event output and cron/plist/task_xml strings as applicable. Never installs schedule.
 
-- [ ] Parse generated XML/plist with stdlib, round-trip quoting for paths with spaces/ampersands, validate no credentials and no environment dump; mock scheduler commands to raise if called. Windows Task Scheduler has StartWhenAvailable, bounded execution time and IgnoreNew multiple-instance policy.
+- [x] Parse generated XML/plist with stdlib, round-trip quoting for paths with spaces/ampersands, validate no credentials and no environment dump; mock scheduler commands to raise if called. Windows Task Scheduler has StartWhenAvailable, bounded execution time and IgnoreNew multiple-instance policy.
 
 ```python
 from monitor_events import host_plan
@@ -91,9 +91,15 @@ assert isinstance(plan["argv"], list)
 assert plan["limits"]["fetch_timeout_seconds"] <= 120
 ```
 
-- [ ] Run red; extend existing schedule generators instead of daemon. Example n8n reads local JSON event, idempotency event_id and explicit ack only after host action; placeholders are input configuration fields, no embedded secrets or preconfigured recipients. Documentation shows dry-run then user-owned install; no auto notification.
-- [ ] Run scheduler eval on all OS CI, Windows native-host process tests, event queue E2E. Actual OS registration/run is a separate operator acceptance row; generated valid XML alone is not that evidence.
+- [x] Run red; extend existing schedule generators instead of daemon. Example n8n reads local JSON event, idempotency event_id and explicit ack only after host action; placeholders are input configuration fields, no embedded secrets or preconfigured recipients. Documentation shows dry-run then user-owned install; no auto notification.
+- [x] Run scheduler eval on all OS CI, Windows native-host process tests, event queue E2E. Actual OS registration/run is a separate operator acceptance row; generated valid XML alone is not that evidence.
 
 ## Exit evidence
 
 Stable schemas, correct error distinctions and cancellation pass actual stdio. Ten-event campaign has zero lost events or duplicate event identities under retries; host plan and Windows XML are validated without installation. External delivery and real scheduler execution remain explicitly recorded separately.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Реальный транспорт stdio проверяется установленным SDK. Генерация и разбор cron, plist, XML и JavaScript n8n не являются регистрацией системного планировщика, импортом рабочего n8n или отправкой уведомления; эти операции на реальном хосте not_run.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).

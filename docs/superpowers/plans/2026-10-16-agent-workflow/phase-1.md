@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: completed
 ---
 # Phase 1: Evidence, time, applicability and decisions Implementation Plan
 
@@ -34,7 +34,7 @@ status: in_progress
 
 **Produces:** `enrich(fetch: dict, *, now: str, raw_refs: dict | None = None) -> dict`; `validate_evidence(fetch: dict) -> list[dict]`. Full Claim schema is fixed in design; new fields cannot silently change it.
 
-- [ ] Add this independent missingness test plus a recorded-response test that resolves the locator against saved raw bytes and checks its transformation; seed raw hash mismatch and a locator pointing to another company.
+- [x] Add this independent missingness test plus a recorded-response test that resolves the locator against saved raw bytes and checks its transformation; seed raw hash mismatch and a locator pointing to another company.
 
 ```python
 import copy
@@ -56,10 +56,10 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(validate_evidence(out), [])
 ```
 
-- [ ] Run `python3 eval/run_evidence_contract_eval.py`; first run must fail because the contract is absent, not because imports accidentally resolve another checkout. Record command/hash/output in `work/implementation-reports/phase-1.json`.
-- [ ] Implement canonical JSON hashing, typed dictionaries, deep-copy adaptation and checked raw lookup. Map real response ids by captured source/subject/request, then verify every locator resolves; do not fabricate `/field` pointers from normalized JSON. Preserve raw_unavailable for older files. Enforce max dependencies, detect dangling refs/cycles, reject foreign subject refs.
-- [ ] Migrate status, unreliability, bankruptcy roles, current/repaid debt, sanctions, capital, revenue, staff, financial leaf fields and every decisive path in `data/profiles_ru.json`. Add a coverage test enumerating profile paths and rule dependencies; an unsupported path fails the gate or returns explicit unknown, never drops from the matrix.
-- [ ] Run the focused eval and `python3 eval/run_evidence_pack_eval.py`; require real raw hashes/locators, original input unmodified, corrupt refs diagnosed and old packs still verified. Request review; root coordinates commit after approval.
+- [x] Run `python3 eval/run_evidence_contract_eval.py`; first run must fail because the contract is absent, not because imports accidentally resolve another checkout. Record command/hash/output in `work/implementation-reports/phase-1.json`.
+- [x] Implement canonical JSON hashing, typed dictionaries, deep-copy adaptation and checked raw lookup. Map real response ids by captured source/subject/request, then verify every locator resolves; do not fabricate `/field` pointers from normalized JSON. Preserve raw_unavailable for older files. Enforce max dependencies, detect dangling refs/cycles, reject foreign subject refs.
+- [x] Migrate status, unreliability, bankruptcy roles, current/repaid debt, sanctions, capital, revenue, staff, financial leaf fields and every decisive path in `data/profiles_ru.json`. Add a coverage test enumerating profile paths and rule dependencies; an unsupported path fails the gate or returns explicit unknown, never drops from the matrix.
+- [x] Run the focused eval and `python3 eval/run_evidence_pack_eval.py`; require real raw hashes/locators, original input unmodified, corrupt refs diagnosed and old packs still verified. Request review; root coordinates commit after approval.
 
 ## Task 1B: Time, lineage, conflicts and applicability
 
@@ -67,7 +67,7 @@ class EvidenceTests(unittest.TestCase):
 
 **Consumes:** Claim schema from 1A, real source date fields and existing TTL constants. **Produces:** `_evidence.conflicts` and `_evidence.applicability`; `reason_code` semantics fixed by design.
 
-- [ ] Add frozen-clock cases from this table before implementation.
+- [x] Add frozen-clock cases from this table before implementation.
 
 | Input | Required result |
 |---|---|
@@ -97,9 +97,9 @@ def test_reloading_does_not_rename_the_period():
     assert staff(first)["retrieved_at"] != staff(second)["retrieved_at"]
 ```
 
-- [ ] Run focused eval red. Implement policy metadata with version and source rationale. Freshness is claim-specific; no single TTL for all financial and registry facts. Unknown family is not independent. Conflict resolution records all candidate ids and selected id/reason or null.
-- [ ] Add form applicability without inventing bank ratios or inferring form solely from OKVED. `not_measurable_for_form`, `not_applicable`, missing publication and unsupported form are separate. Publish support matrix in `references/evidence-contract.md`; flag any form lacking checked real sample as unverified.
-- [ ] Run focused eval, `eval/run_fin_eval.py`, `eval/run_profiles_eval.py`; compare reversal tests, UTC boundaries and all six form segments. Review before marking complete.
+- [x] Run focused eval red. Implement policy metadata with version and source rationale. Freshness is claim-specific; no single TTL for all financial and registry facts. Unknown family is not independent. Conflict resolution records all candidate ids and selected id/reason or null.
+- [x] Add form applicability without inventing bank ratios or inferring form solely from OKVED. `not_measurable_for_form`, `not_applicable`, missing publication and unsupported form are separate. Publish support matrix in `references/evidence-contract.md`; flag any form lacking checked real sample as unverified.
+- [x] Run focused eval, `eval/run_fin_eval.py`, `eval/run_profiles_eval.py`; compare reversal tests, UTC boundaries and all six form segments. Review before marking complete.
 
 ## Task 1C: Authoritative decision metadata and preservation to final output
 
@@ -107,7 +107,7 @@ def test_reloading_does_not_rename_the_period():
 
 **Consumes:** Existing score/resolve APIs and Phase 0 statuses. **Produces:** `evaluate(fetch: dict, *, profile: str, now: str) -> dict` with exactly `{fetch, fin, assessment, metadata}`. `metadata` contains schema_version, engine_version, rules_version, evaluated_at, decision. `fetch._decision == assessment._decision == metadata.decision`. No second risk computation.
 
-- [ ] Add a regression that removes the only mass-head field from the existing clean profile fixture; assert the final recommendation does not say “не массовый”, the required gap appears in metadata, and the dossier preserves it. Test transit lists both staff and revenue dependencies and their years. Neutral stays facts_only.
+- [x] Add a regression that removes the only mass-head field from the existing clean profile fixture; assert the final recommendation does not say “не массовый”, the required gap appears in metadata, and the dossier preserves it. Test transit lists both staff and revenue dependencies and their years. Neutral stays facts_only.
 
 ```python
 from evidence_contract import evaluate
@@ -127,10 +127,16 @@ def test_neutral_is_not_a_deal_recommendation():
     assert snap["_evidence"]["schema_version"] == 1
 ```
 
-- [ ] Run `python3 eval/run_decision_contract_eval.py` red. Add optional metadata to existing results and snapshot fingerprints; older snapshots remain readable. Stable rules_version hashes actual profile/canon/policy contents.
-- [ ] Render decisive findings and decisive absences with evidence ids, periods, scope, conflicts and gaps in Markdown/DOCX model. A recommendation may only use asserted supported facts. `can_recommend` must depend on applicable required rules, including severity overrides, not total source count.
-- [ ] Run both new evals plus existing fin/profiles/dossier/diff/retro evals and ruff on changed files; compare same inputs before/after for coverage and abstention. Preserve legacy API shape and explicit red Phase 0 regressions.
+- [x] Run `python3 eval/run_decision_contract_eval.py` red. Add optional metadata to existing results and snapshot fingerprints; older snapshots remain readable. Stable rules_version hashes actual profile/canon/policy contents.
+- [x] Render decisive findings and decisive absences with evidence ids, periods, scope, conflicts and gaps in Markdown/DOCX model. A recommendation may only use asserted supported facts. `can_recommend` must depend on applicable required rules, including severity overrides, not total source count.
+- [x] Run both new evals plus existing fin/profiles/dossier/diff/retro evals and ruff on changed files; compare same inputs before/after for coverage and abstention. Preserve legacy API shape and explicit red Phase 0 regressions.
 
 ## Exit evidence
 
 All decisive profile paths are represented; every supported claim traces to all inputs or explicitly declares unavailable raw; negative claims require complete scope; unknown survives scorer → resolver → snapshot → dossier. This verifies the declared contract, not factual truth of registries or legal validity of unreviewed reporting forms.
+
+## Как читать отметки о выполнении
+
+Отметки фиксируют программную реализацию, проверенные контракты и написанные протоколы. Они не означают набора участников, получения реальных документов, независимой разметки, завершённых горизонтов наблюдения или работы на реальном хосте. Приёмка относится к происхождению, времени, применимости, необходимым зависимостям и формированию вывода. Она не подтверждает истинность реестра, нерассмотренные реальные формы или вероятность исхода.
+
+Итоговые команды, снимки исходных файлов, область ревью, хеши артефактов и фактические результаты на платформах: [acceptance.md](acceptance.md), [acceptance.json](acceptance.json).
