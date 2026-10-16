@@ -322,7 +322,7 @@ class ReplayTests(unittest.TestCase):
         self.assertEqual(revenue(evaluate())['reason_code'], 'revision_unknown')
 
     def test_evaluator_publication_authority_is_claim_bound_and_keeps_expiry(self):
-        for change in ('missing_reference', 'wrong_claim', 'future_date', 'invalid_date', 'stale'):
+        for change in ('missing_reference', 'wrong_claim', 'future_date', 'noncanonical_publication', 'stale'):
             with self.subTest(change=change):
                 payload = self._published_payload()
                 c = revenue(payload)
@@ -330,12 +330,26 @@ class ReplayTests(unittest.TestCase):
                 if change == 'missing_reference': semantics[c['claim_id']]['reference'] = ''
                 elif change == 'wrong_claim': semantics = {'sha256:' + '0' * 64: next(iter(semantics.values()))}
                 elif change == 'future_date': c['published_at'] = LATER
-                elif change == 'invalid_date': c['published_at'] = '20211231T000000Z'
+                elif change == 'noncanonical_publication':
+                    # A valid instant on Python 3.10 and 3.12, but not the
+                    # full-seconds UTC form required for publication authority.
+                    c['published_at'] = '2021-12-31T00:00Z'
                 else: c['valid_until'] = CUTOFF
+                self.assertEqual(evidence.validate_evidence(payload['fetch']), [])
                 result = evidence.evaluate(payload['fetch'], profile='нейтрально', now=CUTOFF,
                                            publication_semantics=semantics)
                 self.assertEqual(revenue(result)['knowledge'], 'unknown')
                 self.assertEqual(revenue(result)['reason_code'], 'stale' if change == 'stale' else 'revision_unknown')
+
+    def test_evaluator_rejects_malformed_publication_timestamp(self):
+        payload = self._published_payload()
+        c = revenue(payload)
+        c['published_at'] = '2021-12-31T00:00:00Zgarbage'
+        self.assertEqual(evidence.validate_evidence(payload['fetch']), [
+            {'code': 'invalid_timestamp', 'claim_id': c['claim_id']}])
+        with self.assertRaisesRegex(ValueError, '^schema_invalid: previous evidence$'):
+            evidence.evaluate(payload['fetch'], profile='нейтрально', now=CUTOFF,
+                              publication_semantics=payload['metadata']['publication_semantics'])
 
     def test_current_rules_new_manifest_temp_threshold_keeps_source_bytes(self):
         before = disk_bytes(self.root)

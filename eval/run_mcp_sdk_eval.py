@@ -30,8 +30,11 @@ def запуск(версия):
         (dist / "METADATA").write_text("Metadata-Version: 2.1\nName: mcp\nVersion: %s\n" % версия,
                                        encoding="utf-8")
         env = dict(os.environ, PYTHONPATH=tmp)
-        p = subprocess.run([sys.executable, str(SERVER)], cwd=tmp, env=env, capture_output=True,
-                           text=True, timeout=60, check=False, stdin=subprocess.DEVNULL)
+        # Parent -X utf8 is not inherited; both sides of this pipe use UTF-8.
+        p = subprocess.run([sys.executable, "-X", "utf8", str(SERVER)],
+                           cwd=tmp, env=env, capture_output=True,
+                           text=True, encoding="utf-8", errors="strict",
+                           timeout=60, check=False, stdin=subprocess.DEVNULL)
         return p.returncode, p.stderr
 
 
