@@ -303,6 +303,92 @@ def case_lazy_known_file(ag, tmp):
     return errors
 
 
+def case_explainable_metadata(ag):
+    errors = []
+    graph = ag.build_graph(make_fixture_fetcher(), '7700000001', pause=0)
+    for edge in graph.get('рёбра', []):
+        check(errors, all(k in edge for k in ('edge_type', 'evidence_ids', 'effective_at', 'origin_family')), 'missing edge provenance')
+        if edge['тип'] == 'адрес':
+            check(errors, edge.get('edge_type') == 'common_address', 'address promoted to ownership')
+        check(errors, edge.get('evidence_ids') == [], 'invented evidence IDs for legacy fixtures')
+        check(errors, edge.get('evidence_status') == 'unknown', 'unsupported raw pointer not unknown')
+    check(errors, graph.get('ownership_chains') == [], 'ownership inferred from shared director/address')
+    return errors
+
+
+def case_frontier_limits(ag):
+    errors = []
+    cards = {
+        'a': {'ОГРН': 'a', 'ИНН': '7700000001', 'ЮрАдрес': {'МассАдрес': ['b', 'c']}},
+        'b': {'ОГРН': 'b', 'ЮрАдрес': {'МассАдрес': ['d']}},
+        'c': {'ОГРН': 'c'}, 'd': {'ОГРН': 'd'},
+    }
+    def fetch(kind, value):
+        return cards.get('a' if kind == 'inn' else value), 'unavailable'
+    for kwargs, reason in [({'max_depth': 1}, 'depth'), ({'бюджет': 1}, 'budget'), ({'max_nodes': 1}, 'max_nodes')]:
+        g = ag.build_graph(fetch, '7700000001', pause=0, **kwargs)
+        check(errors, g.get('усечено') is True, 'limit silently complete: %s' % reason)
+        check(errors, any(x.get('stop_reason') == reason for x in g.get('frontier', [])), 'missing frontier reason: %s' % reason)
+    del cards['c']
+    g = ag.build_graph(fetch, '7700000001', pause=0)
+    check(errors, any(x.get('stop_reason') == 'unavailable' for x in g.get('frontier', [])), 'missing unavailable frontier')
+    check(errors, g.get('усечено') is True, 'unavailable reported complete')
+    off = ag.normalize_offline(g)
+    check(errors, off.get('усечено') is True and off.get('frontier') == g.get('frontier'), 'offline erased truncation')
+    return errors
+
+
+def case_offline_ownership_guard(ag):
+    errors = []
+    data = {'узлы': [{'огрн': 'a', 'глубина': 0}, {'огрн': 'b'}],
+            'рёбра': [{'от': 'a', 'до': 'b', 'тип': 'адрес', 'edge_type': 'ownership', 'evidence_ids': ['invented']}]}
+    result = ag.normalize_offline(data)
+    edge = result['рёбра'][0]
+    check(errors, edge.get('edge_type') == 'common_address', 'offline address promoted by supplied metadata')
+    check(errors, edge.get('evidence_ids') == [], 'dangling graph evidence accepted')
+    check(errors, result.get('ownership_chains') == [], 'unsupported ownership chain accepted')
+    check(errors, result.get('усечено') is True, 'legacy offline completeness invented')
+    return errors
+
+
+def case_supported_ownership_and_mutation(ag):
+    import copy
+    evidence = ag._load_sibling('evidence_contract')
+    errors = []
+    traced = evidence.enrich({'инн': '7700000001'}, now='2026-10-16T09:00:00Z')['_evidence']
+    claim = copy.deepcopy(next(iter(traced['claims'].values())))
+    claim.update(field='graph.ownership', value={'from': 'a', 'to': 'b', 'edge_type': 'ownership'},
+                 knowledge='known', reason_code=None, source_id='manual', origin_family='egrul',
+                 raw_ref={'response_id': 'saved1', 'sha256': 'b' * 64, 'locator': '/owner', 'availability': 'available'},
+                 effective_at='2026-10-01T00:00:00Z', depends_on=[])
+    claim['claim_id'] = evidence._claim_id(claim)
+    traced['claims'] = {claim['claim_id']: claim}
+    data = {'узлы': [{'огрн': 'a', 'глубина': 0}, {'огрн': 'b'}],
+            'рёбра': [{'от': 'a', 'до': 'b', 'тип': 'владелец', 'evidence_ids': [claim['claim_id']]}],
+            '_evidence': traced, 'усечено': False, 'обход': {'полный': True}}
+    result = ag.normalize_offline(data)
+    check(errors, len(result.get('ownership_chains', [])) == 1, 'supported legal ownership missing')
+    check(errors, result['рёбра'][0].get('effective_at') == '2026-10-01T00:00:00Z', 'effective date lost')
+    changed = copy.deepcopy(data)
+    changed['рёбра'][0]['до'] = 'c'
+    mutated = ag.normalize_offline(changed)
+    check(errors, mutated.get('ownership_chains') == [], 'foreign endpoints accepted as supported')
+    changed = copy.deepcopy(data)
+    changed['_evidence']['claims'][claim['claim_id']]['value']['to'] = 'c'
+    check(errors, ag.normalize_offline(changed).get('ownership_chains') == [], 'mutated claim accepted')
+    # Checko legal entities produce explicit legal ownership but no invented raw reference.
+    cards = {'a': {'ОГРН': 'a', 'ИНН': '7700000001', 'Учред': {'ЮЛ': [{'ОГРН': 'b'}]}}, 'b': {'ОГРН': 'b'}}
+    graph = ag.build_graph(lambda kind, value: (cards.get('a' if kind == 'inn' else value), 'ok'), '7700000001', pause=0)
+    check(errors, graph['рёбра'][0]['edge_type'] == 'ownership', 'legal owner confused with shared founder')
+    check(errors, graph['ownership_chains'] == [], 'untraced Checko relationship used as supported chain')
+    # Presentation keeps source links and unexpanded frontier visible.
+    dossier = ag._load_sibling('dossier')
+    rendered = json.dumps(dossier._подраздел_граф(ag.build_graph(make_fixture_fetcher(), '7700000001', pause=0, бюджет=1)), ensure_ascii=False)
+    check(errors, 'budget' in rendered and 'неразвёрнутые' in rendered, 'dossier hides frontier')
+    check(errors, 'не доказывают владение' in rendered, 'dossier equates associations with control')
+    return errors
+
+
 def main():
     import tempfile
     ag = load_module("affiliates_graph", ROOT / "scripts" / "affiliates_graph.py")
@@ -316,8 +402,39 @@ def main():
     return _итог(cases)
 
 
+def case_unresolved_legal_founders(ag):
+    errors = []
+    for founder in ({'ИНН': '7702070139', 'НаимПолн': 'Known owner without OGRN'},
+                    {'НаимПолн': 'Named unresolved owner'}, {}, None, [], 'malformed'):
+        data = {'ИНН': '7707083893', 'ОГРН': '1027700132195', 'Учред': {'ЮЛ': [founder]}}
+        calls = []
+        def fetch(*args, calls=calls, data=data):
+            calls.append(args)
+            return data, 'ok'
+        graph = ag.build_graph(fetch, '7707083893', pause=0)
+        check(errors, graph.get('усечено') is True, 'unresolved founder silently complete: %r' % founder)
+        check(errors, graph['обход'].get('полный') is False, 'full traversal claimed for unresolved founder')
+        check(errors, bool(graph.get('frontier')) and graph.get('stop_reason') == 'unavailable', 'missing unresolved frontier')
+        check(errors, bool(graph.get('не_проверено')), 'missing founder parsing limitation')
+        check(errors, graph.get('ownership_chains') == [], 'unresolved owner promoted to proven chain')
+        check(errors, len(calls) == 1, 'unresolved owner invented OGRN/network traversal')
+        if isinstance(founder, dict) and founder.get('НаимПолн'):
+            check(errors, any(item.get('edge_type') == 'ownership' and item.get('name') == founder['НаимПолн']
+                              for item in graph.get('frontier', [])), 'named legal ownership relation lost')
+        if isinstance(founder, dict) and founder.get('ИНН'):
+            check(errors, any(item.get('to') == founder['ИНН'] for item in graph.get('frontier', [])), 'known owner INN lost')
+        normalized = ag.normalize_offline(graph)
+        check(errors, normalized.get('усечено') is True, 'normalization erased unresolved founder')
+    return errors
+
+
 def _собрать(ag, dc, canon, td):
     return {
+        "unresolved-legal-founders": case_unresolved_legal_founders(ag),
+        "edge-provenance": case_explainable_metadata(ag),
+        "supported-ownership-mutation": case_supported_ownership_and_mutation(ag),
+        "frontier-limits": case_frontier_limits(ag),
+        "offline-ownership-guard": case_offline_ownership_guard(ag),
         "группа-4-компании": case_group(ag, dc, canon),
         "здоровая-контрольная": case_healthy(ag, dc, canon),
         "offline-граф": case_offline_graph(ag, dc, canon),

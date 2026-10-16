@@ -48,7 +48,11 @@ HERE = Path(__file__).resolve().parent
 URL = "https://www.cbr.ru/inside/warning-list/black-list-json"
 СТРАНИЦА = "https://www.cbr.ru/inside/warning-list/"
 КАРТОЧКА = "https://www.cbr.ru/warninglistapi/DetailInfo?id=%d"
-CACHE_DIR = Path(os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru", "cbr_warning")))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+CACHE_DIR = dataset_root("cbr_warning")
 ФАЙЛ = "black-list.json"
 МЕТА = "meta.json"
 # Список ЦБ пополняется ежедневно; двухнедельная выгрузка ещё годится как

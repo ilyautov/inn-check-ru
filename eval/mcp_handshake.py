@@ -25,7 +25,15 @@ import threading
 import time
 
 ИМЯ_СЕРВЕРА = "inn-check-ru"
-ИНСТРУМЕНТОВ = 14
+# Additive contract imported without SDK or repository-package shadowing.
+import importlib.util
+from pathlib import Path
+
+_spec = importlib.util.spec_from_file_location('handshake_tools', Path(__file__).resolve().parents[1] / 'mcp/tools_impl.py')
+_tools = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_tools)
+EXPECTED_TOOLS = _tools.EXPECTED_TOOLS
+ИНСТРУМЕНТОВ = len(EXPECTED_TOOLS)
 ТАЙМАУТ = float(os.environ.get("MCP_HANDSHAKE_TIMEOUT", "120"))
 
 
@@ -56,6 +64,79 @@ def _ждать(очередь, ид, до):
             continue
         if сообщение.get("id") == ид:
             return сообщение, None
+
+
+class StdioClient:
+    """Small real JSON-lines protocol client shared by workflow integration evals."""
+    def __init__(self, command, *, env=None, cwd=None):
+        self.proc = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, env=env, cwd=cwd)
+        self.queue = queue.Queue()
+        self.pending = {}
+        self.errors = []
+        self.reader = threading.Thread(target=_читатель, args=(self.proc.stdout, self.queue), daemon=True)
+        self.reader.start()
+        def stderr_reader():
+            for line in iter(self.proc.stderr.readline, b''):
+                self.errors.append(line.decode('utf-8', 'replace'))
+        self.stderr_reader = threading.Thread(target=stderr_reader, daemon=True)
+        self.stderr_reader.start()
+
+    def send(self, message):
+        self.proc.stdin.write((json.dumps(message, ensure_ascii=False) + '\n').encode('utf-8'))
+        self.proc.stdin.flush()
+
+    def receive(self, request_id, timeout=30):
+        if request_id in self.pending:
+            return self.pending.pop(request_id)
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                line = self.queue.get(timeout=max(0.001, deadline - time.monotonic()))
+            except queue.Empty:
+                break
+            if line is None:
+                raise AssertionError('MCP closed stdout: ' + ''.join(self.errors)[-1000:])
+            message = json.loads(line)
+            if message.get('id') == request_id:
+                return message
+            if 'id' in message:
+                self.pending[message['id']] = message
+        raise AssertionError('MCP response timed out: %s' % request_id)
+
+    def call(self, request, timeout=30):
+        self.send(request)
+        return self.receive(request['id'], timeout)
+
+    def initialize(self):
+        response = self.call({'jsonrpc': '2.0', 'id': 1, 'method': 'initialize', 'params': {
+            'protocolVersion': '2025-06-18', 'capabilities': {},
+            'clientInfo': {'name': 'workflow-mcp-eval', 'version': '1'}}})
+        if response.get('result', {}).get('serverInfo', {}).get('name') != ИМЯ_СЕРВЕРА:
+            raise AssertionError(response)
+        self.send({'jsonrpc': '2.0', 'method': 'notifications/initialized'})
+        return response
+
+    def close(self):
+        if self.proc.stdin:
+            self.proc.stdin.close()
+        try:
+            self.proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait(timeout=5)
+        self.reader.join(timeout=2)
+        self.stderr_reader.join(timeout=2)
+        self.proc.stdout.close()
+        self.proc.stderr.close()
+
+
+def decode_tool_json(response):
+    result = response.get('result', {})
+    if 'structuredContent' in result:
+        return result['structuredContent']
+    return json.loads(''.join(block.get('text', '') for block in result.get('content', [])
+                              if block.get('type') == 'text'))
 
 
 def main(argv):
@@ -96,7 +177,7 @@ def main(argv):
                 ответ, ошибка = _ждать(очередь, 2, до)
                 if ответ is not None:
                     инструменты = (ответ.get("result") or {}).get("tools") or []
-                    if len(инструменты) != ИНСТРУМЕНТОВ:
+                    if sorted(t.get("name") for t in инструменты) != sorted(EXPECTED_TOOLS):
                         ошибка = "инструментов %d, ожидали %d: %s" % (
                             len(инструменты), ИНСТРУМЕНТОВ,
                             ", ".join(sorted(t.get("name", "?") for t in инструменты)))

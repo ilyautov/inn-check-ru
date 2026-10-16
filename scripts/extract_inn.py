@@ -5,12 +5,13 @@ extract_inn.py — извлечение ИНН из входящего доку�
 
     python3 extract_inn.py счёт.txt договор.html выгрузка.csv
     cat письмо.eml | python3 extract_inn.py --stdin --только-новые
-    python3 extract_inn.py счёт.txt --проверить --профиль отсрочка
+    python3 extract_inn.py счёт.txt --проверить --candidate <ID> --role supplier --профиль отсрочка
 
 Зачем. Раньше триггер проверки был один — фраза человека. Теперь: пришёл счёт
 от нового ИНН, появился контрагент в выгрузке, договор пришёл на подпись —
-ИНН вынимается из текста сам, отсеивается уже проверенное, а новое уходит в
-`batch_check.py --режим quick`, и человек узнаёт о 🔴 до оплаты.
+ИНН вынимается из текста сам, отсеивается уже проверенное. Отдельная проверка
+требует явного ID стороны из `inn-check-workflow document extract`: документ
+может содержать ИНН поставщика, покупателя и банка одновременно.
 
 Вход: файлы аргументами и/или `--stdin`. Форматы:
   * текст, CSV/TSV — разбираются как текст (разделители колонок учитываются
@@ -28,7 +29,7 @@ extract_inn.py — извлечение ИНН из входящего доку�
   * DOCX — это ZIP с XML: читается `word/document.xml` И колонтитулы
     (`header*.xml`, `footer*.xml`), сноски; какие части прочитаны, а какие
     остались непрочитанными, написано в пометке файла;
-  * PDF — НЕ поддерживается (stdlib не читает), честная строка «передайте текст»;
+  * PDF — опциональный extra [pdf], локальный ограниченный разбор;
   * двоичный файл — «двоичный файл, не текст», без попыток угадать.
 Кодировка: UTF-8 (в т.ч. с BOM), при сбое — CP1251 (выгрузки из 1С).
 
@@ -81,15 +82,17 @@ validate_inn` — импорт, не копия) плюс правилом дл�
     --только-новые           в выводе только те, кого раньше не видели
     --json                   JSON вместо человекочитаемого отчёта
     --отбракованные          показать отброшенных кандидатов с причиной
-    --проверить              новые ИНН → batch_check.py --режим quick
+    --проверить              выбранный новый ИНН → batch_check.py --режим quick
+    --candidate <id>         явный ID из document extract (обязателен для проверки)
+    --role <role>            supplier/buyer/own_company/bank/signatory/unknown (other — алиас unknown)
     --профиль <id>           профиль цели для --проверить
     --подтверждаю            согласие на батч больше порога (20 ИНН)
     --каталог <путь>         каталог кэша со снимками
     --список-наблюдения <ф>  файл списка наблюдения
 
-`--проверить` дёргает ФНС, поэтому автопрогон ограничен: больше 20 новых ИНН —
-батч НЕ запускается без `--подтверждаю` (SKILL.md: «выгрузка на сотни ИНН — не
-повод для автопрогона»). Проверенные батчем ИНН попадают в кэш снимков
+`--проверить` дёргает ФНС только после явного `--candidate`: `--подтверждаю`
+не заменяет выбор стороны. Порог 20 ИНН сохранён для standalone функции
+проверить(инны). Проверенные батчем ИНН попадают в кэш снимков
 (`batch_check.py --снимки`), иначе следующий счёт того же поставщика снова
 считался бы новым и снова шёл в сеть.
 
@@ -111,6 +114,7 @@ import io
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import time
@@ -152,6 +156,26 @@ watchlist = _модуль("watchlist")   # только чтение: пути �
 # самая тихая деградация, ради которой всё писалось.
 СНИМОК_СВЕЖ_ДНЕЙ = float(os.environ.get("INN_CHECK_SNAPSHOT_TTL_DAYS", "90"))
 
+# The same 20 MiB ceiling as document_input.MAX_TEXT_BYTES, applied BEFORE
+# inflation/decoding/regex to each selected XML and to all selected XML bytes.
+MAX_DOCX_XML_BYTES = 20 * 1024 * 1024
+DOCX_READ_CHUNK_BYTES = 64 * 1024
+# Bound metadata before ZipFile builds its directory/ZipInfo objects. These
+# limits apply to all ZIP members, including unread images and service parts.
+MAX_DOCX_ENTRIES = 2048
+MAX_DOCX_NAME_BYTES = 1024
+MAX_DOCX_NAMES_BYTES = 256 * 1024
+MAX_DOCX_DIRECTORY_BYTES = 2 * 1024 * 1024
+
+
+class DocxReadLimitError(ValueError):
+    """Whole-document refusal; never convert a bounded read into partial text."""
+
+    reason_code = 'output_too_large'
+
+    def __init__(self, detail):
+        super().__init__('DOCX: превышен лимит чтения (%s) — передайте меньший документ' % detail)
+
 # Разделители, которые вёрстка и 1С вставляют внутрь числа. Видимые (пробелы)
 # и невидимые (мягкий перенос, zero-width) разделены намеренно: правила склейки
 # у них разные, см. докстринг.
@@ -177,7 +201,7 @@ _ПРОБЕЛЫ = re.compile("[\\s%s]+" % re.escape(_СЕП_ВИДИМЫЙ + _С
 USAGE = (
     "Использование: python3 extract_inn.py <файл> [<файл>…] [--stdin]\n"
     "               [--только-новые] [--json] [--отбракованные]\n"
-    "               [--проверить [--профиль <id>] [--подтверждаю]]\n"
+    "               [--проверить --candidate <ID> --role <role> [--профиль <id>]]\n"
     "               [--каталог <путь>] [--список-наблюдения <файл>]")
 
 
@@ -294,26 +318,98 @@ def _текст_из_xml(xml):
     return _html.unescape(xml)
 
 
-def текст_из_docx(данные):
+def _docx_zip_preflight(данные):
+    """Inspect only bounded ZIP metadata before ZipFile allocates its directory.
+
+    Directory size/count fields are not trusted alone: walk every fixed-size
+    directory record and check actual counts and filename lengths as well.
+    ZIP64 metadata cannot be needed within this policy and is refused explicitly.
+    No member data is expanded here; no directory-sized slice is allocated.
+    """
+    end = данные.rfind(b'PK\x05\x06', max(0, len(данные) - (65535 + 22)))
+    if end < 0 or end + 22 > len(данные):
+        raise zipfile.BadZipFile('не найден конец ZIP')
+    _, disk, directory_disk, disk_count, count, size, offset, comment = struct.unpack_from(
+        '<4s4H2LH', данные, end)
+    if end + 22 + comment > len(данные):
+        raise zipfile.BadZipFile('неполный конец ZIP')
+    if (count == 65535 or disk_count == 65535 or size == 0xffffffff
+            or offset == 0xffffffff or данные[max(0, end - 20):end - 16] == b'PK\x06\x07'):
+        raise DocxReadLimitError('метаданные ZIP64 не поддерживаются в ограниченном DOCX')
+    if disk or directory_disk or disk_count != count:
+        raise zipfile.BadZipFile('многотомный ZIP не поддерживается')
+    if count > MAX_DOCX_ENTRIES:
+        raise DocxReadLimitError('более %d частей ZIP' % MAX_DOCX_ENTRIES)
+    if size > MAX_DOCX_DIRECTORY_BYTES:
+        raise DocxReadLimitError('каталог ZIP больше %d байт' % MAX_DOCX_DIRECTORY_BYTES)
+    position = end - size
+    if position < 0:
+        raise zipfile.BadZipFile('неполный каталог ZIP')
+    entries, names_size, has_document = 0, 0, False
+    while position < end:
+        if position + 46 > end or данные[position:position + 4] != b'PK\x01\x02':
+            raise zipfile.BadZipFile('повреждён каталог ZIP')
+        name_size, extra_size, comment_size = struct.unpack_from('<3H', данные, position + 28)
+        entries += 1
+        names_size += name_size
+        if entries > MAX_DOCX_ENTRIES:
+            raise DocxReadLimitError('более %d частей ZIP' % MAX_DOCX_ENTRIES)
+        if name_size > MAX_DOCX_NAME_BYTES or names_size > MAX_DOCX_NAMES_BYTES:
+            raise DocxReadLimitError('имена частей ZIP превышают допустимый размер')
+        next_position = position + 46 + name_size + extra_size + comment_size
+        if next_position > end:
+            raise zipfile.BadZipFile('неполная запись каталога ZIP')
+        has_document |= данные[position + 46:position + 46 + name_size] == b'word/document.xml'
+        position = next_position
+    if entries != count:
+        raise zipfile.BadZipFile('число частей ZIP не совпадает с каталогом')
+    return has_document
+
+
+def текст_из_docx(данные, *, xml_limit=None):
     """DOCX -> (текст, прочитанные части, непрочитанные части).
 
     Это ZIP с XML, stdlib его открывает. Читается тело И колонтитулы со
     сносками; всё, что осталось непрочитанным, возвращается списком —
     имена файлов архива уже в руках, промолчать о них стоило бы дороже.
     """
+    _docx_zip_preflight(данные)
+    limit = MAX_DOCX_XML_BYTES if xml_limit is None else min(MAX_DOCX_XML_BYTES, xml_limit)
     прочитано, пропущено, куски = [], [], []
+    total_bytes, text_bytes = 0, 0
     with zipfile.ZipFile(io.BytesIO(данные)) as z:
-        имена = sorted(z.namelist(),
-                       key=lambda и: (not и.lower().startswith("word/document"), и))
-        for имя in имена:
+        части = sorted(z.infolist(), key=lambda info: (
+            not info.filename.lower().startswith("word/document"), info.filename))
+        declared_bytes = 0
+        for часть in части:
+            if _ЧАСТИ_DOCX.match(часть.filename):
+                declared_bytes += часть.file_size
+                if часть.file_size > limit or declared_bytes > limit:
+                    raise DocxReadLimitError('XML частей больше %d байт' % limit)
+        for часть in части:
+            имя = часть.filename
             if _ЧАСТИ_DOCX.match(имя):
                 try:
-                    xml = z.read(имя).decode("utf-8", "replace")
+                    raw = bytearray()
+                    with z.open(часть) as stream:
+                        while True:
+                            allowance = min(limit - len(raw), limit - total_bytes)
+                            chunk = stream.read(min(DOCX_READ_CHUNK_BYTES, allowance + 1))
+                            if not chunk:
+                                break
+                            total_bytes += len(chunk)
+                            if len(chunk) > allowance:
+                                raise DocxReadLimitError('XML частей больше %d байт' % limit)
+                            raw.extend(chunk)
                 except (KeyError, OSError, RuntimeError, zipfile.BadZipFile) as e:
                     пропущено.append("%s (%s)" % (имя, e))
                     continue
+                xml = raw.decode("utf-8", "replace")
                 текст = _текст_из_xml(xml)
                 if текст.strip():
+                    text_bytes += len(текст.encode('utf-8')) + bool(куски)
+                    if text_bytes > limit:
+                        raise DocxReadLimitError('приведённый текст больше %d байт' % limit)
                     куски.append(текст)
                 прочитано.append(имя)
             elif имя.lower().endswith(".xml") and not _СЛУЖЕБНЫЕ_DOCX.match(имя):
@@ -449,23 +545,26 @@ def _формат_по_содержимому(имя, текст):
     return "текст"
 
 
-def прочитать_документ(имя, данные):
+def прочитать_документ(имя, данные, *, docx_xml_limit=None):
     """Байты документа -> {формат, текст, причина}. Текст None — разбор невозможен."""
-    if данные[:4] == b"%PDF":
-        return {"формат": "pdf", "текст": None,
-                "причина": "PDF не поддерживается (stdlib его не читает) — "
-                           "передайте текст: скопируйте содержимое счёта или "
-                           "сохраните как .txt"}
+    if данные[:4] == b"%PDF" or os.path.splitext(имя or '')[1].lower() == '.pdf':
+        from sibling_imports import load_sibling
+        return load_sibling('document_input')._legacy_pdf(данные, имя)
     if данные[:4] == b"PK\x03\x04":
         try:
-            with zipfile.ZipFile(io.BytesIO(данные)) as z:
-                имена = z.namelist()
+            есть_документ = _docx_zip_preflight(данные)
+        except DocxReadLimitError as e:
+            return {"формат": "docx", "текст": None, "причина": str(e),
+                    "reason_code": e.reason_code}
         except zipfile.BadZipFile as e:
             return {"формат": "архив", "текст": None,
                     "причина": "битый ZIP (%s)" % e}
-        if "word/document.xml" in имена:
+        if есть_документ:
             try:
-                текст, прочитано, пропущено = текст_из_docx(данные)
+                текст, прочитано, пропущено = текст_из_docx(данные, xml_limit=docx_xml_limit)
+            except DocxReadLimitError as e:
+                return {"формат": "docx", "текст": None, "причина": str(e),
+                        "reason_code": e.reason_code}
             except (KeyError, zipfile.BadZipFile, OSError, RuntimeError) as e:
                 return {"формат": "docx", "текст": None,
                         "причина": "DOCX не разобран (%s) — передайте текст" % e}
@@ -646,6 +745,7 @@ def разобрать_текст(текст, источник, предел=П�
     def запись(цифры, как, начало, конец):
         return {"инн": цифры, "как_записано": как, "источник": источник,
                 "строка": строка_номер(карта, начало),
+                "offsets": {"start": начало, "end": конец},
                 "контекст": контекст(текст, начало, конец)}
 
     def отбраковать(причина, цифры, как, начало, конец):
@@ -1094,7 +1194,8 @@ def _значение(флаг, it):
 def _разобрать_аргументы(argv):
     o = {"файлы": [], "stdin": False, "только_новые": False, "json": False,
          "отбракованные": False, "проверить": False, "профиль": None,
-         "каталог": None, "список": None, "подтверждаю": False}
+         "каталог": None, "список": None, "подтверждаю": False,
+         "candidate": None, "role": "unknown"}
     it = iter(argv[1:])
     for a in it:
         ошибка = None
@@ -1114,6 +1215,8 @@ def _разобрать_аргументы(argv):
             o["подтверждаю"] = True
         elif a in ("--профиль", "--profile"):
             o["профиль"], ошибка = _значение(a, it)
+        elif a in ("--candidate", "--role"):
+            o[a[2:]], ошибка = _значение(a, it)
         elif a in ("--каталог", "--dir"):
             o["каталог"], ошибка = _значение(a, it)
         elif a in ("--список-наблюдения", "--watchlist"):
@@ -1142,13 +1245,21 @@ def main(argv):
     for путь in o["файлы"]:
         try:
             with open(путь, "rb") as fh:
-                читаемые.append((путь, fh.read()))
+                данные = fh.read(20 * 1024 * 1024 + 1)
+                if len(данные) > 20 * 1024 * 1024:
+                    raise OSError('документ превышает 20 МиБ')
+                читаемые.append((путь, данные))
         except OSError as e:
             файлы_с_ошибкой.append({"файл": путь, "формат": "—",
                                     "статус": "не прочитан",
                                     "причина": "файл не прочитан (%s)" % e})
     if o["stdin"]:
-        читаемые.append(("<stdin>", sys.stdin.buffer.read()))
+        данные = sys.stdin.buffer.read(20 * 1024 * 1024 + 1)
+        if len(данные) > 20 * 1024 * 1024:
+            файлы_с_ошибкой.append({"файл": "<stdin>", "формат": "—", "статус": "не прочитан",
+                                    "причина": "документ превышает 20 МиБ"})
+        else:
+            читаемые.append(("<stdin>", данные))
 
     результат = собрать(читаемые, o["каталог"], o["список"])
     результат["файлы"] = файлы_с_ошибкой + результат["файлы"]
@@ -1157,9 +1268,33 @@ def main(argv):
     разобрано = результат["итого"]["разобрано_документов"]
 
     if o["проверить"]:
-        результат["проверка"] = проверить(
-            к_проверке(результат), o["профиль"], o["json"], o["каталог"],
-            подтверждено=o["подтверждаю"], разобрано=разобрано)
+        # A contract/invoice can include our company, supplier and bank. A batch
+        # confirmation is not an explicit party selection. Preserve one-shot
+        # extraction; require the document workflow before checking identities.
+        результат["проверка"] = {
+            "запущен": False, "состоялась": False,
+            "status": "needs_input",
+            "reason_code": "explicit_selection_required",
+            "причина": "Сначала выберите сторону: inn-check-workflow document extract/select; "
+                       "затем явно запустите run start для выбранного ИНН."}
+        if not разобрано:
+            результат["проверка"]["причина"] = "ни один документ не разобран — батч не запускался"
+        elif o['candidate']:
+            from sibling_imports import load_sibling
+            document_input = load_sibling('document_input')
+            candidates = []
+            for имя, данные in читаемые:
+                candidates.extend(document_input.extract(данные, filename=имя)['candidates'])
+            selection = document_input.select(candidates, role=o['role'], candidate_id=o['candidate'])
+            результат['выбор_стороны'] = selection
+            if selection['status'] == 'ok':
+                inn = selection['selected']['inn']
+                result_inns = [inn] if inn in к_проверке(результат) else []
+                результат['проверка'] = проверить(result_inns, o['профиль'], o['json'], o['каталог'],
+                                                  подтверждено=o['подтверждаю'], разобрано=разобрано)
+            else:
+                результат['проверка']['status'] = selection['status']
+                результат['проверка']['reason_code'] = selection['reason_code']
 
     блок = результат.get("проверка") or {}
     # Код возврата отвечает на вопрос «работа состоялась?»: упавший или вовсе

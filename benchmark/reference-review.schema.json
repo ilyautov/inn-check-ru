@@ -1,0 +1,191 @@
+{
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rubric_hash",
+    "critical",
+    "label",
+    "evidence",
+    "negative_complete",
+    "scope_start",
+    "scope_end",
+    "reviews",
+    "adjudication",
+    "subject_inn",
+    "outcome_type"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "rubric_hash": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "critical": {
+      "const": true
+    },
+    "label": {
+      "enum": [
+        "event",
+        "no_event"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "sha256",
+          "uri",
+          "permitted_use",
+          "observed_at",
+          "scope"
+        ],
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "permitted_use": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observed_at": {
+            "type": "string",
+            "minLength": 1,
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+            "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "negative_complete": {
+      "type": "boolean"
+    },
+    "scope_start": {
+      "type": "string",
+      "minLength": 1,
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+      "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+    },
+    "scope_end": {
+      "type": "string",
+      "minLength": 1,
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+      "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "independent",
+          "blinded_to_prediction",
+          "label",
+          "reviewed_at"
+        ],
+        "properties": {
+          "reviewer_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "independent": {
+            "const": true
+          },
+          "blinded_to_prediction": {
+            "const": true
+          },
+          "label": {
+            "enum": [
+              "event",
+              "no_event"
+            ]
+          },
+          "reviewed_at": {
+            "type": "string",
+            "minLength": 1,
+            "format": "date-time",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+            "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "adjudication": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "reviewer_id",
+        "independent",
+        "label",
+        "rationale",
+        "reviewed_at"
+      ],
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent": {
+          "const": true
+        },
+        "label": {
+          "enum": [
+            "event",
+            "no_event"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": "string",
+          "minLength": 1,
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])$(?![\\s\\S])",
+          "description": "Supported RFC3339: uppercase T/Z, mandatory seconds and timezone, 1-6 fractional digits; leap seconds are unsupported. Calendar dates must be valid."
+        }
+      },
+      "additionalProperties": false
+    },
+    "subject_inn": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outcome_type": {
+      "enum": [
+        "case_filed",
+        "procedure_opened",
+        "liquidation",
+        "client_loss"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reference-review.schema.json",
+  "title": "Independent outcome reference record; semantics also checked by validate_cohort"
+}

@@ -181,6 +181,25 @@ const окно = "chrome-extension://abc/popup.html";
 ok(m.своёОкно({ id: "abc", url: окно }, "abc", окно), "своё окно");
 ok(!m.своёОкно({ id: "xyz", url: окно }, "abc", окно), "чужое расширение");
 ok(!m.своёОкно({ id: "abc", url: "https://kad.arbitr.ru/" }, "abc", окно), "не окно");
+const rid = "11111111-2222-4333-8444-555555555555";
+const run = { run_id: rid, revision: 3, инн: форма.инн };
+const full = { ...форма, outcome: "completed", pagination_complete: true, параметры: "ИНН " + форма.инн };
+ok(m.runIdВерен(rid) && !m.runIdВерен("../evil") && !m.runIdВерен(null), "UUID only");
+r = m.сообщениеПроверки(full, вкладка.url, run, true, rid);
+ok(!r.ошибки.length && r.сообщение.expected_revision === 3 && r.сообщение.blocks.суды.ответчик_крупные === false, "typed bound message");
+for (const [f, selected, confirmed] of [[full, null, true], [full, run, false], [{ ...full, инн: "7736050003" }, run, true], [{ ...full, pagination_complete: false }, run, true]]) {
+  ok(m.сообщениеПроверки(f, вкладка.url, selected, confirmed, rid).ошибки.length > 0, "binding validation");
+}
+r = m.сообщениеПроверки({ ...full, outcome: "declined", pagination_complete: false, причина: "Отказ" }, вкладка.url, run, true, rid);
+ok(!r.ошибки.length && r.сообщение.blocks.суды.outcome === "declined", "refusal retained");
+const envelope = { run_id: rid, revision: 3, status: "partial", data: { fetch: { инн: форма.инн, егрюл: { название: "<script>$(touch /tmp/no)</script>" } }, metadata: { profile: "нейтрально" } } };
+ok(m.выбраннаяПроверка(envelope, rid).название === envelope.data.fetch.егрюл.название, "hostile subject remains text");
+ok(m.выбраннаяПроверка(envelope, "22222222-2222-4333-8444-555555555555") === null, "unrelated run rejected");
+await m.хранилище("local").set({ demo: "fallback" });
+ok((await m.хранилище("local").get("demo")).demo === "fallback", "storage outside extension context");
+globalThis.chrome = { storage: { local: { get() { throw new Error("no context"); }, set() { throw new Error("no context"); } } } };
+await m.хранилище("local").set({ demo: "fallback failure" });
+ok((await m.хранилище("local").get("demo")).demo === "fallback failure", "storage failed context");
 console.log(JSON.stringify(ош));
 """
 

@@ -310,7 +310,7 @@ def прогон_инн(inn, профиль=None, каталог=None, движ�
                 "изменений": 0, "изменения": []}
 
 
-def прогон(файл=None, каталог=None, движок=None):
+def прогон(файл=None, каталог=None, движок=None, *, events_root=None):
     """Прогон всего списка.
 
     В «результатах» — изменившиеся И непроверенные: строку «не проверено»
@@ -326,6 +326,7 @@ def прогон(файл=None, каталог=None, движок=None):
         проверено += 1
         итог = прогон_инн(inn, з.get("профиль"), каталог, движок)
         итог["комментарий"] = з.get("комментарий")
+        итог["профиль"] = з.get("профиль") or "нейтрально"
         if итог["статус"] == "без изменений":
             без_изменений += 1
             continue
@@ -335,7 +336,7 @@ def прогон(файл=None, каталог=None, движок=None):
     # Строка может быть одновременно «не проверено» и с найденными изменениями:
     # неполнота проверки не отменяет того, что уже найдено, и наоборот.
     с_изменениями = sum(1 for r in результаты if r.get("изменения"))
-    return {
+    отчёт = {
         "дата": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "проверено": проверено,
         "изменилось": изменилось,
@@ -344,6 +345,10 @@ def прогон(файл=None, каталог=None, движок=None):
         "с_найденными_изменениями": с_изменениями,
         "результаты": результаты,
     }
+    if events_root is not None:
+        import monitor_events
+        отчёт["events"] = monitor_events.ingest(отчёт, root=events_root)
+    return отчёт
 
 
 def человеческий_отчёт(отчёт):
@@ -517,6 +522,191 @@ def main(argv):
         return вывод(отчёт)
     sys.stderr.write(USAGE)
     return 2
+
+
+
+# Persisted host monitoring is separate from the compatible one-shot CLI above.
+def _workflow_runner(inn, profile, runs_root):
+    """Fixed executable/argv, shared Phase-0 process-tree timeout implementation."""
+    try:
+        from sibling_imports import load_sibling
+    except ModuleNotFoundError as error:
+        if error.name != 'sibling_imports':
+            raise
+        spec = importlib.util.spec_from_file_location('sibling_imports',
+            os.path.join(_HERE, 'sibling_imports.py'))
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        load_sibling = sys.modules.setdefault('sibling_imports', helper).load_sibling
+    run_script = load_sibling('process_runtime').run_script
+    return run_script('workflow_cli.py', ['run', 'start', inn, '--profile', profile,
+        '--mode', 'всё', '--store', str(runs_root), '--json'], timeout=120)
+
+
+def _stored_coverage(record):
+    """Project stored support only; no re-evaluation, freshness clock or raw reads.
+
+    Logical field/rule keys deliberately exclude claim IDs, response hashes,
+    retrieval dates and rule versions, which may change without loss of support.
+    Values stay in the existing company diff, never in coverage event identity.
+    """
+    payload = record['payload']
+    fetch = payload['fetch']
+    evidence = fetch.get('_evidence') or {}
+    grouped = {}
+    for claim in (evidence.get('claims') or {}).values():
+        key = json.dumps(['claim', claim['source_id'], claim['field']], ensure_ascii=False)
+        grouped.setdefault(key, []).append(claim)
+    signature = {}
+    for key, claims in sorted(grouped.items()):
+        applicable = [c for c in claims if c['knowledge'] != 'not_applicable']
+        known = bool(applicable) and all(c['knowledge'] == 'known' for c in applicable)
+        support = ['known'] if known else []
+        if known and all((c.get('raw_ref') or {}).get('availability') == 'available' for c in applicable):
+            support.append('raw_available')
+        signature[key] = {'source_id': claims[0]['source_id'], 'field': claims[0]['field'],
+            'knowledge': sorted({c['knowledge'] for c in claims}),
+            'reason_codes': sorted({c['reason_code'] for c in claims if c.get('reason_code')}),
+            'support': support}
+    decision = (payload['metadata'].get('decision') or fetch.get('_decision')
+                or payload['assessment'].get('_decision') or {})
+    coverage = decision.get('coverage') or {}
+    supported = set(coverage.get('supported_rules') or [])
+    missing = {item['rule_id']: item.get('reason_codes', []) for item in decision.get('missing_evidence', [])}
+    for rule in sorted(coverage.get('required_rules') or []):
+        key = json.dumps(['rule', rule], ensure_ascii=False)
+        signature[key] = {'rule_id': rule, 'knowledge': ['known' if rule in supported else 'unknown'],
+            'reason_codes': sorted(set(missing.get(rule, []))),
+            'support': ['known'] if rule in supported else []}
+    return signature
+
+
+def _coverage_comparison(record, previous, unsupported):
+    signature = _stored_coverage(record)
+    before = _stored_coverage(previous) if previous else {}
+    changes, incomplete = [], []
+    killers = set(sources.deal_killer_ids())
+    for key in sorted(signature.keys() | before.keys()):
+        old, new = before.get(key), signature.get(key)
+        # A rule removed from the stored applicable denominator is not a lost
+        # observation. A disappeared claim, however, no longer supports its fact.
+        if new is None and old.get('rule_id') is not None:
+            continue
+        if new is None:
+            new = {**old, 'knowledge': ['unknown'], 'reason_codes': ['missing_required_field'], 'support': []}
+        old_support = set(old['support']) if old else set()
+        new_support = set(new['support'])
+        if previous:
+            for kind, changed in (('coverage_lost', old_support - new_support),
+                                  ('coverage_restored', new_support - old_support)):
+                if changed:
+                    changes.append({'kind': kind, 'key': key, 'before': old, 'after': new,
+                                    'support_changed': sorted(changed)})
+        relevant = (new.get('rule_id') is not None or
+                    new.get('source_id') in killers and new.get('source_id') not in unsupported or
+                    bool(old_support - new_support))
+        if relevant and new['knowledge'] != ['not_applicable'] and (
+                'known' not in new_support or 'raw_unavailable' in new['reason_codes']):
+            incomplete.append(new)
+    return {'signature': signature, 'incomplete': incomplete}, changes
+
+
+def _saved_row(record, previous=None):
+    """Apply the existing fingerprint/diff engine to verified immutable runs."""
+    current = snapshot.fingerprint(record['payload']['fetch'])
+    states = current.get('состояния') or {}
+    missing, unsupported = _непроверенные_deal_killer(states, set(current.get('не_покрыты') or ()))
+    checked = bool(current['_итог']['проверка_состоялась'])
+    refresh_failed = record['workflow_status'] in ('failed', 'collecting', 'cancelled') or not checked or bool(missing)
+    canonical, coverage_changes = _coverage_comparison(record, previous, set(unsupported))
+    failed = refresh_failed or bool(canonical['incomplete'])
+    before = snapshot.fingerprint(previous['payload']['fetch']) if previous else None
+    changes = diff_counterparty.diff(before, current, previous['created_at'], record['created_at']) if before else []
+    origin = {'kind': 'saved_run', 'from_run_id': previous['run_id'] if previous else None,
+              'to_run_id': record['run_id'],
+              'from_sha256': previous['manifest']['input_sha256'] if previous else None,
+              'to_sha256': record['manifest']['input_sha256']}
+    return {'инн': record['subject_inn'], 'профиль': record['profile'], 'origin': origin,
+            'from_revision': previous['revision'] if previous else None, 'to_revision': record['revision'],
+            'статус': 'не проверено' if failed else 'первый снимок' if before is None else 'изменения' if changes or coverage_changes else 'без изменений',
+            'refresh_failed': refresh_failed, 'canonical_evidence': canonical, 'coverage_changes': coverage_changes,
+            'причина': 'Сбор неполный или остановлен; доступность источников указана отдельно.' if failed else None,
+            'проверка_состоялась': checked, 'состояния': states, 'не_ответили_deal_killer': missing,
+            'не_покрыты_deal_killer': unsupported, 'изменений': len(changes), 'изменения': changes}
+
+
+def monitor(profile='нейтрально', *, root=None, max_subjects=50):
+    """Bounded host command: durable run -> existing diff -> journal -> outbox.
+
+    The journal is replayed before the next fetch; ingestion precedes advancing
+    the comparison baseline. A crash between queue commit and baseline commit
+    therefore repeats the same event IDs and cannot silently lose the change.
+    """
+    from pathlib import Path
+
+    import monitor_events as events
+    import run_store as store
+    import run_workflow as workflow
+    from redaction import redact
+    workflow._profile(profile)
+    events._limit(max_subjects)
+    base = Path(root).expanduser() if root is not None else Path.home() / '.local/share/inn-check-ru'
+    runs = base / 'runs'
+    with store._errors(), store._root(base, create=True) as directory, store._lock(directory):
+        state = store._parse(directory.read('monitor-state.json')) if directory.info('monitor-state.json') else {
+            'schema_version': 1, 'subjects': {}}
+        if state.get('schema_version') != 1 or not isinstance(state.get('subjects'), dict): store._fail('corrupt_store')
+        # Durable pending report recovers event publication after abrupt exit.
+        if directory.info('monitor-pending.json'):
+            pending = store._parse(directory.read('monitor-pending.json'))
+            events.ingest(pending['report'], root=base / 'events')
+            state = pending['state']
+            store._atomic_write(directory, 'monitor-state.json', store._json(state))
+            directory.unlink('monitor-pending.json'); directory.sync()
+        watch = store._parse(directory.read('watchlist.json')) if directory.info('watchlist.json') else {'контрагенты': []}
+        entries = watch.get('контрагенты')
+        if not isinstance(entries, list) or any(not isinstance(x, dict) for x in entries):
+            raise workflow.WorkflowError('invalid_watchlist', 'Некорректный список наблюдения.')
+        selected = [x for x in entries if (x.get('профиль') or profile) == profile]
+        if len(selected) > max_subjects:
+            raise workflow.WorkflowError('budget_exceeded', 'Список превышает лимит прогона; разделите его на группы до 50 ИНН.')
+        rows, emitted = [], []
+        for entry in selected:
+            inn = entry.get('инн')
+            if not isinstance(inn, str) or not _инн_годится(inn):
+                raise workflow.WorkflowError('invalid_inn', 'Некорректный ИНН в списке наблюдения.')
+            key = profile + ':' + inn
+            previous_ref = state['subjects'].get(key)
+            previous = store.read(previous_ref['run_id'], revision=previous_ref['revision'], root=runs) if previous_ref else None
+            result = _workflow_runner(inn, profile, runs)
+            record = None
+            if result.get('run_id') is not None and result.get('revision') is not None:
+                record = store.read(result['run_id'], revision=result['revision'], root=runs)
+                if record['subject_inn'] != inn or record['profile'] != profile: store._fail('corrupt_store')
+                row = _saved_row(record, previous)
+            else:
+                row = {'инн': inn, 'профиль': profile, 'статус': 'не проверено',
+                       'причина': 'Worker не вернул зафиксированную ревизию; возможен таймаут или ошибка запуска.',
+                       'изменений': 0, 'изменения': []}
+            row['комментарий'] = entry.get('комментарий')
+            observed = workflow._now()
+            report = {'дата': observed, 'профиль': profile, 'результаты': [row]}
+            new_state = json.loads(json.dumps(state))
+            if record is not None:
+                new_state['subjects'][key] = {'run_id': record['run_id'], 'revision': record['revision']}
+            pending = redact({'report': report, 'state': new_state})
+            report = pending['report']
+            store._atomic_write(directory, 'monitor-pending.json', store._json(pending))
+            emitted.extend(events.ingest(report, root=base / 'events'))
+            store._atomic_write(directory, 'monitor-state.json', store._json(new_state))
+            state = new_state
+            directory.unlink('monitor-pending.json'); directory.sync()
+            rows.append(report['результаты'][0])
+        return {'дата': workflow._now(), 'профиль': profile, 'проверено': len(rows),
+                'изменилось': sum(bool(x['изменения']) for x in rows),
+                'без_изменений': sum(x['статус'] == 'без изменений' for x in rows),
+                'не_проверено': sum(x['статус'] == 'не проверено' for x in rows),
+                'результаты': rows, 'events': emitted, 'event_output': str(base / 'events' / 'events.json')}
 
 
 if __name__ == "__main__":

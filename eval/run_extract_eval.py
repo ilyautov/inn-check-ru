@@ -23,18 +23,32 @@ run_extract_eval.py — офлайн-eval потока M волны 3 (зада�
 import base64
 import glob
 import importlib.util
+import io
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import time
+import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 СКРИПТ = ROOT / "scripts" / "extract_inn.py"
+_ZIP_TYPE = zipfile.ZipFile
+
+
+def _выбор(файл, инн):
+    """Explicit selected candidate; a batch consent is not party selection."""
+    sys.path.insert(0, str(ROOT / 'scripts'))
+    import document_input
+    result = document_input.extract(Path(файл).read_bytes(), filename=str(файл))
+    candidate = next(item for item in result['candidates'] if item['inn'] == инн)
+    return ['--candidate', candidate['candidate_id'], '--role', 'other']
 
 # Живые ИНН с верным контрольным числом (те же, что в фикстурах движка).
 СБЕР = "7707083893"
@@ -42,6 +56,172 @@ ROOT = Path(__file__).resolve().parent.parent
 ЮЛ3 = "7736050003"
 ИП1 = "504110181262"
 ИП2 = "561017190346"
+
+
+class DocxBoundsTests(unittest.TestCase):
+    """Small ordinary ZIPs and tiny budgets; no stress/archive-bomb fixtures."""
+
+    def setUp(self):
+        self.mod = загрузить("extract_inn_bounds", СКРИПТ)
+
+    @staticmethod
+    def archive(parts):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, content in parts:
+                archive.writestr(name, content)
+        return buffer.getvalue()
+
+    def refuse(self, raw, **budgets):
+        with patch.multiple(self.mod, create=True, **budgets), \
+                patch.object(_ZIP_TYPE, 'open', autospec=True,
+                             side_effect=_ZIP_TYPE.open) as opened:
+            result = self.mod.прочитать_документ('synthetic.docx', raw)
+        self.assertIsNone(result['текст'], 'a limit must refuse the whole document')
+        self.assertEqual(result.get('reason_code'), 'output_too_large')
+        self.assertIn('лимит', result['причина'].lower())
+        self.assertEqual(opened.call_count, 0, 'metadata refusal must precede inflation')
+
+    def test_declared_member_and_cumulative_xml_preflight_before_open(self):
+        self.refuse(self.archive([('word/document.xml', b'x' * 33)]),
+                    MAX_DOCX_XML_BYTES=32)
+        self.refuse(self.archive([('word/document.xml', b'a' * 17),
+                                  ('word/header1.xml', b'b' * 16)]),
+                    MAX_DOCX_XML_BYTES=32)
+
+    def test_directory_entry_and_name_budgets_precede_zipfile(self):
+        raw = self.archive([('word/document.xml', b'x'), ('word/header1.xml', b'y')])
+        for budgets in ({'MAX_DOCX_ENTRIES': 1}, {'MAX_DOCX_NAME_BYTES': 8},
+                        {'MAX_DOCX_NAMES_BYTES': 20}, {'MAX_DOCX_DIRECTORY_BYTES': 32}):
+            with self.subTest(budgets=budgets), \
+                    patch.object(self.mod.zipfile, 'ZipFile', wraps=zipfile.ZipFile) as constructed:
+                self.refuse(raw, **budgets)
+                self.assertEqual(constructed.call_count, 0,
+                                 'directory limits must precede ZipFile metadata allocation')
+
+    def test_actual_directory_count_and_zip64_are_checked_before_zipfile(self):
+        raw = bytearray(self.archive([('word/document.xml', b'x'), ('word/header1.xml', b'y')]))
+        end = raw.rfind(b'PK\x05\x06')
+        struct.pack_into('<HH', raw, end + 8, 1, 1)
+        with patch.object(self.mod.zipfile, 'ZipFile', wraps=_ZIP_TYPE) as constructed:
+            self.refuse(bytes(raw), MAX_DOCX_ENTRIES=1)
+            self.assertEqual(constructed.call_count, 0)
+        struct.pack_into('<HH', raw, end + 8, 65535, 65535)
+        self.refuse(bytes(raw), MAX_DOCX_ENTRIES=2)
+
+    def test_actual_member_read_is_bounded_even_when_metadata_is_smaller(self):
+        raw = self.archive([('word/document.xml', b'x')])
+        requests = []
+
+        class Stream(io.BytesIO):
+            def read(self, size=-1):
+                requests.append(size)
+                return super().read(size)
+
+        with patch.multiple(self.mod, MAX_DOCX_XML_BYTES=16,
+                            DOCX_READ_CHUNK_BYTES=4, create=True), \
+                patch.object(zipfile.ZipFile, 'open', return_value=Stream(b'x' * 17)), \
+                self.assertRaisesRegex(ValueError, 'лимит'):
+            self.mod.текст_из_docx(raw)
+        self.assertTrue(requests)
+        self.assertTrue(all(0 < size <= 4 for size in requests), requests)
+        self.assertEqual(requests, [4, 4, 4, 4, 1])
+
+    def test_actual_cumulative_stream_limit_refuses_before_next_decode(self):
+        raw = self.archive([('word/document.xml', b'x'), ('word/header1.xml', b'y')])
+        requests, streams, returned_bytes = [], [], []
+
+        class Stream(io.BytesIO):
+            def read(self, size=-1):
+                requests.append(size)
+                chunk = super().read(size)
+                returned_bytes.append(len(chunk))
+                return chunk
+
+        def open_part(archive, info, *args, **kwargs):
+            stream = Stream(b'x' * 10)
+            streams.append(stream)
+            return stream
+
+        with patch.multiple(self.mod, MAX_DOCX_XML_BYTES=16,
+                            DOCX_READ_CHUNK_BYTES=4, create=True), \
+                patch.object(zipfile.ZipFile, 'open', open_part), \
+                patch.object(self.mod, '_текст_из_xml', wraps=self.mod._текст_из_xml) as decode, \
+                self.assertRaisesRegex(ValueError, 'лимит'):
+            self.mod.текст_из_docx(raw)
+        self.assertEqual(len(streams), 2)
+        self.assertEqual(decode.call_count, 1, 'overflowing second XML must not reach regex')
+        self.assertTrue(all(0 < size <= 4 for size in requests), requests)
+        self.assertEqual(sum(returned_bytes), 17, 'only one probe byte beyond the total budget')
+        self.assertTrue(all(stream.closed for stream in streams))
+
+    def test_existing_member_read_errors_remain_explicit_notes(self):
+        raw = self.archive([('word/document.xml', b'x')])
+        for error in (RuntimeError('password required'), OSError('unreadable'),
+                      zipfile.BadZipFile('bad CRC')):
+            with self.subTest(error=error), patch.object(zipfile.ZipFile, 'open', side_effect=error):
+                result = self.mod.прочитать_документ('synthetic.docx', raw)
+            self.assertEqual(result['текст'], '')
+            self.assertIn('НЕ читались', result['причина'])
+            self.assertNotIn('reason_code', result)
+
+    def test_exact_xml_bound_uses_limited_reads(self):
+        xml = b'<w:p>INN 7707083893</w:p>'
+        raw = self.archive([('word/document.xml', xml)])
+        original_open = zipfile.ZipFile.open
+        requests = []
+
+        class Stream:
+            def __init__(self, stream):
+                self.stream = stream
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self.stream.close()
+
+            def read(self, size=-1):
+                requests.append(size)
+                return self.stream.read(size)
+
+        def open_part(archive, *args, **kwargs):
+            return Stream(original_open(archive, *args, **kwargs))
+
+        with patch.multiple(self.mod, MAX_DOCX_XML_BYTES=len(xml),
+                            DOCX_READ_CHUNK_BYTES=4, create=True), \
+                patch.object(zipfile.ZipFile, 'open', open_part):
+            result = self.mod.прочитать_документ('synthetic.docx', raw)
+        self.assertIn('7707083893', result['текст'])
+        self.assertTrue(requests)
+        self.assertTrue(all(0 < size <= 4 for size in requests), requests)
+
+    def test_all_supported_parts_and_legacy_cli_limit_refusal(self):
+        parts = [('word/' + name + '.xml', '<w:p>' + name + ' INN 7707083893</w:p>')
+                 for name in ('document', 'header1', 'footer1', 'footnotes', 'endnotes', 'comments')]
+        raw = self.archive(parts)
+        text, read, skipped = self.mod.текст_из_docx(raw)
+        self.assertEqual(set(read), {name for name, _ in parts})
+        self.assertFalse(skipped)
+        self.assertEqual(text.count('7707083893'), 6)
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp, 'synthetic.docx')
+            source.write_bytes(raw)
+            stdout = io.StringIO()
+            with patch.object(self.mod, 'MAX_DOCX_XML_BYTES', 8, create=True), \
+                    patch('sys.stdout', stdout), patch('sys.stderr', io.StringIO()):
+                code = self.mod.main(['extract_inn.py', str(source), '--json', '--каталог', temp])
+            result = json.loads(stdout.getvalue())
+        self.assertEqual(code, 1)
+        self.assertEqual(result['найдено'], [])
+        self.assertIn('лимит', result['файлы'][0]['причина'].lower())
+        self.assertNotIn('Traceback', stdout.getvalue())
+
+
+def case_docx_лимиты():
+    result = unittest.TestResult()
+    unittest.defaultTestLoader.loadTestsFromTestCase(DocxBoundsTests).run(result)
+    return ['%s: %s' % (case, failure) for case, failure in result.failures + result.errors]
 
 def _инн10(основа):
     """9 цифр + контрольное число: валидные ИНН там, где важно их количество."""
@@ -680,8 +860,8 @@ def case_устойчивость(mod, tmp):
                       **пусто)
     check(errors, res["файлы"][0]["статус"] == "не поддерживается",
           "PDF: статус %r" % res["файлы"][0]["статус"])
-    check(errors, "передайте текст" in (res["файлы"][0].get("причина") or ""),
-          "PDF: в причине нет «передайте текст»: %r" % res["файлы"][0].get("причина"))
+    check(errors, bool(res["файлы"][0].get("причина")),
+          "PDF: отсутствует причина отказа: %r" % res["файлы"][0].get("причина"))
     check(errors, res["найдено"] == [], "PDF: что-то извлеклось")
 
     двоичный = bytes(range(32)) * 40 + СБЕР.encode()
@@ -820,7 +1000,7 @@ def case_проверить(mod, tmp):
     общие = ["--каталог", каталог, "--список-наблюдения", наблюдение]
     env = {"INN_CHECK_EXTRACT_BATCH": заглушка}
 
-    p = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие, env=env)
+    p = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие + _выбор(файл, ИП1), env=env)
     check(errors, p.returncode == 0, "--проверить: код %d, %s" % (p.returncode, p.stderr[-300:]))
     try:
         with open(протокол, encoding="utf-8") as fh:
@@ -852,11 +1032,11 @@ def case_проверить(mod, tmp):
     p = _запуск(["--stdin", "--проверить"] + общие, env=env, вход=только_известные)
     check(errors, not os.path.exists(протокол),
           "батч запущен, хотя новых ИНН нет")
-    check(errors, "новых ИНН нет" in p.stdout,
+    check(errors, "Сначала выберите сторону" in p.stdout,
           "не сказано, почему батч не запускался: %r" % p.stdout[-200:])
 
     # батч сломан — extract_inn не падает, но и не выдаёт это за успех
-    p = _запуск([файл, "--проверить"] + общие,
+    p = _запуск([файл, "--проверить"] + общие + _выбор(файл, ИП1),
                 env={"INN_CHECK_EXTRACT_BATCH": os.path.join(tmp, "нет-батча.py")})
     check(errors, "Traceback" not in p.stderr, "traceback: %s" % p.stderr[-300:])
     check(errors, p.returncode == 1,
@@ -887,7 +1067,7 @@ def case_батч_молчит(mod, tmp):
                  "sys.stderr.write('ВНИМАНИЕ: --продолжить: файл не прочитан, "
                  "начинаем с нуля\\n')\n"
                  "sys.exit(0)\n")
-    p = _запуск([файл] + общие, env={"INN_CHECK_EXTRACT_BATCH": молчун})
+    p = _запуск([файл] + общие + _выбор(файл, ИП1), env={"INN_CHECK_EXTRACT_BATCH": молчун})
     check(errors, "не сказал ни слова" in p.stdout,
           "молчание батча не названо молчанием: %r" % p.stdout[-400:])
     check(errors, "НЕ состоялась" in p.stdout,
@@ -904,7 +1084,7 @@ def case_батч_молчит(mod, tmp):
                  "print('| инн | светофор |')\n"
                  "sys.stderr.write('сеть недоступна\\n')\n"
                  "sys.exit(1)\n")
-    p = _запуск([файл] + общие, env={"INN_CHECK_EXTRACT_BATCH": упавший})
+    p = _запуск([файл] + общие + _выбор(файл, ИП1), env={"INN_CHECK_EXTRACT_BATCH": упавший})
     check(errors, p.returncode == 1, "упавший батч дал код %d" % p.returncode)
     check(errors, "сеть недоступна" in p.stdout,
           "stderr упавшего батча потерян: %r" % p.stdout[-300:])
@@ -916,7 +1096,7 @@ def case_батч_молчит(mod, tmp):
                  "print('| инн | светофор |')\n"
                  "sys.stderr.write('ВНИМАНИЕ: результаты не записаны в файл\\n')\n"
                  "sys.exit(0)\n")
-    p = _запуск([файл] + общие, env={"INN_CHECK_EXTRACT_BATCH": ворчун})
+    p = _запуск([файл] + общие + _выбор(файл, ИП1), env={"INN_CHECK_EXTRACT_BATCH": ворчун})
     check(errors, p.returncode == 0,
           "нормальный батч дал код %d" % p.returncode)
     check(errors, "результаты не записаны" in p.stdout,
@@ -951,22 +1131,21 @@ def case_порог_батча(mod, tmp):
     p = _запуск([файл] + общие, env=env)
     check(errors, not os.path.exists(протокол),
           "выгрузка на 25 ИНН ушла в батч без согласия человека")
-    check(errors, "порога" in p.stdout and "--подтверждаю" in p.stdout,
-          "не сказано, почему батч не запущен и как его запустить: %r"
-          % p.stdout[-400:])
-    check(errors, p.returncode == 1,
-          "не состоявшийся из-за порога батч дал код %d" % p.returncode)
-
+    check(errors, "Сначала выберите сторону" in p.stdout,
+          "не указан обязательный выбор стороны: %r" % p.stdout[-400:])
+    check(errors, p.returncode == 1, "не состоявшийся батч дал код %d" % p.returncode)
     p = _запуск([файл, "--подтверждаю"] + общие, env=env)
-    check(errors, os.path.exists(протокол),
-          "--подтверждаю не запустил батч: %r" % p.stdout[-300:])
+    check(errors, not os.path.exists(протокол), "batch consent обошёл выбор стороны")
+    with patch.dict(os.environ, env):
+        blocked = mod.проверить(МНОГО_ИНН[:25])
+        check(errors, not blocked['запущен'], "standalone batch bypassed threshold")
+        approved = mod.проверить(МНОГО_ИНН[:25], подтверждено=True)
+        check(errors, approved['состоялась'], "explicit standalone INNs no longer checkable")
     if os.path.exists(протокол):
         with open(протокол, encoding="utf-8") as fh:
             аргументы = json.load(fh)
         check(errors, len([a for a in аргументы if a.isdigit()]) == 25,
-              "в батч ушло %d ИНН, ждали 25"
-              % len([a for a in аргументы if a.isdigit()]))
-    check(errors, p.returncode == 0, "с --подтверждаю код %d" % p.returncode)
+              "standalone batch received wrong explicit INNs")
     return errors
 
 
@@ -993,7 +1172,7 @@ def case_петля_снимков(mod, tmp):
     env = {"INN_CHECK_EXTRACT_BATCH": str(ROOT / "scripts" / "batch_check.py"),
            "INN_CHECK_BATCH_ENGINE": движок}
 
-    p = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие, env=env)
+    p = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие + _выбор(файл, ЮЛ2), env=env)
     check(errors, p.returncode == 0,
           "живой прогон: код %d, stderr %s" % (p.returncode, p.stderr[-400:]))
     check(errors, "Traceback" not in p.stderr, "traceback: %s" % p.stderr[-400:])
@@ -1010,7 +1189,7 @@ def case_петля_снимков(mod, tmp):
               "отпечаток quick-прогона не помечен неполным: %r" % сбор)
 
     # второй прогон по тому же документу: ИНН уже не новый и в батч не идёт
-    p2 = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие, env=env)
+    p2 = _запуск([файл, "--проверить", "--профиль", "отсрочка"] + общие + _выбор(файл, ЮЛ2), env=env)
     check(errors, "уже проверялся" in p2.stdout,
           "петля не замкнулась: тот же ИНН снова «новый»: %r" % p2.stdout[:400])
     check(errors, "новых ИНН нет" in p2.stdout,
@@ -1060,6 +1239,7 @@ def main():
             "форматы-файлов": case_форматы(mod, tmp),
             "html-атрибуты": case_html_атрибуты(mod, tmp),
             "docx-колонтитулы": case_docx_колонтитул(mod, tmp),
+            "docx-лимиты": case_docx_лимиты(),
             "письмо-mime": case_письмо(mod, tmp),
             "форматы-записи-инн": case_форматы_записи(mod, tmp),
             "линейность-разбора": case_линейность(mod, tmp),

@@ -454,6 +454,8 @@ def run_canaries(fc, registry):
 
     opener = None
     failed = 0
+    unavailable = ("кэш:", "сеть:", "tls:", "гео:", "капча:", "антибот:",
+                   "дедлайн:", "probe:", "не покрыто:")
     for sid, d in registry.items():
         canary = d.get("канарейка")
         inn = (canary or {}).get("инн")
@@ -472,11 +474,32 @@ def run_canaries(fc, registry):
         try:
             data, _av = fetcher(opener, inn)
         except Exception as e:
+            # FETCHERS здесь сырые: сетевой слой может бросить исключение,
+            # которое обычный run_source превращает в _доступность.
+            source_errors = tuple(cls for cls in (getattr(fc, "SourceUnavailable", None),
+                                                   getattr(fc, "DeadlineExceeded", None))
+                                  if isinstance(cls, type) and issubclass(cls, Exception))
+            reason = str(e) if isinstance(e, source_errors) else ""
+            if isinstance(e, (urllib.error.URLError, TimeoutError, ssl.SSLError,
+                              socket.gaierror, ConnectionError)):
+                classify = getattr(fc, "_classify_exc", None)
+                reason = classify(e) if callable(classify) else "сеть: %s" % type(e).__name__
+            if reason.startswith(unavailable):
+                report[sid] = {"инн": inn, "результат": "не запускалась", "причина": reason}
+                continue
             failed += 1
             report[sid] = {"инн": inn, "результат": "провал",
                            "причина": "%s: %s" % (type(e).__name__, e)}
             continue
-        if not isinstance(data, dict):
+        # Состояние источника не является результатом проверки парсера.
+        # Только явная недоступность без данных даёт пробел покрытия; «схема:»,
+        # пустой ответ известного ИНН и неизвестные сбои остаются провалом.
+        state = _av.get("состояние") if isinstance(_av, dict) else None
+        reason = str(_av.get("причина") or "") if isinstance(_av, dict) else ""
+        if data is None and state == "не проверено" and reason.startswith(unavailable):
+            report[sid] = {"инн": inn, "результат": "не запускалась", "причина": reason}
+            continue
+        if state == "не проверено" or not isinstance(data, dict):
             failed += 1
             report[sid] = {"инн": inn, "результат": "провал",
                            "причина": "fetcher вернул не dict (%s): %s"

@@ -1,0 +1,1113 @@
+[
+  {
+    "name": "access_check",
+    "inputSchema": {
+      "properties": {},
+      "title": "access_checkArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "affiliates_graph",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "affiliates_graphArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_batch",
+    "inputSchema": {
+      "properties": {
+        "inns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Inns",
+          "type": "array"
+        },
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inns"
+      ],
+      "title": "counterparty_batchArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_cache_plan",
+    "inputSchema": {
+      "properties": {
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "now": {
+          "title": "Now",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "now"
+      ],
+      "title": "counterparty_cache_planArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_cache_status",
+    "inputSchema": {
+      "properties": {
+        "profile": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "now": {
+          "title": "Now",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "now"
+      ],
+      "title": "counterparty_cache_statusArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_compare",
+    "inputSchema": {
+      "properties": {
+        "run_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 2,
+          "title": "Run Ids",
+          "type": "array"
+        },
+        "as_of": {
+          "title": "As Of",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_ids",
+        "as_of"
+      ],
+      "title": "counterparty_compareArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_diff",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "counterparty_diffArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_doctor",
+    "inputSchema": {
+      "properties": {
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "title": "counterparty_doctorArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_document_extract",
+    "inputSchema": {
+      "properties": {
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        },
+        "artifact_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "ocr": {
+          "default": false,
+          "title": "Ocr",
+          "type": "boolean"
+        }
+      },
+      "title": "counterparty_document_extractArguments",
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "run_id": {
+              "type": "null"
+            },
+            "artifact_id": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "required": [
+            "run_id",
+            "artifact_id"
+          ],
+          "properties": {
+            "text": {
+              "type": "null"
+            },
+            "run_id": {
+              "type": "string"
+            },
+            "artifact_id": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_document_select",
+    "inputSchema": {
+      "properties": {
+        "candidates": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "maxItems": 10000,
+          "title": "Candidates",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "supplier",
+            "buyer",
+            "own_company",
+            "bank",
+            "signatory",
+            "unknown",
+            "other"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Id"
+        }
+      },
+      "required": [
+        "candidates",
+        "role"
+      ],
+      "title": "counterparty_document_selectArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_events_ack",
+    "inputSchema": {
+      "properties": {
+        "event_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Event Ids",
+          "type": "array"
+        },
+        "consumer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+          "title": "Consumer Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_ids",
+        "consumer_id"
+      ],
+      "title": "counterparty_events_ackArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_events_claim",
+    "inputSchema": {
+      "properties": {
+        "consumer_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$",
+          "title": "Consumer Id",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "lease_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Lease Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "consumer_id"
+      ],
+      "title": "counterparty_events_claimArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_events_list",
+    "inputSchema": {
+      "properties": {
+        "state": {
+          "default": "pending",
+          "enum": [
+            "pending",
+            "delivered",
+            "acknowledged",
+            "dead_letter",
+            "all"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "maximum": 50,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "title": "counterparty_events_listArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_fetch",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "save": {
+          "default": false,
+          "title": "Save",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "counterparty_fetchArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_fin_scoring",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "counterparty_fin_scoringArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_probe",
+    "inputSchema": {
+      "properties": {
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "title": "counterparty_probeArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_run_export",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "format": {
+          "default": "markdown",
+          "enum": [
+            "markdown",
+            "json",
+            "docx"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "counterparty_run_exportArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_manual",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "blocks": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Blocks",
+          "type": "object"
+        },
+        "expected_revision": {
+          "minimum": 1,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "operation_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Operation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "blocks",
+        "expected_revision",
+        "operation_id"
+      ],
+      "title": "counterparty_run_manualArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_read",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "counterparty_run_readArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_refresh",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "expected_revision": {
+          "minimum": 1,
+          "title": "Expected Revision",
+          "type": "integer"
+        },
+        "operation_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Operation Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "source_ids",
+        "expected_revision",
+        "operation_id"
+      ],
+      "title": "counterparty_run_refreshArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_run_render",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "format": {
+          "default": "markdown",
+          "enum": [
+            "markdown",
+            "json"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "counterparty_run_renderArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_replay",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "original",
+            "current_rules"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "cutoff": {
+          "title": "Cutoff",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "mode",
+        "cutoff"
+      ],
+      "title": "counterparty_run_replayArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_resume",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "counterparty_run_resumeArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_snapshot",
+    "inputSchema": {
+      "properties": {
+        "run_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "run_id"
+      ],
+      "title": "counterparty_run_snapshotArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "counterparty_run_start",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        },
+        "mode": {
+          "default": "полный",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "counterparty_run_startArguments",
+      "type": "object",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "counterparty_verdict",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "counterparty_verdictArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "droblenie_check",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "droblenie_checkArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "due_diligence_dossier",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "profile": {
+          "default": "нейтрально",
+          "title": "Profile",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "amount": {
+          "default": "",
+          "title": "Amount",
+          "type": "string"
+        },
+        "evidence_dir": {
+          "default": "",
+          "title": "Evidence Dir",
+          "type": "string"
+        },
+        "timestamp": {
+          "default": false,
+          "title": "Timestamp",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "due_diligence_dossierArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "extract_inns",
+    "inputSchema": {
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "only_new": {
+          "default": false,
+          "title": "Only New",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "extract_innsArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "industry_benchmarks",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "industry_benchmarksArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "paper_vat_signs",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "subject": {
+          "default": "",
+          "title": "Subject",
+          "type": "string"
+        },
+        "amount": {
+          "default": "",
+          "title": "Amount",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn"
+      ],
+      "title": "paper_vat_signsArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "retro_verdict",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "title": "Inn",
+          "type": "string"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "profile": {
+          "default": "",
+          "title": "Profile",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inn",
+        "date"
+      ],
+      "title": "retro_verdictArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "sanctions_check",
+    "inputSchema": {
+      "properties": {
+        "inn": {
+          "default": "",
+          "title": "Inn",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "title": "sanctions_checkArguments",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  }
+]

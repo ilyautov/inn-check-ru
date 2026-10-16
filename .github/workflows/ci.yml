@@ -79,6 +79,18 @@ jobs:
       - name: check_access классификатор (офлайн)
         run: python3 eval/run_access_eval.py
 
+      - name: MCP ввод, отмена дерева процессов и ручная установка (офлайн)
+        run: python3 eval/run_mcp_safety_eval.py
+
+      - name: пропуски финансовых фактов и последовательность отчётных лет (офлайн)
+        run: python3 eval/run_decision_regressions.py
+
+      - name: "хранилище запусков: ревизии, блокировки и целостность (офлайн)"
+        run: python3 -X utf8 eval/run_run_store_eval.py
+
+      - name: "удаление секретов: рекурсивный экспорт и идемпотентность (офлайн)"
+        run: python3 -X utf8 eval/run_redaction_eval.py
+
       - name: install_ca конвертация и отпечатки (офлайн)
         run: python3 eval/run_ca_eval.py
 
@@ -269,3 +281,124 @@ jobs:
 
       - name: "native-хост на Windows: ключ HKCU, .bat через cmd, двоичные кадры"
         run: python eval/run_native_host_windows.py
+
+      - name: "MCP на Windows: Job Object, ранний выход parent, Unicode и cleanup (офлайн)"
+        run: python -X utf8 eval/run_mcp_safety_eval.py
+
+      - name: "финансовые периоды и неизвестные факты на Windows (офлайн)"
+        run: python -X utf8 eval/run_decision_regressions.py
+
+      - name: "хранилище запусков на Windows: ревизии, блокировки и целостность (офлайн)"
+        run: python -X utf8 eval/run_run_store_eval.py
+
+      - name: "удаление секретов на Windows: рекурсивный экспорт и идемпотентность (офлайн)"
+        run: python -X utf8 eval/run_redaction_eval.py
+
+  workflow-core:
+    name: Workflow core (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install artifact build tooling only
+        run: python -m pip install build
+      - name: Core without SDK and incompatible SDK refusal
+        run: python -X utf8 eval/run_mcp_sdk_eval.py
+      - name: Installed wheel and release ZIP workflow, recovery, no SDK
+        run: python -X utf8 eval/run_installed_workflow_eval.py
+      - name: Capability and documentation contracts
+        run: |
+          python -X utf8 eval/run_capability_parity_eval.py
+          python -X utf8 eval/run_workflow_docs_gate.py
+      - name: Platform persistence and cancellation
+        run: |
+          python -X utf8 eval/run_run_store_eval.py
+          python -X utf8 eval/run_monitor_events_eval.py
+          python -X utf8 eval/run_schedule_plan_eval.py
+          python -X utf8 eval/run_mcp_safety_eval.py
+      - name: Core workflow contracts without optional SDK
+        run: |
+          python -X utf8 eval/run_run_workflow_eval.py
+          python -X utf8 eval/run_workflow_doctor_eval.py
+          python -X utf8 eval/run_cache_policy_eval.py
+          python -X utf8 eval/run_provider_policy_eval.py
+          python -X utf8 eval/run_document_input_eval.py
+          python -X utf8 eval/run_compare_eval.py
+          python -X utf8 eval/run_historical_replay_eval.py
+          python -X utf8 eval/run_workflow_metrics_cli_eval.py
+      - name: Actual native Windows host
+        if: runner.os == 'Windows'
+        run: python -X utf8 eval/run_native_host_windows.py
+      - name: Supported SDK install
+        run: python -m pip install -r mcp/requirements.txt
+      - name: Actual supported SDK tools and descendant cancellation
+        run: |
+          python -X utf8 eval/run_workflow_mcp_eval.py
+          python -X utf8 eval/run_workflow_feature_mcp_eval.py
+          python -X utf8 eval/run_installed_workflow_eval.py --mcp
+
+  workflow-contracts:
+    name: Workflow decision and evidence contracts (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install actual supported MCP SDK and optional PDF parser
+        run: python -m pip install '.[mcp,pdf]'
+      - name: Installed PDF extra on a real synthetic text PDF
+        run: |
+          python -I - <<'PYCODE'
+          import importlib.metadata
+          import document_input
+          from pathlib import Path
+          assert 'site-packages' in document_input.__file__, document_input.__file__
+          report = document_input.extract(Path('eval/fixtures/document-input/text.pdf').read_bytes(), filename='text.pdf')
+          assert report['status'] != 'error', report
+          assert sorted(c['inn'] for c in report['candidates']) == ['7702070139', '7707083893'], report
+          print('Installed PDF extra:', importlib.metadata.version('pypdf'), report['method'])
+          PYCODE
+      - name: "Offline cache update acceptance"
+        run: python -X utf8 eval/run_cache_update_eval.py
+      - name: "Offline decision contract acceptance"
+        run: python -X utf8 eval/run_decision_contract_eval.py
+      - name: "Offline decision fixes acceptance"
+        run: python -X utf8 eval/run_decision_fixes_eval.py
+      - name: "Offline decision gate acceptance"
+        run: python -X utf8 eval/run_decision_gate_eval.py
+      - name: "Offline evidence contract acceptance"
+        run: python -X utf8 eval/run_evidence_contract_eval.py
+      - name: "Offline export integrity acceptance"
+        run: python -X utf8 eval/run_export_integrity_eval.py
+      - name: "Offline financial support acceptance"
+        run: python -X utf8 eval/run_financial_support_eval.py
+      - name: "Offline import compatibility acceptance"
+        run: python -X utf8 eval/run_import_compatibility_eval.py
+      - name: "Offline knowledge invariants acceptance"
+        run: python -X utf8 eval/run_knowledge_invariants_eval.py
+      - name: "Offline manual handoff acceptance"
+        run: python -X utf8 eval/run_manual_handoff_eval.py
+      - name: "Offline mcp review fixes acceptance"
+        run: python -X utf8 eval/run_mcp_review_fixes_eval.py
+      - name: "Offline outcome protocol acceptance"
+        run: python -X utf8 eval/run_outcome_protocol_eval.py
+      - name: "Offline provider workflow acceptance"
+        run: python -X utf8 eval/run_provider_workflow_eval.py
+      - name: "Offline schedule plan acceptance"
+        run: python -X utf8 eval/run_schedule_plan_eval.py
+      - name: "Offline workflow e2e acceptance"
+        run: python -X utf8 eval/run_workflow_e2e_eval.py
+      - name: "Offline workflow metrics acceptance"
+        run: python -X utf8 eval/run_workflow_metrics_eval.py

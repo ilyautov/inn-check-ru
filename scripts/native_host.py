@@ -6,6 +6,9 @@ install_native_host.py) и говорит с ним кадрами: 4 байта
 машины + JSON в UTF-8. Спека — docs/superpowers/specs/2026-09-28-browser-extension-design.md.
 
 Команды (поле «команда»), и больше ничего:
+    run_read       {run_id} -> workflow envelope сохранённой проверки
+    run_manual     {run_id, expected_revision, operation_id, blocks}
+                     -> новая ревизия с ручным исходом; тот же envelope
     проверить       {инн, профиль?}  -> светофор быстрой проверки (batch_check.py)
     ручной_блок     {операция, инн, блок, url, дата, итог, поля?, найдено?,
                      параметры?, причина?} -> <каталог>/<инн>/ручные/<блок>.json
@@ -48,6 +51,8 @@ PNG_ПОДПИСЬ = b"\x89PNG\r\n\x1a\n"
 ХОСТЫ = {"фссп": ("fssp.gov.ru",), "суды": ("kad.arbitr.ru",),
          "залоги": ("reestr-zalogov.ru",)}
 ПОЛЯ_КОМАНД = {
+    "run_read": {"команда", "run_id"},
+    "run_manual": {"команда", "run_id", "expected_revision", "operation_id", "blocks"},
     "проверить": {"команда", "инн", "профиль"},
     "ручной_блок": {"команда", "операция", "инн", "блок", "url", "дата", "итог", "поля",
                     "найдено", "параметры", "причина", "текст"},
@@ -95,6 +100,107 @@ def писать_кадр(поток, ответ):
                           ensure_ascii=False).encode("utf-8")
     поток.write(struct.pack("=I", len(тело)) + тело)
     поток.flush()
+
+
+def _native_workflow(ответ):
+    """Native transport view only; never mutate the materialized run/receipt.
+
+    Small envelopes keep their existing full data. Large ones expose only the
+    popup binding fields, with explicit omissions and bounded UTF-8-safe text.
+    The same boundary applies to failures (including huge unknown input keys).
+    """
+    полный = dict(ответ, native_projection={
+        "version": 1, "kind": "full", "complete": True, "omitted": [], "truncated": []})
+    if len(json.dumps(полный, ensure_ascii=False).encode("utf-8")) <= МАКС_ОТВЕТ:
+        return полный
+
+    сокращено = []
+
+    def объект(value):
+        return value if isinstance(value, dict) else {}
+
+    def текст(value, field, limit=128):
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            сокращено.append(field)
+            return None
+        if len(value) > limit:
+            сокращено.append(field)
+            return value[:limit] + "… [сокращено]"
+        return value
+
+    data = объект(ответ.get("data"))
+    fetch = объект(data.get("fetch"))
+    metadata = объект(data.get("metadata"))
+    decision = объект(fetch.get("_decision"))
+    name = объект(fetch.get("егрюл")).get("название") or fetch.get("название")
+    outcomes = объект(metadata.get("manual_outcomes"))
+    actions = ответ.get("pending_actions") or []
+    warnings = ответ.get("warnings") or []
+    if not isinstance(actions, list):
+        сокращено.append("pending_actions")
+        actions = []
+    if not isinstance(warnings, list):
+        сокращено.append("warnings")
+        warnings = []
+    if len(actions) > 128:
+        сокращено.append("pending_actions")
+    if len(warnings) > 16:
+        сокращено.append("warnings")
+    projection = {
+        "version": 1, "kind": "binding", "complete": False,
+        "omitted": ["fetch_source_details", "fin", "assessment_details",
+                    "metadata_evidence_refs", "decision_details", "pending_action_details",
+                    "warning_details", "nonbrowser_manual_outcomes"],
+        "truncated": сокращено,
+        "pending_actions_total": len(actions), "warnings_total": len(warnings),
+        "full_payload_access": "CLI/MCP",
+    }
+    projected_data = None
+    if ответ.get("data") is not None:
+        projected_data = {"fetch": {
+            "инн": текст(fetch.get("инн"), "subject_inn", 12),
+            "егрюл": {"название": текст(name, "subject_name", 1024)},
+            "_decision": {
+                "decision_status": текст(decision.get("decision_status"), "decision_status"),
+                "can_recommend": (decision.get("can_recommend")
+                                  if type(decision.get("can_recommend")) is bool else None),
+            }},
+            "assessment": {"светофор": текст(объект(data.get("assessment")).get("светофор"),
+                                              "assessment_status")},
+            "metadata": {
+                "profile": текст(metadata.get("profile"), "profile"),
+                "workflow_status": текст(metadata.get("workflow_status"), "workflow_status"),
+                "manual_outcomes": {sid: текст(outcomes[sid], "manual_outcome." + sid, 64)
+                                    for sid in ХОСТЫ if sid in outcomes},
+            }}
+    error = объект(ответ.get("error"))
+    bounded = {
+        "schema_version": 1, "status": ответ["status"], "run_id": ответ.get("run_id"),
+        "revision": ответ.get("revision"), "data": projected_data,
+        "error": ({"code": текст(error.get("code"), "error.code", 64),
+                   "message": текст(error.get("message"), "error.message", 1024),
+                   "retryable": error.get("retryable") is True} if error else None),
+        "warnings": [{"code": текст(объект(w).get("code"), "warning.code", 64),
+                      "message": текст(объект(w).get("message"), "warning.message", 512)}
+                     for w in warnings[:16]],
+        "pending_actions": [{key: текст(объект(action).get(key), "pending_action." + key)
+                             for key in ("source_id", "kind", "reason_code")}
+                            for action in actions[:128]],
+        "native_projection": projection,
+    }
+    # Defense in depth for future schema changes: still a workflow envelope,
+    # with an explicit projection error rather than the legacy frame fallback.
+    if len(json.dumps(bounded, ensure_ascii=False).encode("utf-8")) > МАКС_ОТВЕТ:
+        import run_workflow
+        fallback = run_workflow.failure(run_workflow.WorkflowError(
+            "native_projection_too_large", "Ответ для привязки не помещается; перечитайте проверку через CLI/MCP."),
+            run_id=ответ.get("run_id"), revision=ответ.get("revision"))
+        fallback["native_projection"] = {"version": 1, "kind": "binding", "complete": False,
+                                         "omitted": ["data"], "truncated": ["response"]}
+        return fallback
+    return bounded
 
 
 # --- настройка и файлы ------------------------------------------------------
@@ -171,11 +277,32 @@ class Журнал:
 
 def _строго(сообщение):
     команда = сообщение.get("команда")
-    if команда not in ПОЛЯ_КОМАНД:
+    if not isinstance(команда, str) or команда not in ПОЛЯ_КОМАНД:
         raise Отказ("команда %r не поддерживается: %s" % (команда, ", ".join(ПОЛЯ_КОМАНД)))
     лишние = set(сообщение) - ПОЛЯ_КОМАНД[команда]
     if лишние:
         raise Отказ("лишние поля: %s" % ", ".join(sorted(лишние)))
+    if команда in {"run_read", "run_manual"}:
+        if set(сообщение) != ПОЛЯ_КОМАНД[команда]:
+            raise Отказ("нужны все поля команды сохранённой проверки")
+        import run_store
+        run_store._id(сообщение["run_id"])
+        if команда == "run_manual":
+            run_store._revision(сообщение["expected_revision"])
+            run_store._id(сообщение["operation_id"], operation=True)
+            blocks = сообщение["blocks"]
+            if not isinstance(blocks, dict) or not blocks:
+                raise Отказ("blocks: непустой объект ручных блоков")
+            for sid, block in blocks.items():
+                if not isinstance(block, dict):
+                    raise Отказ("ручной блок должен быть объектом")
+                completed = block.get("outcome") == "completed" or (
+                    block.get("outcome") is None and block.get("статус") == "проверено")
+                if completed and type(block.get("pagination_complete")) is not bool:
+                    raise Отказ("завершённый шаг требует явный pagination_complete: true или false")
+                _инн(block.get("инн"))
+                _сайт_источника(sid, block.get("url"))
+        return команда
     for k, v in сообщение.items():
         if k in ("поля", "png"):
             continue
@@ -337,6 +464,14 @@ def обработать(сообщение, корень=None, запуск=Non
     """Одно сообщение -> ответ. Никогда не бросает: отказ и сбой — в ответе."""
     try:
         команда = _строго(сообщение)
+        if команда in {"run_read", "run_manual"}:
+            import run_workflow
+            # run_store resolves INN_CHECK_RUNS_DIR or its local default. Never
+            # reuse the legacy output directory or accept a root from a message.
+            if команда == "run_read":
+                return _native_workflow(run_workflow.resume(сообщение["run_id"]))
+            return _native_workflow(run_workflow.import_manual(сообщение["run_id"], сообщение["blocks"],
+                expected_revision=сообщение["expected_revision"], operation_id=сообщение["operation_id"]))
         if команда == "проверить":
             return проверить(сообщение, запуск)
         корень = корень or каталог()
@@ -345,8 +480,14 @@ def обработать(сообщение, корень=None, запуск=Non
             return ручной_блок(сообщение, корень, журнал)
         return доказательство(сообщение, корень, журнал, добавить)
     except Отказ as e:
+        if сообщение.get("команда") in ("run_read", "run_manual"):
+            import run_workflow
+            return _native_workflow(run_workflow.failure(run_workflow.WorkflowError("invalid_input", str(e))))
         return {"ok": False, "ошибка": str(e)}
     except Exception as e:               # хост не падает traceback'ом в канал
+        if сообщение.get("команда") in ("run_read", "run_manual"):
+            import run_workflow
+            return _native_workflow(run_workflow.failure(e))
         sys.stderr.write("native_host: %s: %s\n" % (type(e).__name__, e))
         return {"ok": False, "ошибка": "сбой хоста (%s)" % type(e).__name__}
 

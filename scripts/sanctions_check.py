@@ -83,7 +83,11 @@ def _ssl_context():
 
 import xml.etree.ElementTree as ET
 
-CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru"))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+CACHE_DIR = str(dataset_root("sanctions"))
 CACHE_TTL_DAYS = 7
 TIMEOUT = 120
 UA = "inn-check-ru/1.2 (sanctions_check; offline cache refresh)"

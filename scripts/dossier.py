@@ -279,11 +279,13 @@ def поля(пары):
 
 # --- чтение fetch-JSON -------------------------------------------------------
 
-def _доступность(fetch):
+def _доступность(fetch, *, materialized=False):
     """`_доступность` входа с поправкой на контракт ручного блока: состояние
     источника в документе то же, что засчитал резолвер профилей
     (profiles._состояние_блока) — иначе раздел 2 назвал бы суды «ok», а вердикт
     — непроверенными (ручной блок без даты и URL)."""
+    if materialized:
+        return fetch["_evidence"]["source_states"]
     d = fetch.get("_доступность")
     if not isinstance(d, dict):
         return {}
@@ -306,7 +308,7 @@ def _доступность(fetch):
     return out
 
 
-def _порядок_источников(fetch, sources):
+def _порядок_источников(fetch, sources, *, materialized=False):
     """id источников: весь реестр в порядке реестра, затем всё, чего в реестре нет.
 
     Именно реестр, а не `_доступность`. Источник, о котором во входе нет ни слова
@@ -314,7 +316,7 @@ def _порядок_источников(fetch, sources):
     выпавший deal-killer читается как проверенный, а это ровно та тихая
     деградация, ради которой документ и составляется.
     """
-    дост = _доступность(fetch)
+    дост = _доступность(fetch, materialized=materialized)
     порядок = list(getattr(sources, "SOURCES", {}) or {}) if sources is not None else []
     порядок += [s for s in дост if s not in порядок]
     return порядок
@@ -504,9 +506,9 @@ def _блок_пакета(пакет):
     return блоки
 
 
-def _раздел_2(fetch, sources, fin, санкции, граф):
-    дост = _доступность(fetch)
-    порядок = _порядок_источников(fetch, sources)
+def _раздел_2(fetch, sources, fin, санкции, граф, *, materialized=False):
+    дост = _доступность(fetch, materialized=materialized)
+    порядок = _порядок_источников(fetch, sources, materialized=materialized)
     строки = []
     for sid in порядок:
         состояние, зап = _запись_источника(sid, дост)
@@ -748,13 +750,31 @@ def _подраздел_граф(граф):
     ]
     if граф.get("оговорка"):
         блоки.append(абзац(_текст(граф["оговорка"]), жирный=True))
+    блоки.append(абзац("Общий адрес, директор или учредитель — виды связи. Они сами по себе не доказывают владение или контроль."))
+    edges = граф.get("рёбра") or []
+    if edges:
+        блоки.append(таблица(
+            ["От", "К", "Вид связи", "Действует с", "Происхождение", "Доказательства"],
+            [[_текст(edge.get("от")), _текст(edge.get("до")),
+              _текст(edge.get("edge_type") or edge.get("тип")),
+              _текст(edge.get("effective_at"), "дата неизвестна"),
+              _текст(edge.get("origin_family"), "не установлено"),
+              ", ".join(edge.get("evidence_ids") or []) or "ссылка на исходный факт неизвестна"]
+             for edge in edges if isinstance(edge, dict)]))
+    frontier = граф.get("frontier") or []
+    if frontier:
+        блоки.append(абзац("Ниже перечислены неразвёрнутые связи. Отсутствие найденной связи здесь не означает, что её нет.", жирный=True))
+        блоки.append(таблица(["От", "Не проверено", "Глубина", "Причина остановки"],
+                            [[_текст(item.get("from")), _текст(item.get("to")),
+                              _текст(item.get("depth")), _текст(item.get("stop_reason"))]
+                             for item in frontier if isinstance(item, dict)]))
     return блоки
 
 
 def _раздел_3(fetch, sources, вердикт, fin, санкции, граф, ошибки_входа,
-              входы=None):
-    дост = _доступность(fetch)
-    порядок = _порядок_источников(fetch, sources)
+              входы=None, *, materialized=False):
+    дост = _доступность(fetch, materialized=materialized)
+    порядок = _порядок_источников(fetch, sources, materialized=materialized)
     строки = []
     for sid in порядок:
         состояние, зап = _запись_источника(sid, дост)
@@ -1006,19 +1026,106 @@ def _раздел_5(мета):
 
 def собрать(fetch, мета, fin=None, санкции=None, граф=None, вердикт=None,
             профиль_вердиктный=False, ошибки_входа=None, sources=None,
-            входы=None):
+            входы=None, *, materialized=False):
     """Полный список блоков документа. Чистая функция — ни ввода-вывода, ни сети.
 
     `входы` — какие вспомогательные входы вообще передавали ({"--fin": путь|None,
     ...}): без этого «не запускали» неотличимо от «нечего показать».
     """
+    policy_module = _модуль("provider_policy")
+    fetch_policy = policy_module.captured_policy(fetch)
+    graph_policy = policy_module.captured_policy(граф)
+    captured = fetch_policy or graph_policy
+    if captured is not None:
+        exported = policy_module.export_allowed(fetch, captured)
+        return [заголовок("Экспорт с ограничениями провайдера", 1),
+                абзац("Исходный локальный запуск сохранён. Сырые ответы, вложенные копии, "
+                      "производные выводы и метаданные исключены из экспорта. Решение не пересчитывалось."),
+                таблица(["Разрешённое поле", "Значение"],
+                        [[key, _текст(value)] for key, value in exported["data"].items()]),
+                абзац("Основание: сохранённая политика провайдера; разрешения поставщика отдельно не проверены.")]
+    from evidence_contract import bind_financial, prepare, validate_evidence
+    if materialized:
+        errors = validate_evidence(fetch)
+        decision = fetch.get("_decision")
+        if errors or not isinstance(decision, dict) or decision.get("schema_version") != 1:
+            raise ValueError("unsupported_schema" if any(e["code"] == "unsupported_schema" for e in errors)
+                             or isinstance(decision, dict) and decision.get("schema_version") != 1 else "schema_invalid")
+        required = {"rules_version", "decision_status", "can_recommend", "missing_evidence", "next_checks", "claim_ids", "coverage"}
+        if (not required <= decision.keys() or decision["rules_version"] != fetch["_evidence"]["rules_version"]
+                or decision["decision_status"] not in ("supported", "insufficient_evidence", "facts_only")
+                or not isinstance(decision["can_recommend"], bool)
+                or not isinstance(decision["claim_ids"], list)
+                or any(cid not in fetch["_evidence"]["claims"] for cid in decision["claim_ids"])
+                or not isinstance(decision["missing_evidence"], list)
+                or not isinstance(decision["coverage"], dict)
+                or not {"numerator", "denominator"} <= decision["coverage"].keys()):
+            raise ValueError("schema_invalid")
+        if not isinstance(вердикт, dict) or вердикт.get("_decision") != decision:
+            raise ValueError("decision_mismatch")
+        if not isinstance(fin, dict):
+            raise ValueError("materialized_fin_required")
+        states = fetch["_evidence"].get("source_states")
+        if (not isinstance(states, dict)
+                or any(not isinstance(s, dict) or s.get("состояние") not in ("ok", "пусто", "не проверено")
+                       for s in states.values())
+                or set(states) != set(fetch.get("_доступность") or {})):
+            raise ValueError("materialized_source_states_required")
+    else:
+        fetch = prepare(fetch)
+        if fin is not None:
+            fetch = bind_financial(fetch, fin)
     вердикт = вердикт if isinstance(вердикт, dict) else {}
     блоки = []
     блоки += _раздел_1(fetch, мета)
-    блоки += _раздел_2(fetch, sources, fin, санкции, граф)
+    блоки += _раздел_2(fetch, sources, fin, санкции, граф, materialized=materialized)
     блоки += _раздел_3(fetch, sources, вердикт, fin, санкции, граф, ошибки_входа,
-                       входы=входы)
+                       входы=входы, materialized=materialized)
     блоки += _раздел_4(вердикт, профиль_вердиктный)
+    evidence = fetch.get("_evidence")
+    decision = fetch.get("_decision") or вердикт.get("_decision")
+    if isinstance(evidence, dict):
+        блоки.append(заголовок("Доказательства решения и пробелы", 2))
+        if isinstance(decision, dict):
+            блоки.append(абзац("Статус решения: %s; покрытие %s/%s; рекомендации: %s" % (
+                decision["decision_status"], decision["coverage"]["numerator"],
+                decision["coverage"]["denominator"], decision["can_recommend"])))
+            блоки.append(абзац("Рекомендация связана с утверждениями: " + ", ".join(decision["claim_ids"])))
+            for gap in decision["missing_evidence"]:
+                блоки.append(абзац("Пробел %s: %s; %s" % (gap["rule_id"],
+                    ", ".join(gap["reason_codes"]), ", ".join(gap["claim_ids"]))))
+        relevant = set(evidence["claims"])
+        if isinstance(decision, dict):
+            relevant = set(decision["claim_ids"])
+            for gap in decision["missing_evidence"]:
+                relevant.update(gap["claim_ids"])
+            pending = list(relevant)
+            while pending:
+                claim = evidence["claims"].get(pending.pop(), {})
+                for cid in claim.get("depends_on", []):
+                    if cid not in relevant:
+                        relevant.add(cid)
+                        pending.append(cid)
+        rows = []
+        for cid, claim in evidence["claims"].items():
+            if cid not in relevant:
+                continue
+            raw = claim["raw_ref"]
+            rows.append([cid, claim["field"], claim["knowledge"] + ":" + str(claim["reason_code"] or ""),
+                         "Период: %s; область поиска: %s; raw: %s %s %s %s; зависимости: %s; "
+                         "полнота: %s; преобразование: %s; источник: %s; семейство: %s; "
+                         "получено: %s; наблюдалось: %s; действует: %s; опубликовано: %s; "
+                         "актуально до: %s; политика: %s" % (
+                             json.dumps(claim["period"], ensure_ascii=False),
+                             json.dumps(claim["search_scope"], ensure_ascii=False),
+                             raw["availability"], raw["response_id"], raw["sha256"], raw["locator"],
+                             ", ".join(claim["depends_on"]), claim["coverage_complete"], claim["transformation"],
+                             claim["source_id"], claim["origin_family"], claim["retrieved_at"],
+                             claim["first_observed_at"], claim["effective_at"], claim["published_at"],
+                             claim["valid_until"], claim["freshness_policy"])])
+        блоки.append(таблица(["Claim ID", "Поле", "Знание", "Период / scope / raw / зависимости"], rows))
+        for conflict in evidence["conflicts"]:
+            блоки.append(абзац("Конфликт: " + json.dumps(conflict, ensure_ascii=False)))
     блоки += _раздел_5(мета)
     return блоки
 
@@ -1127,31 +1234,74 @@ def _run(текст, жирный=False, курсив=False, размер=None):
     if размер:
         свойства += '<w:sz w:val="%d"/><w:szCs w:val="%d"/>' % (размер, размер)
     rpr = "<w:rPr>%s</w:rPr>" % свойства if свойства else ""
-    return '<w:r>%s<w:t xml:space="preserve">%s</w:t></w:r>' % (rpr, _xml(текст))
+    # Headless renderers may omit emoji glyphs or map different circles to one
+    # PDF character. Retain each original symbol and state its literal colour;
+    # this adds no interpretation of the source's risk/status semantics.
+    colors = {'🔴': 'красный', '🟡': 'жёлтый', '🟢': 'зелёный'}
+    readable = ''.join(char + ' (%s)' % colors[char] if char in colors else char
+                       for char in str(текст))
+    return '<w:r>%s<w:t xml:space="preserve">%s</w:t></w:r>' % (rpr, _xml(readable))
 
 
-def _p(текст="", жирный=False, курсив=False, размер=None, отступ_после=120):
-    ppr = '<w:pPr><w:spacing w:after="%d"/></w:pPr>' % отступ_после
+def _p(текст="", жирный=False, курсив=False, размер=None, отступ_после=120,
+       со_следующим=False):
+    # Allow character wrapping of long hashes/URLs without inserting characters
+    # into the source text. Fixed table widths alone do not constrain words.
+    ppr = ('<w:pPr><w:spacing w:after="%d"/><w:wordWrap w:val="0"/>'
+           '%s</w:pPr>') % (отступ_после, '<w:keepNext/>' if со_следующим else '')
     прогон = _run(текст, жирный, курсив, размер) if текст != "" else ""
     return "<w:p>%s%s</w:p>" % (ppr, прогон)
 
 
+_DOCX_PAGE_WIDTH = 11906
+_DOCX_LEFT_MARGIN = 1134
+_DOCX_RIGHT_MARGIN = 850
+_DOCX_TEXT_WIDTH = _DOCX_PAGE_WIDTH - _DOCX_LEFT_MARGIN - _DOCX_RIGHT_MARGIN
+
+
 def _tbl(шапка, строки):
+    строки = list(строки)
+    колонки = max([len(шапка)] + [len(r) for r in строки] + [1])
+    # Content-aware but capped weights: a long identifier must never enlarge
+    # the table beyond the printable page or starve all neighbouring columns.
+    веса = [max(8, min(30, max(len(str(r[i])) if i < len(r) else 0
+              for r in [шапка] + строки) // 3)) for i in range(колонки)]
+    ширины = [_DOCX_TEXT_WIDTH * вес // sum(веса) for вес in веса]
+    ширины[-1] += _DOCX_TEXT_WIDTH - sum(ширины)
     границы = "".join(
         '<w:%s w:val="single" w:sz="4" w:space="0" w:color="AAAAAA"/>' % край
         for край in ("top", "left", "bottom", "right", "insideH", "insideV"))
-    части = ['<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/>'
-             '<w:tblBorders>%s</w:tblBorders></w:tblPr>' % границы]
-    for r in [шапка] + list(строки):
-        жирный = r is шапка
+    части = ['<w:tbl><w:tblPr><w:tblW w:w="%d" w:type="dxa"/>'
+             '<w:tblLayout w:type="fixed"/>'
+             '<w:tblBorders>%s</w:tblBorders></w:tblPr><w:tblGrid>%s</w:tblGrid>'
+             % (_DOCX_TEXT_WIDTH, границы, ''.join(
+                 '<w:gridCol w:w="%d"/>' % ширина for ширина in ширины))]
+    for index, r in enumerate([шапка] + строки):
+        жирный = index == 0
         ячейки = "".join(
-            '<w:tc><w:tcPr><w:tcW w:w="0" w:type="auto"/></w:tcPr>%s</w:tc>'
-            % _p(str(c), жирный=жирный, размер=18, отступ_после=0) for c in r)
-        части.append("<w:tr>%s</w:tr>" % ячейки)
+            '<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/></w:tcPr>%s</w:tc>'
+            % (ширина, _p(str(r[i]) if i < len(r) else '', жирный=жирный,
+                         размер=20, отступ_после=0)) for i, ширина in enumerate(ширины))
+        header = '<w:trPr><w:tblHeader/></w:trPr>' if жирный else ''
+        части.append("<w:tr>%s%s</w:tr>" % (header, ячейки))
     части.append("</w:tbl>")
     # Абзац после таблицы обязателен: две таблицы подряд Word склеивает.
     части.append(_p())
     return "".join(части)
+
+
+def _docx_records(шапка, строки):
+    """Wide evidence remains in model order as labelled, flowing paragraphs."""
+    части = []
+    for строка in строки:
+        for index, (label, value) in enumerate(zip(шапка, строка)):
+            части.append('<w:p><w:pPr><w:spacing w:after="%d"/>'
+                         '<w:wordWrap w:val="0"/>%s</w:pPr>%s%s</w:p>'
+                         % (100 if index == len(шапка) - 1 else 40,
+                            '<w:keepNext/>' if index < len(шапка) - 1 else '',
+                            _run('%s: ' % label, жирный=True, размер=20),
+                            _run(value, размер=20)))
+    return ''.join(части)
 
 
 def в_docx_xml(блоки):
@@ -1162,7 +1312,8 @@ def в_docx_xml(блоки):
         if т == "заголовок":
             уровень = int(b.get("уровень", 2))
             тело.append(_p(b["текст"], жирный=True,
-                           размер=РАЗМЕР_ЗАГОЛОВКА.get(уровень, 22), отступ_после=160))
+                           размер=РАЗМЕР_ЗАГОЛОВКА.get(уровень, 22), отступ_после=160,
+                           со_следующим=True))
         elif т == "абзац":
             тело.append(_p(b["текст"], жирный=bool(b.get("жирный")),
                            курсив=bool(b.get("курсив")), размер=20))
@@ -1175,10 +1326,12 @@ def в_docx_xml(блоки):
                             % (_run("%s: " % k, жирный=True, размер=20),
                                _run(v, размер=20)))
         elif т == "таблица":
-            тело.append(_tbl(b["шапка"], b["строки"]))
-    тело.append('<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
-                '<w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1134" '
-                'w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>')
+            formatter = _docx_records if b['шапка'] and b['шапка'][0] == 'Claim ID' else _tbl
+            тело.append(formatter(b["шапка"], b["строки"]))
+    тело.append(('<w:sectPr><w:pgSz w:w="%d" w:h="16838"/>'
+                 '<w:pgMar w:top="1134" w:right="%d" w:bottom="1134" w:left="%d" '
+                 'w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>')
+                % (_DOCX_PAGE_WIDTH, _DOCX_RIGHT_MARGIN, _DOCX_LEFT_MARGIN))
     return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
             '<w:document xmlns:w="%s"><w:body>%s</w:body></w:document>'
             % (W_NS, "".join(тело)))

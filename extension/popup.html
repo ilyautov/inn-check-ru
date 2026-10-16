@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <title>inn-check-ru</title>
 <style>
+  [hidden] { display: none !important; }
   :root {
+    color-scheme: light dark;
     --фон: #ffffff; --текст: #1c1b1f; --тише: #5f5b66; --рамка: #d6d3dc;
     --поле: #f7f6f9; --акцент: #2f5bb7; --акцент-текст: #ffffff;
     --красный: #b3261e; --жёлтый: #8a5a00; --зелёный: #1b6e3a;
@@ -41,6 +43,10 @@
   button.вторая { background: transparent; color: var(--акцент); }
   button:disabled { opacity: .5; cursor: default; }
   :focus-visible { outline: 2px solid var(--акцент); outline-offset: 1px; }
+  main, button, #выбранная-проверка, #итог-формы, #run-status, #страница { overflow-wrap: anywhere; }
+  .ряд { flex-wrap: wrap; }
+  button { max-width: 100%; white-space: normal; }
+  #выбранная-проверка { white-space: pre-line; padding: 8px; border: 1px solid var(--рамка); border-radius: 6px; }
   ul { margin: 4px 0; padding-left: 18px; }
 </style>
 </head>
@@ -51,16 +57,37 @@
   <section id="проверка">
     <div id="результат" class="тише">Выделите ИНН на любой странице и выберите
       «Проверить ИНН в inn-check-ru» в контекстном меню.</div>
-    <label for="профиль">Профиль проверки</label>
+    <label for="профиль">Профиль новой проверки</label>
     <select id="профиль"></select>
   </section>
 
   <section id="форма" hidden>
     <h2 id="заголовок-формы">Ручной блок</h2>
     <div class="тише">Страница: <span id="страница"></span></div>
+    <label for="режим-записи">Куда сохранить</label>
+    <select id="режим-записи">
+      <option value="legacy">Отдельный ручной блок</option>
+      <option value="run">В сохранённую проверку по run_id</option>
+    </select>
+    <div id="run-binding" hidden>
+      <label for="run-id">run_id сохранённой проверки (UUID)</label>
+      <input id="run-id" type="text" autocomplete="off" spellcheck="false">
+      <button id="run-load" type="button" class="вторая">Загрузить выбранную проверку</button>
+      <div id="run-status" role="status" class="тише"></div>
+      <div id="выбранная-проверка" hidden></div>
+      <label><input id="run-confirm" type="checkbox" disabled> Подтверждаю привязку к этой проверке и странице</label>
+      <label for="run-outcome">Исход ручного шага</label>
+      <select id="run-outcome">
+        <option value="completed">Проверка завершена</option>
+        <option value="incomplete">Поиск не завершён</option>
+        <option value="declined">Отказываюсь от ручной проверки</option>
+      </select>
+      <label><input id="pagination-complete" type="checkbox"> Просмотрены все страницы результатов по указанным параметрам</label>
+      <p class="тише">Отказ и неполный поиск сохраняются, но не закрывают пробел проверки. Снимки сохраняются только в режиме отдельного блока.</p>
+    </div>
     <label for="инн">ИНН контрагента</label>
     <input id="инн" type="text" inputmode="numeric" autocomplete="off">
-    <div class="ряд" role="radiogroup" aria-label="Итог">
+    <div id="legacy-outcome" class="ряд" role="radiogroup" aria-label="Итог">
       <label><input type="radio" name="итог" value="проверено" checked> проверено</label>
       <label><input type="radio" name="итог" value="не проверено"> не проверено</label>
     </div>

@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 # Версия одна на репозиторий: гейт eval/run_version_gate.py.
 [project]
 name = "inn-check-ru"
-version = "1.12.3"
+version = "1.13.0"
 description = "Проверка российского контрагента по ИНН: светофор риска по открытым реестрам (ЕГРЮЛ, ГИР БО, МСП, санкции РФМ/OFAC/EU), финансовая патология и признаки дробления кодом. CLI и MCP-сервер."
 readme = "README.md"
 license = "Apache-2.0"
@@ -35,16 +35,37 @@ dependencies = []
 # без них установка через extra разрешала бы версии с известными CVE
 mcp = ["mcp>=1.30,<2", "anyio>=4.15.1", "idna>=3.20", "python-multipart>=0.0.32"]
 
+pdf = ["pypdf>=6.21,<7"]
+
 [project.urls]
 Repository = "https://github.com/ilyautov/inn-check-ru"
 Changelog = "https://github.com/ilyautov/inn-check-ru/blob/main/CHANGELOG.md"
 
 [project.scripts]
 inn-check-ru = "fetch_counterparty:cli"
+inn-check-workflow = "workflow_cli:cli"
 inn-check-ru-mcp = "inn_check_ru_mcp.server:entry"
 
 [tool.setuptools]
 py-modules = [
+  "sibling_imports",
+  "process_windows",
+  "process_runtime",
+  "cache_policy",
+  "cache_update_worker",
+  "workflow_doctor",
+  "schedule_templates",
+  "evidence_contract",
+  "redaction",
+  "run_store",
+  "compare_counterparties",
+  "document_input",
+  "historical_replay",
+  "monitor_events",
+  "provider_policy",
+  "run_workflow",
+  "workflow_cli",
+  "workflow_metrics",
   "fetch_counterparty",
   "rzn_licenses",
   "pledge_text",

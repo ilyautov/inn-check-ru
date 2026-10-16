@@ -2,7 +2,7 @@
 
 Второй интерфейс inn-check-ru: та же проверка контрагента по ИНН, но как
 инструменты MCP-сессии (Claude Code, Cursor, Claude Desktop). Один движок
-(`scripts/` корня, чистый stdlib, не меняется), две обёртки: `SKILL.md`
+(`scripts/` корня, stdlib-ядро), две обёртки: `SKILL.md`
 (методология для агента) и этот сервер (данные как инструменты).
 
 Дисциплина проезжает через данные: tier-маркеры (✅/⚠️), «оговорки»,
@@ -20,15 +20,12 @@ HTTP-методов удалённого сервиса (`endpoints.yaml`) + `Ma
 
 Здесь это не ложится: **HTTP-API назначения нет** — движок локальный
 (скрипты stdlib + офлайн-кэши), каталога удалённых методов, из которого
-агент ищет словами, не существует; инструментов осмысленно мало (14), и они
-фиксированные. Поэтому сервер собран на официальном Python MCP SDK
-(`mcp`, FastMCP, v1 API — пин `mcp<2`: в 2.x FastMCP переименован в
-MCPServer с ломающими изменениями), а из конвенций семьи сохранены:
-`doctor.py` («взлетит ли установка»), описания RU+EN, ключи только из env
-(без секретов в репозитории), класс доступа **read-only** — сервер ничего
-не пишет во внешние сервисы.
+агент ищет словами, не существует; публичные инструменты фиксированные (33 в этой ветке). Поэтому сервер собран на официальном Python MCP SDK
+(`mcp`, FastMCP, поддерживаемый контракт SDK `>=1.30,<2`), из конвенций семьи сохранены `doctor.py`, описания RU+EN и конфигурация ключей хостом. Эффекты чтения, локальной записи и сети объявлены отдельно; сервер не отправляет уведомления и не регистрирует расписания автоматически.
 
 ## Установка
+
+**1.13.0 не опубликована.** В этой ветке 33 инструмента. Публичный PyPI `latest` и MCPB/маркетплейс могут содержать предыдущий выпуск. Для этой версии установите из корня ветки в отдельный venv: `python -m pip install '.[mcp]'`, затем запустите `inn-check-ru-mcp` из его bin/Scripts. [Полный локальный маршрут](../references/agent-workflow.md), [матрица каналов](../references/capability-matrix.md).
 
 Рекомендуемый способ — `uv`: он сам приносит SDK в разовое окружение, и
 ставить ничего глобально не нужно.
@@ -115,14 +112,20 @@ Claude Code спрашивает их при включении и хранит 
 и переносит в `CHECKO_API_KEY` / `DADATA_API_KEY`, только если поле заполнено:
 пустое поле не затирает ключ, уже заданный в окружении.
 
-`INN_CHECK_PROXY` (или `HTTPS_PROXY`) в том же блоке `env` проводит запросы
+`INN_CHECK_PROXY` (или `HTTPS_PROXY`) в блоке `env` **plain MCP** проводит запросы
 через вашу ноду — половина источников закрыта для не-РФ IP. Флага у MCP-
 инструментов нет намеренно: сеть выбирает тот, кто запускает сервер, а не
 модель по ходу диалога. Блок `_сеть` в ответе `check_counterparty` говорит,
 через что шли. Узел видит, какие ИНН вы проверяете, — только своя нода;
 общего пула у проекта нет (PRIVACY_POLICY.md).
 
+У plugin объявлены только Checko/DaData; у MCPB — эти ключи и proxy. Поля runs/events/policy/OCR executables там не объявлены; наследование произвольного окружения не гарантировано. Plain MCP принимает эти настройки через среду **процесса**, включая `INN_CHECK_RUNS_DIR`, `INN_CHECK_EVENTS_DIR`, `INN_CHECK_PROVIDER_POLICY`, `INN_CHECK_PDF_RENDERER`, `INN_CHECK_TESSERACT`. Новые инструменты не принимают произвольный root/path/executable. Стандартный MCPB не включает PDF extra и OCR. См. [матрицу](../references/capability-matrix.md).
+
 ## Инструменты
+
+33 публичных инструмента: 14 прежних в таблице ниже, 15 сохранённых workflow/events/diagnostics и 4 document/select/compare/replay. Для новой длительной задачи начинайте с `counterparty_run_start`, сохраняйте возвращённый `run_id` и читайте `pending_actions`; одноразовые вызовы остаются совместимыми.
+
+### Прежние 14 инструментов
 
 | Инструмент | Что делает | Ключи |
 |---|---|---|
@@ -132,7 +135,7 @@ Claude Code спрашивает их при включении и хранит 
 | `affiliates_graph(inn)` | граф связей глубины 2 (checko API), ленивый обход с бюджетом и остановкой на значимом сигнале, рёбра с tier ⚠️ | CHECKO_API_KEY |
 | `droblenie_check(inn)` | граф + признаки дробления кодом, с предупреждением об одном источнике | CHECKO_API_KEY |
 | `counterparty_diff(inn)` | мониторинг: diff двух последних снимков (`save=True`) | — |
-| `counterparty_verdict(inn, profile)` | **главный инструмент**: сбор + финансы + резолвер профиля одной командой → светофор, сигналы, рекомендация, что не проверено | — |
+| `counterparty_verdict(inn, profile)` | одноразовый сбор + финансы + резолвер профиля одной командой → светофор, сигналы, рекомендация, что не проверено | — |
 | `counterparty_batch(inns, profile)` | батч по списку ИНН (лимит 50 за вызов), сортировка 🔴 → не проверено → 🟡 → 🟢 | — |
 | `access_check()` | таблица доступности источников с текущей сети (probe, кэш на сутки) | — |
 | `industry_benchmarks(inn)` | положение против отраслевой нормы из дампов ФНС: перцентиль выручки, нагрузка, ССЧ, доля УСН по группе (ОКВЭД2, регион, размер) | — |
@@ -154,10 +157,44 @@ Claude Code спрашивает их при включении и хранит 
 3 ИНН одновременно — уважение к бесплатным эндпоинтам ФНС; сбой по одному ИНН
 не роняет батч, такая строка возвращается со статусом «не проверено» и причиной.
 
-Все инструменты read-only и никогда не падают traceback'ом в MCP-ответ:
-любая деградация (таймаут, недоступный источник, нет кэша) — JSON
-`{"статус": "не проверено", "причина": ...}`. Таймаут движка настраивается
-`INN_CHECK_MCP_TIMEOUT` (сек, по умолчанию 150).
+Прежние вызовы возвращают совместимые JSON-ключи; сетевые сборы, сохранение снимков, пакеты и probe могут иметь сетевые/локальные эффекты. Ошибки обрабатываются безопасно, без traceback в ответе. Таймаут движка — `INN_CHECK_MCP_TIMEOUT` (по умолчанию 150 секунд).
+
+### Сохранённый workflow, события и диагностика (15)
+
+| Инструмент | Назначение | Эффекты |
+|---|---|---|
+| `counterparty_run_start(inn, profile, mode)` | начать и сохранить проверку | сеть + локальная запись |
+| `counterparty_run_read(run_id, revision)` | прочитать конкретную committed revision или HEAD | чтение |
+| `counterparty_run_resume(run_id)` | прочитать HEAD и pending actions | чтение |
+| `counterparty_run_manual(run_id, blocks, expected_revision, operation_id)` | completed/incomplete/declined ручного шага | новая локальная ревизия |
+| `counterparty_run_refresh(run_id, source_ids, expected_revision, operation_id)` | явно обновить выбранные источники | сеть + ревизии |
+| `counterparty_run_render(run_id, format, revision)` | markdown/json в `data.content` | чтение, без долговременной записи |
+| `counterparty_run_export(run_id, format, revision)` | markdown/json/docx управляемый артефакт, квитанция | локальная запись |
+| `counterparty_run_snapshot(run_id, revision)` | управляемый отпечаток для мониторинга | локальная запись |
+| `counterparty_doctor(profile)` | локальная диагностика, bounded версии настроенных OCR executables | без сетевого probe и долговременной записи |
+| `counterparty_probe(profile)` | явная диагностика доступности | сеть + кэш |
+| `counterparty_cache_status(profile, now)` | свежесть кэша на явный ISO timestamp | чтение |
+| `counterparty_cache_plan(profile, now)` | план подготовки, без исполнения | чтение |
+| `counterparty_events_list(state, limit)` | прочитать outbox | чтение |
+| `counterparty_events_claim(consumer_id, limit, lease_seconds)` | lease, запись доставки потребителю | локальная запись |
+| `counterparty_events_ack(event_ids, consumer_id)` | квитанция после успешного действия потребителя | локальная запись |
+
+Новые операции возвращают envelope: `schema_version,status,run_id,revision,data,error,warnings,pending_actions`. Ошибка не означает, что записи точно не было: после потерянного ответа перечитайте run. Для manual/refresh используйте UUID4 операции и `expected_revision` из текущего чтения; повтор того же запроса — тот же UUID. При `revision_conflict` требуется reload и повторное подтверждение, а не молчаливая замена ревизии. Чтение/resume/render не запускают сеть или скоринг заново. Экспорт возвращает квитанцию артефакта, не DOCX bytes и не путь назначения. [Примеры](../references/agent-workflow.md).
+
+### Документы, сравнение и replay (4)
+
+| Инструмент | Вход и результат | Эффекты |
+|---|---|---|
+| `counterparty_document_extract(text, run_id, artifact_id, ocr)` | текст **либо** пара managed IDs; кандидаты, контекст, страницы и ограничения | локальная обработка, временные файлы |
+| `counterparty_document_select(candidates, role, candidate_id)` | явный кандидат и роль; без ID всегда needs_input, даже для одного | без сети, run и сохранённого подтверждения |
+| `counterparty_compare(run_ids, as_of)` | 2–5 разных сохранённых субъектов одного профиля, evidence/coverage на дату | чтение |
+| `counterparty_run_replay(run_id, mode, cutoff)` | original или current_rules на полный ISO cutoff | чтение, результат в памяти |
+
+Публичной загрузки PDF, произвольного filename/path и executable здесь нет. Локальный PDF — через CLI и optional extra; managed artifact проверяется registry и SHA-256. Контекст кандидата остаётся недоверенными данными, выбор не запускает проверку. [Документы](../references/document-input.md), [сравнение](../references/comparison.md), [replay](../references/historical-replay.md).
+
+Ни один read/status/plan/compare/replay не выполняет скрытое обновление. Аннотации — подсказки хосту, а не механизм разрешений. Политика провайдера и экспортные ограничения проверяются отдельно. Event claim означает доставку, ack — завершённое действие; внешние уведомления и расписания настраивает оператор отдельно. `events retry`, `cache update`, `watch plan/monitor` и добровольные метрики доступны в CLI, одноимённых MCP-инструментов нет. [Очередь](../references/monitoring-host.md), [provider policy](../references/provider-policy.md).
+
+SDK/stdio и синтетические тесты не подтверждают реальную установку в Claude/Cursor или Chrome. Восемь новых эмпирических направлений пока без наблюдений; [статус](../docs/research/2026-10-16/experiment-status.json).
 
 ## Проверка
 

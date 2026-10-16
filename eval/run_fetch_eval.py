@@ -546,14 +546,14 @@ def case_parallel(fc):
         """Fetcher-шпион: помечает, в каком потоке и с каким opener его позвали."""
         def fetcher(opener, inn, контекст=None):
             потоки.add(threading.current_thread().name)
-            openers.add(id(opener))
+            openers[id(opener)] = opener  # удерживаем объект до конца collect: id не переиспользуется
             пары.add((id(opener), threading.get_ident()))
             return {"маркер": sid}, fc._av(sid, "ok")
         return fetcher
 
     try:
         for seq in ("1", None):
-            потоки, openers, пары = set(), set(), set()
+            потоки, openers, пары = set(), {}, set()
             orig = dict(fc.FETCHERS)
             for sid in list(fc.FETCHERS):
                 fc.FETCHERS[sid] = шпион(sid, потоки, openers, пары)
@@ -1449,19 +1449,23 @@ def case_sro(fc):
     check(errors, av["состояние"] == "пусто", "чужой ИНН по подстроке засчитан: %r" % av)
     sys.path.insert(0, str(ROOT / "scripts"))
     import profiles
-    for значение, статус in ((True, "найден"), (False, "отсутствует")):
+    for значение, статус in ((True, "найден"), (False, "не проверен")):
         fetch = {"сро": {"право_не_действует": значение},
                  "_доступность": {"сро": {"состояние": "ok"}}}
         сиг = {x.get("id"): x for x in profiles.extract_signals(fetch)}
         check(errors, (сиг.get("сро_право_не_действует") or {}).get("статус") == статус,
               "сигнал при %r: %r" % (значение, сиг.get("сро_право_не_действует")))
-    # НОСТРОЙ и НОПРИЗ — разные виды работ: чистый НОСТРОЙ не закрывает сигнал НОПРИЗ
+        if значение is False:
+            check(errors, сиг["сро_право_не_действует"].get("причина") == "coverage_incomplete",
+                  "legacy false без полноты поиска стал доказанным отсутствием")
+    # НОСТРОЙ без полноты поиска остаётся неизвестным независимо от недоступности НОПРИЗ
     сиг = {x.get("id"): x for x in profiles.extract_signals({
         "сро": {"право_не_действует": False}, "сро_проект": None,
         "_доступность": {"сро": {"состояние": "ok"},
                          "сро_проект": {"состояние": "не проверено", "причина": "сеть: HTTP 500"}}})}
     check(errors, (сиг.get("сро_проект_право_не_действует") or {}).get("статус") == "не проверен"
-          and (сиг.get("сро_право_не_действует") or {}).get("статус") == "отсутствует"
+          and (сиг.get("сро_право_не_действует") or {}).get("статус") == "не проверен"
+          and (сиг.get("сро_право_не_действует") or {}).get("причина") == "coverage_incomplete"
           and "сро_проект" not in str((сиг.get("сро_право_не_действует") or {}).get("причина")),
           "сигналы реестров не раздельны: %r" % {k: (сиг.get(k) or {}).get("статус") for k in (
               "сро_право_не_действует", "сро_проект_право_не_действует")})

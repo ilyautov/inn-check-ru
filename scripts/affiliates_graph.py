@@ -28,6 +28,7 @@ MAX_NODES узлов — при превышении пометка «усече
 дата построения, источник. Граф — вход для droblenie_check.py.
 """
 
+import copy
 import json
 import os
 import pathlib
@@ -50,6 +51,23 @@ def _ssl_context():
         return _build_ssl_context()
     except Exception:
         return ssl.create_default_context()
+
+
+try:
+    from sibling_imports import load_sibling as _load_sibling
+except ModuleNotFoundError as _error:
+    if _error.name != "sibling_imports":
+        raise
+    import importlib.util as _import_util
+    import sys as _import_sys
+    from pathlib import Path as _ImportPath
+    _spec = _import_util.spec_from_file_location(
+        "sibling_imports", _ImportPath(__file__).resolve().with_name("sibling_imports.py"))
+    _helper = _import_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_helper)
+    # Publish only the complete, stateless bootstrap. Concurrent bootstrap calls
+    # all select the same helper; dependency loads use Python's module locks.
+    _load_sibling = _import_sys.modules.setdefault("sibling_imports", _helper).load_sibling
 
 
 API_URL = "https://api.checko.ru/v2/company"
@@ -80,7 +98,34 @@ TIER_TARGET = "✅ ЕГРЮЛ"
                     "реорганиз")
 
 
-def fetch_company(key, inn=None, ogrn=None):
+def fetch_company(key, inn=None, ogrn=None, *, policy=None, ledger=None):
+    """Policy-governed graph request; CLI shares one ledger across its traversal."""
+    policy_module = _load_sibling("provider_policy")
+    policy = policy if policy is not None else policy_module.configured_policy()
+    if policy is None:
+        return _fetch_company_transport(key, inn=inn, ogrn=ogrn)
+    policy = copy.deepcopy(policy)
+    for entry in policy["providers"]:
+        entry["request_limit"] = min(entry["request_limit"], БЮДЖЕТ_ЗАПРОСОВ)
+    def request(provider, subject, fields):
+        # DaData has no graph capability and is refused before this callback.
+        data, note = _fetch_company_transport(key, inn=inn, ogrn=ogrn)
+        if data is not None:
+            safe = _load_sibling("redaction").redact(data, secrets=(key,))
+            return {"status":"ok", "data":{"graph":safe}, "requests_used":1}
+        match = re.search(r"HTTP (401|402|403|429|500|502|503|504)\b", note or "")
+        reason = "http_" + match.group(1) if match else "unavailable"
+        return {"status":"error", "data":None, "reason_code":reason, "requests_used":1}
+    result = policy_module.fetch_with_policy(str(inn or ogrn), ["graph"], policy,
+                request=request, ledger=ledger if ledger is not None else {})
+    if ledger is not None:
+        ledger.setdefault("transfers", []).extend(result["transfers"])
+    if result["data"] is None:
+        return None, "бюджет/политика провайдера: " + ", ".join(result["limitations"])
+    return result["data"]["graph"], "ok"
+
+
+def _fetch_company_transport(key, inn=None, ogrn=None):
     """Один запрос к checko v2/company. Возвращает (data|None, заметка)."""
     params = {"key": key}
     if ogrn:
@@ -142,6 +187,7 @@ def parse_card(data):
         "ссч": _g(data, "СЧР"),
         "руководители": [],
         "учредители": [],
+        "учредители_юл": [],
         "масс_адрес": _str_list(_g(data, "ЮрАдрес", "МассАдрес")),
         "правопреемство": [],
     }
@@ -167,6 +213,22 @@ def parse_card(data):
                 })
     elif фл is not None:
         gaps.append("Учред.ФЛ: неожиданный формат")
+    legal_founders = _g(data, "Учред", "ЮЛ")
+    if isinstance(legal_founders, list):
+        for owner in legal_founders:
+            if not isinstance(owner, dict):
+                gaps.append("Учред.ЮЛ: неожиданный формат записи")
+                continue
+            ogrn = owner.get("ОГРН")
+            if type(ogrn) not in (str, int) or not str(ogrn).strip():
+                ogrn = None
+                gaps.append("Учред.ЮЛ: связь владельца без ОГРН не развёрнута")
+            card["учредители_юл"].append({
+                "огрн": str(ogrn) if ogrn is not None else None,
+                "инн": owner.get("ИНН") if isinstance(owner.get("ИНН"), str) else None,
+                "название": owner.get("НаимПолн") if isinstance(owner.get("НаимПолн"), str) else None})
+    elif legal_founders is not None:
+        gaps.append("Учред.ЮЛ: неожиданный формат")
     for поле in ("Правопреем", "Правопредш"):
         список = data.get(поле)
         if isinstance(список, list):
@@ -194,261 +256,258 @@ def _ключи(card):
     return {str(v) for v in (card.get("инн"), card.get("огрн")) if v}
 
 
+def _edge_type(legacy):
+    return {'адрес': 'common_address', 'общий_директор': 'common_director',
+            'общий_учредитель': 'common_founder', 'правопреемство': 'succession',
+            'владелец': 'ownership'}.get(legacy, 'unknown')
+
+
+def _edge_metadata(edge, evidence=None, origin=None):
+    """Only exact relationship claims can support an edge. Never mint IDs.
+
+    For ownership, direction is company -> its legal owner (owned_by). Shared
+    natural-person founders/directors are associations, not an ownership chain.
+    A legacy Checko response has no canonical raw pointer and stays untraced.
+    """
+    edge = dict(edge)
+    edge['edge_type'] = _edge_type(edge.get('тип'))
+    claims = (evidence or {}).get('claims', {})
+    supported = []
+    requested = edge.get('evidence_ids', [])
+    for cid in requested if isinstance(requested, list) else []:
+        claim = claims.get(cid) if isinstance(cid, str) else None
+        if not isinstance(claim, dict):
+            continue
+        try:
+            issues = _load_sibling('evidence_contract').validate_evidence(
+                {'инн': claim.get('subject_inn'), '_evidence': evidence})
+        except (TypeError, ValueError, KeyError):
+            continue
+        if issues or claim.get('knowledge') != 'known' or claim.get('raw_ref', {}).get('availability') != 'available':
+            continue
+        if (claim.get('field') == 'graph.' + edge['edge_type'] and
+                claim.get('value') == {'from': edge['от'], 'to': edge['до'], 'edge_type': edge['edge_type']}):
+            supported.append(claim)
+    edge['evidence_ids'] = sorted({c['claim_id'] for c in supported})
+    dates = {c.get('effective_at') for c in supported}
+    origins = {c.get('origin_family') for c in supported}
+    edge['effective_at'] = next(iter(dates)) if len(dates) == 1 else None
+    edge['origin_family'] = next(iter(origins)) if len(origins) == 1 else origin
+    edge['evidence_status'] = 'supported' if supported else 'unknown'
+    edge['source_pointer_status'] = 'available' if supported else 'raw_unavailable'
+    return edge
+
+
+def _ownership_chains(edges):
+    # Each displayed segment must itself be supported; no beneficial-owner or
+    # control conclusion follows from this legal ownership path.
+    supported = [e for e in edges if e.get('edge_type') == 'ownership' and e.get('evidence_status') == 'supported']
+    return [{'nodes': [e['от'], e['до']], 'direction': 'owned_by',
+             'evidence_ids': e['evidence_ids'], 'effective_at': e['effective_at']}
+            for e in supported]
+
+
+def _edges_of(card):
+    out = []
+    for person in card.get('руководители', []):
+        out.extend(('общий_директор', ogrn, person.get('фио'))
+                   for key in ('связ_руковод', 'связ_учред') for ogrn in person.get(key, []))
+    for person in card.get('учредители', []):
+        out.extend(('общий_учредитель', ogrn, person.get('фио'))
+                   for key in ('связ_учред', 'связ_руковод') for ogrn in person.get(key, []))
+    out.extend(('адрес', ogrn, None) for ogrn in card.get('масс_адрес', []))
+    out.extend(('правопреемство', item['огрн'], None) for item in card.get('правопреемство', []))
+    out.extend(('владелец', item['огрн'], None) for item in card.get('учредители_юл', []) if item.get('огрн'))
+    return out
+
+
 def build_graph(fetcher, inn, max_nodes=MAX_NODES, max_depth=MAX_DEPTH,
                 pause=PAUSE, бюджет=БЮДЖЕТ_ЗАПРОСОВ, стоп_на_сигнале=True,
                 известные=None):
-    """Строит BFS-граф с отсечкой. fetcher(kind, value) -> (data|None, note) —
-    отделяет логику графа от сети (в eval подставляется фикстурный fetcher).
-
-    Обход ленивый (задача 20): идёт в ширину и останавливается на первом из —
-    исчерпан бюджет запросов, найден узел со значимым статусом
-    (`стоп_на_сигнале`), найдено пересечение с `известными` (ИНН/ОГРН, которые
-    вы уже проверяли), пройдена `max_depth`.
-
-    Остановка НЕ делает граф полным. Всё, до чего обход не дошёл, попадает в
-    «не_проверено» и в блок «остановка» — иначе усечённый граф читается как
-    «связей больше нет», и вывод «пересечений не найдено» становится выдумкой.
-    """
+    """Bounded BFS with explicit unexplored frontier; legacy JSON preserved."""
+    бюджет = max(0, min(int(бюджет), БЮДЖЕТ_ЗАПРОСОВ))
+    max_nodes = max(1, min(int(max_nodes), MAX_NODES))
+    max_depth = max(0, int(max_depth))
     известные = {str(x) for x in (известные or []) if x}
-    счётчик = {"запросов": 0}
+    requests = 0
 
-    def запрос(kind, value):
-        if счётчик["запросов"] >= бюджет:
-            return None, "бюджет запросов исчерпан (%d)" % бюджет
-        счётчик["запросов"] += 1
+    def request(kind, value):
+        nonlocal requests
+        if requests >= бюджет:
+            return None, 'бюджет запросов исчерпан (%d)' % бюджет
+        requests += 1
         return fetcher(kind, value)
 
-    target_data, note = запрос("inn", inn)
-    if target_data is None:
-        return {"статус": "не проверено", "причина": note,
-                "источник": "checko API (%s)" % API_URL}
+    data, note = request('inn', inn)
+    if data is None:
+        reason = 'budget' if requests >= бюджет and ('бюджет' in (note or '') or not бюджет) else 'unavailable'
+        return {'статус': 'не проверено', 'причина': note, 'источник': 'checko API (%s)' % API_URL,
+                'усечено': True, 'frontier': [{'from': None, 'to': inn, 'depth': 0, 'stop_reason': reason}],
+                'stop_reason': reason, 'ownership_chains': []}
+    target, gaps = parse_card(data)
+    target_id = str(target.get('огрн') or target.get('инн') or '')
+    if not target_id:
+        return {'статус': 'не проверено', 'причина': 'карточка цели без ОГРН/ИНН',
+                'источник': 'checko API (%s)' % API_URL, 'усечено': True,
+                'frontier': [{'from': None, 'to': inn, 'depth': 0, 'stop_reason': 'unavailable'}],
+                'stop_reason': 'unavailable', 'ownership_chains': []}
+    nodes, edges, frontier, unchecked = {}, [], [], list(gaps)
+    edge_keys, failed = set(), set()
+    signals, intersections = [], []
+    stop, stop_note = None, None
 
-    узлы = {}        # огрн -> узел
-    рёбра = []
-    не_проверено = []
-    усечено = False
-
-    def add_node(card, глубина, тип_связи=None):
-        огрн = card.get("огрн") or card.get("инн")
-        if not огрн:
+    def add(card, depth, relation=None):
+        identity = str(card.get('огрн') or card.get('инн') or '')
+        if not identity:
             return None
-        if огрн in узлы:
-            if тип_связи and тип_связи not in узлы[огрн]["типы_связи"]:
-                узлы[огрн]["типы_связи"].append(тип_связи)
-            return огрн
-        узлы[огрн] = {
-            "огрн": card.get("огрн"),
-            "инн": card.get("инн"),
-            "название": card.get("название"),
-            "статус": card.get("статус"),
-            "оквэд": card.get("оквэд"),
-            "адрес": card.get("адрес"),
-            "спецрежим": card.get("спецрежим") or None,
-            "ссч": card.get("ссч"),
-            "глубина": глубина,
-            "типы_связи": [тип_связи] if тип_связи else ["цель"],
-            "tier": TIER_TARGET if глубина == 0 else TIER_CHECKO,
-        }
-        return огрн
+        if identity not in nodes:
+            nodes[identity] = {key: card.get(key) for key in
+                               ('огрн', 'инн', 'название', 'статус', 'оквэд', 'адрес', 'спецрежим', 'ссч')}
+            nodes[identity].update(глубина=depth, типы_связи=[], tier=TIER_TARGET if depth == 0 else TIER_CHECKO)
+        relation = relation or 'цель'
+        if relation not in nodes[identity]['типы_связи']:
+            nodes[identity]['типы_связи'].append(relation)
+        return identity
 
-    target, gaps = parse_card(target_data)
-    не_проверено.extend(gaps)
-    target_id = add_node(target, 0)
-    if target_id is None:
-        return {"статус": "не проверено",
-                "причина": "карточка цели без ОГРН/ИНН",
-                "источник": "checko API (%s)" % API_URL}
+    def pending(source, destination, depth, reason, **details):
+        item = {'from': source, 'to': destination, 'depth': depth, 'stop_reason': reason}
+        item.update(details)
+        if item not in frontier:
+            frontier.append(item)
+            unchecked.append('связи компании %s не развёрнуты: %s' % (destination, reason))
 
-    # Рёбра из карточки: (тип, список огрн, через-фио)
-    def edges_of(card):
-        out = []
-        for рук in card.get("руководители", []):
-            for ogrn in рук.get("связ_руковод", []):
-                out.append(("общий_директор", ogrn, рук.get("фио")))
-            for ogrn in рук.get("связ_учред", []):
-                out.append(("общий_директор", ogrn, рук.get("фио")))
-        for учр in card.get("учредители", []):
-            for ogrn in учр.get("связ_учред", []):
-                out.append(("общий_учредитель", ogrn, учр.get("фио")))
-            for ogrn in учр.get("связ_руковод", []):
-                out.append(("общий_учредитель", ogrn, учр.get("фио")))
-        for ogrn in card.get("масс_адрес", []):
-            out.append(("адрес", ogrn, None))
-        for o in card.get("правопреемство", []):
-            out.append(("правопреемство", o["огрн"], None))
-        return out
+    def mark_intersection(card, depth):
+        match = _ключи(card) & известные
+        if match:
+            intersections.append({'огрн': card.get('огрн'), 'инн': card.get('инн'),
+                                  'название': card.get('название'), 'совпало_по': sorted(match), 'глубина': depth})
+        return match
 
-    остановка = None          # причина ранней остановки, None — дошли до конца
-    сигналы = []              # узлы со значимым статусом
-    пересечение = []          # узлы, совпавшие с «известными»
-    неразвёрнутые = []        # то, до чего обход не дошёл — это «не проверено»
-
-    # Пересечение проверяется и на самой цели: если её уже проверяли, идти
-    # дальше не за чем — ответ «да, пересекается» уже получен.
-    совпало = _ключи(target) & известные
-    if совпало:
-        пересечение.append({"огрн": target.get("огрн"), "инн": target.get("инн"),
-                            "название": target.get("название"),
-                            "совпало_по": sorted(совпало), "глубина": 0})
-        остановка = "цель уже есть среди известных (%s)" % ", ".join(sorted(совпало))
-
-    frontier = [] if остановка else [(target_id, target)]
-    depth = 1
-    while frontier and depth <= max_depth and not усечено and not остановка:
-        next_frontier = []
-        for from_id, card in frontier:
-            if остановка or усечено:
-                неразвёрнутые.append(card.get("огрн") or from_id)
+    add(target, 0)
+    if gaps:
+        pending(target_id, target_id, 0, 'unavailable')
+    if mark_intersection(target, 0):
+        stop, stop_note = 'intersection', 'цель уже есть среди известных'
+    queue = [(target_id, target, 0)]
+    for from_id, card, depth in queue:
+        for owner in card.get('учредители_юл', []):
+            if owner.get('огрн') is None:
+                # Preserve the reported legal-owner relationship explicitly.
+                # This OGRN-based traversal cannot resolve it; no ID is invented.
+                pending(from_id, owner.get('инн') or from_id, depth + 1, 'unavailable',
+                        edge_type='ownership', name=owner.get('название'), inn=owner.get('инн'),
+                        reason_code='owner_ogrn_unavailable', evidence_status='unknown')
+        relations = _edges_of(card)
+        for legacy, to_value, via in relations:
+            to_ogrn = str(to_value)
+            to_id = to_ogrn if to_ogrn in nodes else None
+            if stop:
+                pending(from_id, to_ogrn, depth + 1, stop)
                 continue
-            for тип, to_огрн, через in edges_of(card):
-                if len(узлы) >= max_nodes:
-                    усечено = True
-                    остановка = остановка or ("достигнут потолок узлов (%d)" % max_nodes)
-                    break
-                if to_огрн not in узлы:
-                    data, note2 = запрос("ogrn", to_огрн)
-                    if data is None:
-                        не_проверено.append(
-                            "ОГРН %s: карточка не получена (%s)" % (to_огрн, note2))
-                        if "бюджет" in (note2 or ""):
-                            остановка = note2
-                            break
-                        continue
-                    to_card, gaps = parse_card(data)
-                    не_проверено.extend(gaps)
-                    to_id = add_node(to_card, depth, тип)
-                    if to_id and depth < max_depth:
-                        next_frontier.append((to_id, to_card))
-                    if pause:
-                        time.sleep(pause)
-                    совпало = _ключи(to_card) & известные
-                    if совпало:
-                        пересечение.append({
-                            "огрн": to_card.get("огрн"), "инн": to_card.get("инн"),
-                            "название": to_card.get("название"),
-                            "совпало_по": sorted(совпало), "глубина": depth})
-                        остановка = ("найдено пересечение с известными: %s"
-                                     % ", ".join(sorted(совпало)))
-                    знач = _значимый(to_card)
-                    if знач and стоп_на_сигнале:
-                        сигналы.append({"огрн": to_card.get("огрн"),
-                                        "инн": to_card.get("инн"),
-                                        "название": to_card.get("название"),
-                                        "статус": знач, "глубина": depth})
-                        остановка = остановка or (
-                            "найден значимый сигнал у связанной компании: %s — %s"
-                            % (to_card.get("название") or to_card.get("огрн"), знач))
-                else:
-                    add_node({"огрн": to_огрн}, depth, тип)
-                    to_id = to_огрн
-                if to_id and (from_id, to_id, тип) not in [
-                        (r["от"], r["до"], r["тип"]) for r in рёбра]:
-                    рёбра.append({"от": from_id, "до": to_id,
-                                  "тип": тип, "через": через,
-                                  "tier": TIER_CHECKO})
-                if остановка:
-                    break
-        frontier = next_frontier
-        depth += 1
-
-    # Всё, что осталось в очереди на момент остановки, НЕ развёрнуто. Молчать об
-    # этом нельзя: «связей больше нет» и «дальше не смотрели» — разные ответы.
-    if остановка:
-        неразвёрнутые.extend((карточка.get("огрн") or узел_id)
-                             for узел_id, карточка in frontier)
-        for огрн in неразвёрнутые:
-            не_проверено.append(
-                "связи компании %s не развёрнуты: обход остановлен (%s)"
-                % (огрн, остановка))
-
-    полный = not остановка and not усечено
-    return {
-        "статус": "ок",
-        "цель": {"инн": target.get("инн"), "огрн": target.get("огрн"),
-                 "название": target.get("название")},
-        "узлов": len(узлы),
-        "рёбер": len(рёбра),
-        # «усечено» остаётся в прежнем смысле «граф неполон» — на него смотрит
-        # droblenie_check.py, и ранняя остановка обязана его поднимать тоже.
-        "усечено": not полный,
-        "обход": {
-            "полный": полный,
-            "глубина_задана": max_depth,
-            "бюджет_запросов": бюджет,
-            "запросов_сделано": счётчик["запросов"],
-            "стоп_на_сигнале": bool(стоп_на_сигнале),
-            "известных_на_входе": len(известные),
-            "причина_остановки": остановка,
-            "неразвёрнутые_узлы": sorted(set(неразвёрнутые)),
-        },
-        "значимые_сигналы": сигналы,
-        "пересечение_с_известными": {
-            "найдено": пересечение,
-            "полнота": ("обход полный: проверены все узлы до глубины %d" % max_depth)
-                       if полный else
-                       ("обход остановлен (%s) — пересечение проверено только у "
-                        "%d найденных узлов, остальные не смотрели"
-                        % (остановка, len(узлы))),
-        } if известные else None,
-        "узлы": list(узлы.values()),
-        "рёбра": рёбра,
-        "не_проверено": не_проверено,
-        "оговорка": ОГОВОРКА,
-        "источник": "checko API (%s), схема v2/company по документации 19.09.2026"
-                    % API_URL,
-        "дата_построения": time.strftime("%Y-%m-%d"),
-    }
+            if to_id is None:
+                reason = ('depth' if depth >= max_depth else 'max_nodes' if len(nodes) >= max_nodes
+                          else 'budget' if requests >= бюджет else 'unavailable' if to_ogrn in failed else None)
+                if reason:
+                    pending(from_id, to_ogrn, depth + 1, reason)
+                    continue
+                child_data, note = request('ogrn', to_ogrn)
+                if child_data is None:
+                    failed.add(to_ogrn)
+                    reason = 'budget' if 'бюджет' in (note or '') else 'unavailable'
+                    pending(from_id, to_ogrn, depth + 1, reason)
+                    unchecked.append('ОГРН %s: карточка не получена (%s)' % (to_ogrn, note))
+                    continue
+                child, child_gaps = parse_card(child_data)
+                unchecked.extend(child_gaps)
+                # A provider must not silently substitute a different company.
+                if str(child.get('огрн') or '') != to_ogrn:
+                    failed.add(to_ogrn)
+                    pending(from_id, to_ogrn, depth + 1, 'unavailable')
+                    continue
+                to_id = add(child, depth + 1, legacy)
+                if child_gaps:
+                    pending(from_id, to_id, depth + 1, 'unavailable')
+                queue.append((to_id, child, depth + 1))
+                if pause:
+                    time.sleep(pause)
+                if mark_intersection(child, depth + 1):
+                    stop, stop_note = 'intersection', 'найдено пересечение с известными'
+                significant = _значимый(child)
+                if significant and стоп_на_сигнале:
+                    signals.append({'огрн': child.get('огрн'), 'инн': child.get('инн'),
+                                    'название': child.get('название'), 'статус': significant, 'глубина': depth + 1})
+                    stop, stop_note = stop or 'signal', stop_note or 'найден значимый сигнал: %s' % significant
+            else:
+                add({'огрн': to_ogrn}, depth + 1, legacy)
+            key = (from_id, to_id, legacy, via)
+            if to_id and key not in edge_keys:
+                edge_keys.add(key)
+                edges.append(_edge_metadata({'от': from_id, 'до': to_id, 'тип': legacy, 'через': via,
+                                             'tier': TIER_CHECKO}, origin='checko'))
+    if stop and not frontier:
+        pending(target_id, target_id, 0, stop)
+    complete = not frontier and not stop
+    reason = stop or (frontier[0]['stop_reason'] if frontier else None)
+    reason_labels = {'budget': 'бюджет запросов исчерпан', 'depth': 'достигнута глубина обхода',
+                     'max_nodes': 'достигнут потолок узлов', 'unavailable': 'карточка недоступна'}
+    stop_note = stop_note or reason_labels.get(reason)
+    return {'статус': 'ок', 'цель': {k: target.get(k) for k in ('инн', 'огрн', 'название')},
+            'узлов': len(nodes), 'рёбер': len(edges), 'усечено': not complete,
+            'обход': {'полный': complete, 'глубина_задана': max_depth, 'бюджет_запросов': бюджет,
+                      'запросов_сделано': requests, 'стоп_на_сигнале': bool(стоп_на_сигнале),
+                      'известных_на_входе': len(известные), 'причина_остановки': stop_note,
+                      'неразвёрнутые_узлы': sorted({x['to'] for x in frontier})},
+            'значимые_сигналы': signals,
+            'пересечение_с_известными': {'найдено': intersections, 'полнота':
+                ('обход полный: проверены все узлы до глубины %d' % max_depth) if complete else
+                ('обход остановлен (%s) — пересечение проверено только у %d найденных узлов, остальные не смотрели' % (stop_note, len(nodes)))} if известные else None,
+            'узлы': list(nodes.values()), 'рёбра': edges, 'не_проверено': unchecked,
+            'frontier': frontier, 'stop_reason': reason, 'ownership_chains': _ownership_chains(edges),
+            'оговорка': ОГОВОРКА, 'источник': 'checko API (%s), схема v2/company по документации 19.09.2026' % API_URL,
+            'дата_построения': time.strftime('%Y-%m-%d')}
 
 
-def normalize_offline(data, имя_файла="offline-граф"):
-    """Нормализует заранее собранные связи (ручной сбор через браузер, другой
-    агрегатор) в формат графа: checko становится заменяемым слоем, а не
-    требованием. Вход: {"цель"?, "узлы": [...], "рёбра": [...]}. Сеть не
-    дёргается; отсутствующие tier проставляются как ⚠️ ручной сбор."""
-    if not isinstance(data, dict) or not isinstance(data.get("узлы"), list) \
-            or not isinstance(data.get("рёбра"), list):
-        return {"статус": "не проверено",
-                "причина": "offline-граф должен содержать списки «узлы» и «рёбра» "
-                           "в формате affiliates_graph (%s)" % имя_файла}
-    узлы, рёбра = [], []
-    for u in data["узлы"]:
-        if not isinstance(u, dict):
+def normalize_offline(data, имя_файла='offline-граф'):
+    """Preserve supplied provenance and incompleteness, never infer completeness."""
+    if not isinstance(data, dict) or not isinstance(data.get('узлы'), list) or not isinstance(data.get('рёбра'), list):
+        return {'статус': 'не проверено', 'причина': 'offline-граф должен содержать списки «узлы» и «рёбра» в формате affiliates_graph (%s)' % имя_файла}
+    result = copy.deepcopy(data)
+    nodes = []
+    for item in data['узлы']:
+        if not isinstance(item, dict):
             continue
-        node = dict(u)
-        целевой = node.get("глубина") == 0 or "цель" in (
-            node.get("типы_связи") or [])
-        node.setdefault("типы_связи", ["цель"] if целевой else [])
-        node.setdefault("глубина", 0 if целевой else 1)
-        node["tier"] = node.get("tier") or (
-            TIER_TARGET if целевой else TIER_OFFLINE)
-        узлы.append(node)
-    for r in data["рёбра"]:
-        if not isinstance(r, dict) or not r.get("от") or not r.get("до"):
+        node = copy.deepcopy(item)
+        target = node.get('глубина') == 0 or 'цель' in (node.get('типы_связи') or [])
+        node.setdefault('типы_связи', ['цель'] if target else [])
+        node.setdefault('глубина', 0 if target else 1)
+        node['tier'] = node.get('tier') or (TIER_TARGET if target else TIER_OFFLINE)
+        nodes.append(node)
+    edges = []
+    for item in data['рёбра']:
+        if not isinstance(item, dict) or not item.get('от') or not item.get('до'):
             continue
-        edge = {"от": r["от"], "до": r["до"],
-                "тип": r.get("тип"), "через": r.get("через"),
-                "tier": r.get("tier") or TIER_OFFLINE}
-        рёбра.append(edge)
-    цель = data.get("цель")
-    if not цель:
-        for node in узлы:
-            if node.get("глубина") == 0:
-                цель = {"инн": node.get("инн"), "огрн": node.get("огрн"),
-                        "название": node.get("название")}
-                break
-    return {
-        "статус": "ок",
-        "цель": цель,
-        "узлов": len(узлы),
-        "рёбер": len(рёбра),
-        "усечено": False,
-        "узлы": узлы,
-        "рёбра": рёбра,
-        "не_проверено": [],
-        "оговорка": ОГОВОРКА,
-        "источник": "offline-граф (ручной сбор): %s" % имя_файла,
-        "дата_построения": time.strftime("%Y-%m-%d"),
-    }
+        edge = copy.deepcopy(item)
+        edge.setdefault('тип', None)
+        edge.setdefault('через', None)
+        edge['tier'] = edge.get('tier') or TIER_OFFLINE
+        edges.append(_edge_metadata(edge, data.get('_evidence'), origin=item.get('origin_family')))
+    target = data.get('цель')
+    if not target:
+        target = next(({k: n.get(k) for k in ('инн', 'огрн', 'название')} for n in nodes if n.get('глубина') == 0), None)
+    frontier = copy.deepcopy(data.get('frontier') or [])
+    complete = (data.get('усечено') is False and (data.get('обход') or {}).get('полный') is True
+                and not frontier and not data.get('stop_reason'))
+    if not complete and not frontier:
+        frontier = [{'from': None, 'to': None, 'depth': None, 'stop_reason': data.get('stop_reason') or 'unknown'}]
+    result.update({'статус': 'ок', 'цель': target, 'узлов': len(nodes), 'рёбер': len(edges),
+                   'усечено': not complete, 'узлы': nodes, 'рёбра': edges,
+                   'frontier': frontier, 'stop_reason': data.get('stop_reason') or (frontier[0]['stop_reason'] if frontier else None),
+                   'ownership_chains': _ownership_chains(edges),
+                   'не_проверено': list(data.get('не_проверено') or []) + ([] if complete else ['Полнота offline-графа не подтверждена.']),
+                   'оговорка': data.get('оговорка') or ОГОВОРКА,
+                   'источник': 'offline-граф (ручной сбор): %s' % имя_файла,
+                   'дата_построения': data.get('дата_построения') or time.strftime('%Y-%m-%d')})
+    return result
 
 
 def _известные_из(путь):
@@ -592,13 +651,22 @@ def main(argv):
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
         return 0
 
+    policy = _load_sibling("provider_policy").configured_policy()
+    if policy is not None:
+        policy = copy.deepcopy(policy)
+        for entry in policy["providers"]:
+            entry["request_limit"] = min(entry["request_limit"], бюджет, БЮДЖЕТ_ЗАПРОСОВ)
+    ledger = {}
     def fetcher(kind, value):
-        return fetch_company(key, inn=value) if kind == "inn" \
-            else fetch_company(key, ogrn=value)
+        return fetch_company(key, inn=value, policy=policy, ledger=ledger) if kind == "inn" \
+            else fetch_company(key, ogrn=value, policy=policy, ledger=ledger)
 
     graph = build_graph(fetcher, позиционные[0], max_depth=глубина,
                         бюджет=бюджет, стоп_на_сигнале=стоп_на_сигнале,
                         известные=известные)
+    if policy is not None:
+        graph["_provider_policy"] = {"schema_version":1, "policy":copy.deepcopy(policy),
+                                     "transfers":copy.deepcopy(ledger.get("transfers", []))}
     if отброшено:
         graph["известные_отброшено"] = {
             "строк": len(отброшено), "примеры": отброшено[:5],

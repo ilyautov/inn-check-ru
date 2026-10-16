@@ -353,6 +353,40 @@ def case_canaries(ca, src):
     return errors
 
 
+
+def case_canary_availability(ca):
+    """Недоступность не проверяет парсер; полученная неправильная схема падает."""
+    errors = []
+    registry = {"тест": {"канарейка": {"инн": "7707083893", "ожидаем_непустые": ["поле"]}}}
+    cases = [
+        (None, {"состояние": "не проверено", "причина": "кэш: индекса нет"}, "не запускалась", 0),
+        (None, {"состояние": "не проверено", "причина": "сеть: таймаут"}, "не запускалась", 0),
+        (None, {"состояние": "не проверено", "причина": "схема: нет поля rows"}, "провал", 1),
+        (None, {"состояние": "ok", "причина": None}, "провал", 1),
+        (None, {"состояние": "не проверено", "причина": "неизвестная ошибка"}, "провал", 1),
+        ({}, {"состояние": "ok", "причина": None}, "провал", 1),
+        ({}, {"состояние": "пусто", "причина": None}, "провал", 1),
+        ({"поле": 0}, {"состояние": "ok", "причина": None}, "ok", 0),
+    ]
+    for data, av, want, want_code in cases:
+        fc = types.SimpleNamespace(FETCHERS={"тест": lambda *a, _data=data, _av=av: (_data, _av)})
+        report, code = ca.run_canaries(fc, registry)
+        row = report["тест"]
+        check(errors, row["результат"] == want and code == want_code,
+              "канарейка %r/%r: %r, код %r" % (data, av, row, code))
+        if want == "не запускалась":
+            check(errors, av["причина"] in row["причина"], "утеряна причина покрытия")
+    for exc, want, want_code in [(TimeoutError("timed out"), "не запускалась", 0),
+                                  (ValueError("parser broke"), "провал", 1)]:
+        def raising(*args, _exc=exc):
+            raise _exc
+        fc = types.SimpleNamespace(FETCHERS={"тест": raising})
+        report, code = ca.run_canaries(fc, registry)
+        check(errors, report["тест"]["результат"] == want and code == want_code,
+              "исключение %r: %r" % (exc, report))
+    return errors
+
+
 def case_nonempty(ca):
     errors = []
     check(errors, ca.is_nonempty(False) and ca.is_nonempty(0) and ca.is_nonempty("нет"),
@@ -484,6 +518,7 @@ def main():
         "формат-кэша": case_cache_format(ca),
         "ttl": case_ttl(ca),
         "канарейки-офлайн": case_canaries(ca, src),
+        "канарейки-доступность": case_canary_availability(ca),
         "непустые-поля": case_nonempty(ca),
         "прокси-отмечен-в-отчёте": case_proxy_marks_report(ca),
         "прокси-негодный-это-отказ": case_proxy_hard_refusal(ca),

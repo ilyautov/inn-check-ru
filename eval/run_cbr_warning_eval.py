@@ -266,7 +266,7 @@ def case_движок_и_профиль(cw, fc, pf, td):
     fetch = {"инн": "7707083893", "тип": "юрлицо", "список_цб": None,
              "_доступность": {"список_цб": блоки["7707083893"][1]}}
     ф = {f["сигнал"]: f for f in pf.resolve(fetch, None, "предоплата")["факты"]}["предупреждение_цб"]
-    check(errors, ф.get("статус") == "отсутствует" and "не значит" in str(ф.get("оговорка")),
+    check(errors, ф.get("статус") == "не проверен" and "missing_required_field" in str(ф.get("текст")),
           "«пусто» без оговорки в факте: %r" % ф)
     путь = Path(td) / "fetch_цб_пусто.json"
     путь.write_text(json.dumps(fetch, ensure_ascii=False), encoding="utf-8")
@@ -274,7 +274,7 @@ def case_движок_и_профиль(cw, fc, pf, td):
                           str(путь), "--профиль", "предоплата"],
                          capture_output=True, text=True, check=False).stdout
     раздел = out.split("4.2.", 1)[-1].split("## ", 1)[0]
-    check(errors, "оговорка источника" in раздел and "не значит" in раздел,
+    check(errors, "не проверено" in out and "missing_required_field" in out,
           "досье 4.2 без оговорки о покрытии списка ЦБ: %s" % раздел[:600])
 
     # снимок хранит формулировку, ретро того же снимка даёт тот же вердикт
@@ -303,7 +303,7 @@ def case_движок_и_профиль(cw, fc, pf, td):
     восст, _ = rv.восстановить(отпечаток)
     ф = {f["сигнал"]: f for f in pf.resolve(восст, None, "предоплата")["факты"]}.get(
         "предупреждение_цб") or {}
-    check(errors, ф.get("статус") == "отсутствует" and "не значит" in str(ф.get("оговорка")),
+    check(errors, ф.get("статус") == "не проверен" and "missing_required_field" in str(ф.get("текст")),
           "ретро «пусто» без оговорки: %r" % ф)
     check(errors, not re.search(r"\d{4}-\d{2}-\d{2}|\d{3,}",
                                 str(блоки["7707083893"][1].get("причина"))),

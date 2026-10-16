@@ -29,14 +29,13 @@ k/n» при k < n — «частично», это не «ок». Учётки 
 Код выхода прогона 1, если хотя бы один не «ок».
 
 --установить-расписание НИЧЕГО НЕ УСТАНАВЛИВАЕТ: печатает строки crontab и
-launchd plist (раз в месяц) с путями текущей установки. Значение
+launchd plist и Windows XML (ежедневно) с путями текущей установки. Значение
 INN_CHECK_PROXY в них не печатается.
 """
 
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -180,58 +179,30 @@ def прогон(путь=None, запуск=subprocess.run):
 
 
 def расписание(путь=None, день=5, час=4, минута=0):
+    """Generate daily templates, safely before every selected dataset TTL.
+
+    день remains accepted for CLI compatibility; a monthly interval was unsafe
+    for sanctions and is intentionally no longer used to schedule updates.
+    """
+    if _HERE not in sys.path:
+        sys.path.insert(0, _HERE)
+    from cache_policy import inventory
+    from schedule_templates import render
     путь = os.path.abspath(путь_конфига(путь))
-    прочитать(путь)
-    лог = os.path.join(os.path.expanduser("~"), ".cache", "inn-check-ru", "refresh.log")
-    аргументы = [os.path.abspath(sys.executable), os.path.abspath(__file__), "--прогон",
-                 "--конфиг", путь]
-    # в crontab «%» — перевод строки, его экранируют
-    cron = ("%d %d %d * * mkdir -p %s && %s >> %s 2>&1" % (
-        минута, час, день, shlex.quote(os.path.dirname(лог)),
-        " ".join(shlex.quote(а) for а in аргументы), shlex.quote(лог))).replace("%", "\\%")
-    from xml.sax.saxutils import escape
-    plist = """<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
-"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>%s</string>
-  <key>ProgramArguments</key>
-  <array>
-%s
-  </array>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Day</key><integer>%d</integer>
-    <key>Hour</key><integer>%d</integer>
-    <key>Minute</key><integer>%d</integer>
-  </dict>
-  <key>StandardOutPath</key>
-  <string>%s</string>
-  <key>StandardErrorPath</key>
-  <string>%s</string>
-</dict>
-</plist>""" % (МЕТКА_LAUNCHD, "\n".join("    <string>%s</string>" % escape(a) for a in аргументы),
-               день, час, минута, escape(лог), escape(лог))
-    текст = [
-        "Ничего не установлено — ниже готовые строки, поставьте их сами.",
-        "Индексы и сеть берутся из конфига %s при каждом прогоне." % путь,
-        "Если в конфиге есть \"env\", добавьте INN_CHECK_PROXY в окружение задания сами.",
-        "",
-        "crontab, %d-го числа каждого месяца в %02d:%02d:" % (день, час, минута),
-        "  crontab -e   # и вставьте строку:",
-        "  " + cron,
-        "",
-        "launchd (macOS):",
-        "  mkdir -p %s   # каталог лога: launchd сам его не создаст"
-        % shlex.quote(os.path.dirname(лог)),
-        "  сохраните plist ниже как ~/Library/LaunchAgents/%s.plist" % МЕТКА_LAUNCHD,
-        "  launchctl load ~/Library/LaunchAgents/%s.plist" % МЕТКА_LAUNCHD,
-        "",
-        plist,
-    ]
-    return {"cron": cron, "plist": plist, "текст": "\n".join(текст)}
+    selected = прочитать(путь)
+    periods = [row['ttl_days'] - row['refresh_margin_days'] for row in inventory()
+               if row['updater'] in selected and row['ttl_days'] is not None]
+    arguments = [os.path.abspath(sys.executable), os.path.abspath(__file__), '--прогон',
+                 '--конфиг', путь]
+    result = render(arguments, interval_days=max(1, min(periods, default=1)),
+                    hour=час, minute=минута, label=МЕТКА_LAUNCHD)
+    result['текст'] = ('Ничего не установлено — шаблоны для ручной установки.\n'
+                       'Ежедневно в %02d:%02d; день месяца %d принят для совместимости.\n'
+                       'Индексы и сеть берутся из конфига при каждом прогоне.\n'
+                       'INN_CHECK_PROXY добавьте в окружение задания самостоятельно.\n'
+                       'crontab:\n%s\nlaunchd (macOS):\n%s\nWindows Task Scheduler XML:\n%s'
+                       % (час, минута, день, result['cron'], result['plist'], result['windows_xml']))
+    return result
 
 
 def _опция(args, имя):

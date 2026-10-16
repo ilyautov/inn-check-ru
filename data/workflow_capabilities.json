@@ -1,0 +1,596 @@
+{
+  "schema_version": 1,
+  "version": "1.13.0",
+  "release_status": "unpublished",
+  "core_dependencies": [],
+  "mcp_sdk": ">=1.30,<2",
+  "pdf_extra": ">=6.21,<7",
+  "mcp_tool_count": 33,
+  "entry_points": {
+    "inn-check-ru": "fetch_counterparty:cli",
+    "inn-check-ru-mcp": "inn_check_ru_mcp.server:entry",
+    "inn-check-workflow": "workflow_cli:cli"
+  },
+  "channels": {
+    "cli": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "optional_extra_and_host_binaries",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host."
+    },
+    "plain_mcp": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "unsupported_public_input_use_host_cli",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host. Public MCP document input accepts text or managed markdown/json/snapshot/docx artifacts; no PDF upload, local path or base64 input. Use the host CLI for PDF extraction."
+    },
+    "docker": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "unsupported_in_default_artifact",
+      "host_acceptance": "not_run",
+      "notes": "Docker paths require writable host-mounted directories and container-visible policy/binaries. Public MCP document input accepts text or managed markdown/json/snapshot/docx artifacts; no PDF upload, local path or base64 input. Use the host CLI for PDF extraction."
+    },
+    "claude_plugin": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "plugin_user_config",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "plugin_user_config",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PROXY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "run_store": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "event_store": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "provider_policy": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "pdf_renderer": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "tesseract": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        }
+      },
+      "workflow": "supported",
+      "pdf": "unsupported_in_default_artifact",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host. Public MCP document input accepts text or managed markdown/json/snapshot/docx artifacts; no PDF upload, local path or base64 input. Use the host CLI for PDF extraction."
+    },
+    "mcpb": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "mcpb_user_config",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "mcpb_user_config",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "mcpb_user_config",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "event_store": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "provider_policy": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "pdf_renderer": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "tesseract": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        }
+      },
+      "workflow": "supported",
+      "pdf": "unsupported_in_default_artifact",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host. Public MCP document input accepts text or managed markdown/json/snapshot/docx artifacts; no PDF upload, local path or base64 input. Use the host CLI for PDF extraction."
+    },
+    "codex_skill": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "optional_extra_and_host_binaries",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host."
+    },
+    "cursor_skill": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "optional_extra_and_host_binaries",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host."
+    },
+    "gemini_extension": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "optional_extra_and_host_binaries",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host. Public MCP document input accepts text or managed markdown/json/snapshot/docx artifacts; no PDF upload, local path or base64 input. Use the host CLI for PDF extraction."
+    },
+    "release_zip": {
+      "settings": {
+        "checko_key": {
+          "status": "supported",
+          "environment": "CHECKO_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "dadata_key": {
+          "status": "supported",
+          "environment": "DADATA_API_KEY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "proxy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROXY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "supported",
+      "pdf": "optional_extra_and_host_binaries",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host."
+    },
+    "browser_extension": {
+      "settings": {
+        "checko_key": {
+          "status": "unsupported",
+          "environment": "CHECKO_API_KEY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "dadata_key": {
+          "status": "unsupported",
+          "environment": "DADATA_API_KEY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "proxy": {
+          "status": "unsupported",
+          "environment": "INN_CHECK_PROXY",
+          "route": null,
+          "limitation": "No declared channel configuration field; inherited host environment is not guaranteed by this channel."
+        },
+        "run_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_RUNS_DIR",
+          "route": "native_host_environment",
+          "limitation": null
+        },
+        "event_store": {
+          "status": "supported",
+          "environment": "INN_CHECK_EVENTS_DIR",
+          "route": "native_host_environment",
+          "limitation": null
+        },
+        "provider_policy": {
+          "status": "supported",
+          "environment": "INN_CHECK_PROVIDER_POLICY",
+          "route": "native_host_environment",
+          "limitation": null
+        },
+        "pdf_renderer": {
+          "status": "supported",
+          "environment": "INN_CHECK_PDF_RENDERER",
+          "route": "native_host_environment",
+          "limitation": null
+        },
+        "tesseract": {
+          "status": "supported",
+          "environment": "INN_CHECK_TESSERACT",
+          "route": "native_host_environment",
+          "limitation": null
+        }
+      },
+      "workflow": "native_manual_handoff_only",
+      "pdf": "unsupported_in_default_artifact",
+      "host_acceptance": "not_run",
+      "notes": "Configuration support does not attest installation in a real agent host."
+    }
+  },
+  "platform_matrix": {
+    "operating_systems": [
+      "linux",
+      "macos",
+      "windows"
+    ],
+    "python_versions": [
+      "3.10",
+      "3.12"
+    ],
+    "ci_execution": "not_run"
+  },
+  "security": {
+    "configuration_owner": "host",
+    "mcp_accepts_root_path_or_executable": false,
+    "paid_fallback": "explicit_host_policy_and_budget",
+    "schedulers_installed_automatically": false,
+    "outbound_notifications_automatic": false
+  },
+  "empirical_validation": "awaiting_external_evidence"
+}

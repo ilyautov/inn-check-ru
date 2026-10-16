@@ -3,30 +3,31 @@
 
 Паттерн humanizer-ru: счётчики внутри растра не должны отставать от правды —
 картинка собирается из тех же источников, что и остальное:
-  - реестры  — строки таблицы каскада источников в SKILL.md;
-  - сигналы  — флаги fin_scoring (вызовы флаг()), признаки droblenie_check
-               (вызовы признак()) и пункты чеклиста однодневки в SKILL.md.
+  - источники — записи SOURCES в scripts/sources.py;
+  - сигналы профилей — записи «сигналы» в data/profiles_ru.json.
+Это единицы текущих каталогов: переход от строк каскада и суммы чеклистов
+меняет методику счётчиков, а не означает рост функциональности.
 Палитра повторяет фирменную (docs/style.css семьи репозиториев автора).
 
 Запуск:
     python3 scripts/make_social_preview.py            # перерисовать
     python3 scripts/make_social_preview.py --check    # гейт: растр на текущих счётчиках
 
-Нужен Pillow (`pip install pillow`) и моноширинный шрифт с кириллицей
-(macOS Menlo, Linux DejaVu Sans Mono).
+Для перерисовки нужны Pillow (`pip install pillow`) и моноширинный шрифт
+с кириллицей (macOS Menlo, Linux DejaVu Sans Mono). Для --check хватит stdlib.
 """
 
 import argparse
-import re
+import json
+import runpy
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets" / "social-preview.png"
 STAMP = ROOT / "assets" / ".social-preview-counters"
-SKILL = ROOT / "SKILL.md"
-FIN = ROOT / "scripts" / "fin_scoring.py"
-DROB = ROOT / "scripts" / "droblenie_check.py"
+SOURCES = ROOT / "scripts" / "sources.py"
+PROFILES = ROOT / "data" / "profiles_ru.json"
 
 # Палитра семьи (docs/style.css humanizer-ru).
 BG = (10, 13, 19)
@@ -48,16 +49,14 @@ FONT_CANDIDATES = (
 
 
 def counters():
-    """Источники истины — SKILL.md и скрипты, а не рукой вбитые числа."""
-    skill = SKILL.read_text(encoding="utf-8")
-    реестры = len(re.findall(r"^\|\s*[🟢🟡🔴⚪]", skill, re.MULTILINE))
-    фин = len(re.findall(r"^\s+флаг\(\"", FIN.read_text(encoding="utf-8"),
-                         re.MULTILINE))
-    дроб = len(re.findall(r"^\s+признак\(\"",
-                          DROB.read_text(encoding="utf-8"), re.MULTILINE))
-    секция = skill.split("## Признаки однодневки")[1].split("## ")[0]
-    однодневка = len(re.findall(r"^- ", секция, re.MULTILINE))
-    return реестры, фин + дроб + однодневка
+    """Размеры канонических каталогов, независимо от разметки SKILL.md."""
+    # Явный путь берёт каталог этого checkout, а не одноимённый установленный модуль.
+    источники = runpy.run_path(str(SOURCES))["SOURCES"]
+    сигналы = json.loads(PROFILES.read_text(encoding="utf-8"))["сигналы"]
+    for имя, каталог in (("SOURCES", источники), ("сигналы", сигналы)):
+        if not isinstance(каталог, dict) or not каталог:
+            raise ValueError("пустой или некорректный каталог %s" % имя)
+    return len(источники), len(сигналы)
 
 
 def _font(path, size, bold=False):
@@ -78,7 +77,7 @@ def _мн(n, одна, две, пять):
     return пять
 
 
-def draw(реестры, сигналы):
+def draw(источники, сигналы):
     from PIL import Image, ImageDraw
 
     font_path = next((p for p in FONT_CANDIDATES if Path(p).exists()), None)
@@ -114,8 +113,8 @@ def draw(реестры, сигналы):
         x += 42 + int(d.textlength(label, font=chip)) + 46
 
     chips = [
-        ("%d %s" % (реестры, _мн(реестры, "реестр", "реестра", "реестров")), ACCENT),
-        ("%d %s риска кодом" % (сигналы, _мн(сигналы, "сигнал", "сигнала", "сигналов")), ACCENT),
+        ("%d %s" % (источники, _мн(источники, "источник", "источника", "источников")), ACCENT),
+        ("%d %s профилей" % (сигналы, _мн(сигналы, "сигнал", "сигнала", "сигналов")), ACCENT),
         ("числа с источником и датой", TEXT_DIM),
         ("Apache-2.0", TEXT_DIM),
     ]
@@ -133,9 +132,9 @@ def draw(реестры, сигналы):
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     im.save(OUT)
-    STAMP.write_text("%d/%d\n" % (реестры, сигналы), encoding="utf-8")
-    print("[ok] %s: %d %s, %d %s" % (
-        OUT.relative_to(ROOT), реестры, _мн(реестры, "реестр", "реестра", "реестров"),
+    STAMP.write_text("%d/%d\n" % (источники, сигналы), encoding="utf-8")
+    print("[ok] %s: %d %s, %d %s профилей" % (
+        OUT.relative_to(ROOT), источники, _мн(источники, "источник", "источника", "источников"),
         сигналы, _мн(сигналы, "сигнал", "сигнала", "сигналов")))
 
 
@@ -145,9 +144,9 @@ def main():
                     help="только проверить, что растр собран на текущих счётчиках")
     args = ap.parse_args()
 
-    реестры, сигналы = counters()
+    источники, сигналы = counters()
     if args.check:
-        want = "%d/%d" % (реестры, сигналы)
+        want = "%d/%d" % (источники, сигналы)
         have = (STAMP.read_text(encoding="utf-8").strip()
                 if STAMP.exists() else "(нет отметки)")
         if have != want:
@@ -158,7 +157,7 @@ def main():
         print("[гейт] ✓ social-preview.png на актуальных счётчиках (%s)" % want)
         return 0
 
-    draw(реестры, сигналы)
+    draw(источники, сигналы)
     return 0
 
 

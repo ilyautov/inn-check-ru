@@ -1,0 +1,309 @@
+{
+  "review_date": "2026-10-16",
+  "repository": "https://github.com/ilyautov/inn-check-ru",
+  "commit": "3e06046995860b5360df5dd3a6110bd7108d36a3",
+  "version": "1.12.3",
+  "python": "3.12.1; pyexpat import verified",
+  "source_changes": false,
+  "eval_scripts": [
+    {
+      "name": "run_access_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.24
+    },
+    {
+      "name": "run_batch_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 2.01
+    },
+    {
+      "name": "run_benchmark_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.13
+    },
+    {
+      "name": "run_benchmarks_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.15
+    },
+    {
+      "name": "run_ca_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.07
+    },
+    {
+      "name": "run_calibration_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.1
+    },
+    {
+      "name": "run_cbr_registries_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.19
+    },
+    {
+      "name": "run_cbr_warning_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.15
+    },
+    {
+      "name": "run_commands_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.04
+    },
+    {
+      "name": "run_diff_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 2.33
+    },
+    {
+      "name": "run_disq_dump_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.1
+    },
+    {
+      "name": "run_domain_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.04
+    },
+    {
+      "name": "run_dossier_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 1.45
+    },
+    {
+      "name": "run_erknm_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.49
+    },
+    {
+      "name": "run_evidence_pack_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.6
+    },
+    {
+      "name": "run_extension_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.12
+    },
+    {
+      "name": "run_extract_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 2.97
+    },
+    {
+      "name": "run_fetch_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.71
+    },
+    {
+      "name": "run_fin_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.17
+    },
+    {
+      "name": "run_fsa_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.65
+    },
+    {
+      "name": "run_graph_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 3.0
+    },
+    {
+      "name": "run_manual_block_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.1
+    },
+    {
+      "name": "run_mcp_sdk_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.21
+    },
+    {
+      "name": "run_minpromtorg_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.09
+    },
+    {
+      "name": "run_native_host_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.45
+    },
+    {
+      "name": "run_native_host_windows.py",
+      "status": "skip",
+      "reason": "Windows only"
+    },
+    {
+      "name": "run_offline_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 14.33
+    },
+    {
+      "name": "run_opendata_index_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.4
+    },
+    {
+      "name": "run_paper_vat_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.83
+    },
+    {
+      "name": "run_pledge_text_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.04
+    },
+    {
+      "name": "run_profiles_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.23
+    },
+    {
+      "name": "run_refresh_indexes_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.07
+    },
+    {
+      "name": "run_registries_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.07
+    },
+    {
+      "name": "run_retro_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 7.36
+    },
+    {
+      "name": "run_rospatent_tz_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.1
+    },
+    {
+      "name": "run_ru_opendata_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.68
+    },
+    {
+      "name": "run_rzn_licenses_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.11
+    },
+    {
+      "name": "run_sanctions_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.63
+    },
+    {
+      "name": "run_skill_gate.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.24
+    },
+    {
+      "name": "run_svetofor_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 5.98
+    },
+    {
+      "name": "run_uc_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.11
+    },
+    {
+      "name": "run_version_gate.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.04
+    },
+    {
+      "name": "run_watchlist_eval.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 1.54
+    },
+    {
+      "name": "run_workflows_gate.py",
+      "status": "pass",
+      "exit_code": 0,
+      "seconds": 0.03
+    }
+  ],
+  "ruff": "All checks passed",
+  "mcp_smoke": {
+    "tools_impl": "pass",
+    "sdk_transport": "pass",
+    "live_stdio_handshake": "pass"
+  },
+  "dependency_scans": {
+    "npm_audit": "0 known vulnerabilities in resolved site lockfile",
+    "pip_audit": "No known vulnerabilities in resolved MCP requirements"
+  },
+  "live_run": {
+    "inn": "7707083893",
+    "mode": "всё",
+    "credentials": "none",
+    "cache": "isolated empty",
+    "exit_code": 0,
+    "elapsed_seconds": 29.41,
+    "source_counts": {
+      "ok": 4,
+      "пусто": 7,
+      "не проверено": 22
+    },
+    "coverage_note": "One CLI observation; includes inapplicable sources and unprepared caches. Registry truth not independently validated; no browser or agent end-to-end acceptance."
+  },
+  "github_runs": {
+    "ci": "https://github.com/ilyautov/inn-check-ru/actions/runs/38256727706",
+    "canary": "https://github.com/ilyautov/inn-check-ru/actions/runs/38271936591"
+  },
+  "unverified": [
+    "Real native-host installation in browser",
+    "Windows behavior locally",
+    "Full agent-host session",
+    "Independent ground truth for live sources",
+    "Full Git history secret scan",
+    "Visual and accessibility audit of site"
+  ]
+}

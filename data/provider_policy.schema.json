@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Host provider policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "total_cost_units",
+    "providers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "total_cost_units": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000000000
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "enabled",
+          "allowed_fields",
+          "export_fields",
+          "request_limit",
+          "request_cost_units",
+          "fallback_on"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "checko",
+              "dadata"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "allowed_fields": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "address",
+                "graph",
+                "name",
+                "дисквалификация",
+                "дисквалификация_руководителя",
+                "недостоверность",
+                "недостоверность_сведений"
+              ]
+            }
+          },
+          "export_fields": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "address",
+                "graph",
+                "name",
+                "дисквалификация",
+                "дисквалификация_руководителя",
+                "недостоверность",
+                "недостоверность_сведений"
+              ]
+            }
+          },
+          "request_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "request_cost_units": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "fallback_on": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "quota_exhausted",
+                "unavailable",
+                "timeout"
+              ]
+            }
+          },
+          "transient_retries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  },
+  "$comment": "Runtime validate_policy additionally enforces unique provider IDs, supported provider fields and export_fields subset of allowed_fields."
+}

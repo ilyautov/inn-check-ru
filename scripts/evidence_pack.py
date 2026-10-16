@@ -62,6 +62,23 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+# Preserve flat installed imports and legacy absolute-file entry points.
+try:
+    from sibling_imports import load_sibling as _load_sibling
+except ModuleNotFoundError as _error:
+    if _error.name != "sibling_imports":
+        raise
+    import importlib.util as _import_util
+    import sys as _import_sys
+    from pathlib import Path as _ImportPath
+    _spec = _import_util.spec_from_file_location(
+        "sibling_imports", _ImportPath(__file__).resolve().with_name("sibling_imports.py"))
+    _helper = _import_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_helper)
+    # Publish only the complete, stateless bootstrap. Concurrent bootstrap calls
+    # all select the same helper; dependency loads use Python's module locks.
+    _load_sibling = _import_sys.modules.setdefault("sibling_imports", _helper).load_sibling
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 
@@ -125,7 +142,11 @@ def _версия():
             return m.group(1)
     except OSError:
         pass
-    return "не определена"
+    try:
+        from importlib.metadata import version
+        return version("inn-check-ru")
+    except Exception:
+        return "не определена"
 
 
 def _имя_источника(ист):
@@ -149,7 +170,52 @@ def каталог_годится(путь):
     return None
 
 
-def записать_пакет(каталог, inn, fetch, ответы, штамп=None, now=None):
+
+def sanitize_capture(record, *, secrets=()):
+    """Sanitize a new recorded response; hashes refer to these saved bytes only.
+
+    Non-JSON opaque bodies are withheld: they have no checked field locators and
+    cannot be reliably redacted. Existing packs/manual attachments are untouched.
+    """
+    redact = _load_sibling("redaction").redact
+    safe = dict(record)
+    original = record.get("данные") or b""
+    request = record.get("тело_запроса")
+    discovered = list(secrets)
+    parsed = None
+    try:
+        parsed = json.loads(original)
+        if isinstance(parsed, dict) and "t" in parsed:
+            token = parsed.pop("t")
+            if isinstance(token, str) and token:
+                discovered.append(token)
+    except (ValueError, UnicodeError):
+        pass
+    request_value = None
+    if request:
+        try:
+            request_value = json.loads(request)
+        except (ValueError, UnicodeError):
+            try:
+                request_value = dict(urllib.parse.parse_qsl(request.decode("utf-8"), keep_blank_values=True))
+            except (AttributeError, UnicodeError):
+                request_value = None
+    cleaned = redact({"response": parsed, "request": request_value,
+                      "url": record.get("url") or ""}, secrets=discovered)
+    metadata = {k: v for k, v in record.items() if k not in ("данные", "тело_запроса")}
+    safe.update(redact(metadata, secrets=discovered))
+    safe["url"] = cleaned["url"]
+    safe["данные"] = (json.dumps(cleaned["response"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                       if parsed is not None else b"")
+    safe["тело_запроса"] = (json.dumps(cleaned["request"], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                            if cleaned["request"] is not None else None)
+    safe["capture_format"] = "sanitized_json_v1" if parsed is not None else "withheld_non_json_v1"
+    safe["original_response_preserved"] = (safe["данные"] == original and
+        record.get("original_response_preserved", True))
+    safe["sha256"] = _sha256(safe["данные"])
+    return safe
+
+def записать_пакет(каталог, inn, fetch, ответы, штамп=None, now=None, *, secrets=()):
     """Пишет пакет; возвращает {каталог, ответов, файлов, манифест_sha256, штамп}.
 
     `ответы` — записи движка (_ЗАПИСЬ["ответы"]): источник, метод, url, статус,
@@ -159,16 +225,39 @@ def записать_пакет(каталог, inn, fetch, ответы, шта
     ошибка = каталог_годится(каталог)
     if ошибка:
         raise ValueError(ошибка)
+    policy_module = _load_sibling("provider_policy")
+    captured = policy_module.captured_policy(fetch)
+    if captured is not None:
+        # Export is a distinct projection; original archived captures are untouched.
+        fetch = policy_module.export_allowed(fetch, captured)
+        ответы = []
+    # Labelled captures may already have been durably saved by a callback.
+    # Never rewrite those bytes under the old response ID and locator hash.
+    recordings = []
+    for original in ответы:
+        safe = sanitize_capture(original, secrets=secrets)
+        if original.get("capture_format") and any(safe.get(k) != original.get(k)
+                for k in ("данные", "тело_запроса", "url")):
+            raise ValueError("captured_bytes_redaction_mismatch")
+        recordings.append(safe)
+    redact = _load_sibling("redaction").redact
+    fetch = redact(fetch, secrets=secrets)
+    if "_evidence" in fetch:
+        validate_evidence = _load_sibling("evidence_contract").validate_evidence
+        if validate_evidence(fetch):
+            raise ValueError("evidence_redaction_required")
     корень = Path(каталог)
     raw = корень / "raw"
     raw.mkdir(parents=True, exist_ok=True)
-
     индекс = []
-    for n, о in enumerate(ответы, 1):
+    for n, о in enumerate(recordings, 1):
         база = "%03d_%s" % (n, _имя_источника(о.get("источник")))
         данные = о.get("данные") or b""
         (raw / (база + ".bin")).write_bytes(данные)
         запись = {
+            "response_id": о.get("response_id"),
+            "capture_format": о.get("capture_format"),
+            "original_response_preserved": о.get("original_response_preserved", False),
             "файл": "raw/%s.bin" % база,
             "источник": о.get("источник"),
             "метод": о.get("метод"),

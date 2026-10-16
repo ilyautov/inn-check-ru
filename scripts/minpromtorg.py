@@ -42,7 +42,11 @@ import urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dump_tools
 
-CACHE_DIR = os.path.expanduser(os.path.join("~", ".cache", "inn-check-ru", "minpromtorg"))
+if os.path.dirname(os.path.abspath(__file__)) not in sys.path:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cache_policy import dataset_root
+
+CACHE_DIR = str(dataset_root("minpromtorg"))
 CACHE_DIR_ВИДИМЫЙ = "~/.cache/inn-check-ru/minpromtorg"
 ИНДЕКС = "индекс.json.gz"
 САЙТ = "https://minpromtorg.gov.ru"

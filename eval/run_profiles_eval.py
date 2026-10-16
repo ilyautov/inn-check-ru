@@ -20,6 +20,8 @@ run_profiles_eval.py — офлайн-eval профилей цели (волна
 PASS/FAIL, чистый stdlib, сети не требует — гоняется в CI.
 """
 
+import datetime
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -29,6 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
 PROFILES_JSON = ROOT / "data" / "profiles_ru.json"
+sys.path.insert(0, str(SCRIPTS))
 
 ДАТА = "2026-09-19"
 
@@ -71,6 +74,8 @@ def fetch_clean(**overrides):
         "суды": _av("ok", tier="🔴", требует="браузер"),
         "банкротство": _av("ok", tier="🔴", требует="браузер"),
         "дампы_фнс": _av("ok", tier="🟡", требует="кэш"),
+        "федресурс": _av("ok", tier="🟡"),
+        "список_цб": _av("пусто", tier="🟢", требует="кэш"),
     }
     data = {
         "инн": "7707083893", "тип": "юрлицо",
@@ -86,6 +91,7 @@ def fetch_clean(**overrides):
         "финансы": {"отчётность_по_годам": []},
         "мсп": {"статус_мсп": "в реестре", "категория": "малое предприятие"},
         "нпд": None,
+        "федресурс": {"намерение_кредитора": False, "намерение_должника": False},
         "спецреестры": {"дисквалификация_руководителя": False,
                         "налоговая_задолженность": False,
                         "недостоверность_сведений": False},
@@ -99,7 +105,10 @@ def fetch_clean(**overrides):
         "суды": {"статус": "проверено", "ответчик_дел": 0, "ответчик_сумма": 0,
                  "ответчик_крупные": False, "ввод": "браузер",
                  "дата_проверки": "2026-09-19", "url": "https://kad.arbitr.ru/"},
-        "банкротство": {"статус": "проверено", "процедура": False},
+        # Отрицательные поля здесь заданы явно: «чистая» синтетика отличается
+        # от частичной выдачи, в которой отсутствие ключа означает unknown.
+        "банкротство": {"статус": "проверено", "процедура": False,
+                        "заявления": False, "прекращённое_дело": False},
         "_доступность": доступность,
         "_итог_проверки": {
             "источников": 12, "ok": 9, "пусто": 3, "не_проверено": 0,
@@ -110,22 +119,78 @@ def fetch_clean(**overrides):
             "вывод": "проверка состоялась: 7 из 7 deal-killer-источников проверено",
         },
     }
+    data["финансы"] = json.loads((ROOT / "eval/fixtures/healthy.json").read_text())["финансы"]
+    data["финансы"]["форма_отчётности"] = "full"
+    data["егрюл"]["уставный_капитал"] = 10000
+    data["риски"]["среднесписочная_за_год"] = 2024
     data.update(overrides)
-    return data
+    return synthetic_verified(data)
 
 
-def fin_ok(*flag_ids):
-    """fin-JSON в формате fin_scoring.py с указанными флагами."""
-    sev = {"ча_отрицательные_2года": "🔴"}
-    return {
-        "статус": "ок",
-        "флаги": [{"id": f, "severity": sev.get(f, "🟡"),
-                   "показатель": f, "значение": -1.0, "порог": "тест",
-                   "пояснение": "синтетический флаг", "источник": "ГИР БО",
-                   "год": "2024–2025", "строки_баланса": {}} for f in flag_ids],
-        "финансовый_профиль": {"сводка": "тест", "не_проверено": [],
-                               "строки_баланса": {}},
-    }
+
+def synthetic_verified(data):
+    """Explicit IN-MEMORY synthetic fixture observations; no registry truth claim.
+
+    Every supplied field has a real pointer into the serialized synthetic body.
+    Missing fields stay missing, and a missing/partial source stays unavailable.
+    """
+    import evidence_contract as ec
+    data = json.loads(json.dumps(data))
+    data.pop("_evidence", None)
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    body = dict(data, fixture_asof=now)
+    raw = json.dumps(body, ensure_ascii=False).encode()
+    refs = {"responses": {}, "fields": {}}
+    policy = json.loads((ROOT / "data/evidence_policy.json").read_text())
+    for field, spec in policy["fields"].items():
+        if spec.get("derived"):
+            continue
+        node = data
+        for part in field.split("."):
+            node = node.get(part) if isinstance(node, dict) else None
+        if node is None:
+            continue
+        source = spec["source_id"]
+        if isinstance(data.get(source), dict) and data[source].get("инн") is not None:
+            continue  # foreign/scoped manual-block cases are tested by the resolver
+        rid = "synthetic-" + source
+        refs["responses"][rid] = {"source_id": source, "subject_inn": data["инн"],
+            "request": {"subject_inn": data["инн"]}, "body": raw,
+            "sha256": hashlib.sha256(raw).hexdigest(), "retrieved_at": now}
+        refs["fields"][field] = [{"response_id": rid, "locator": "/" + field.replace(".", "/"),
+            "subject_locator": "/инн", "search_scope": {"subject_inn": data["инн"], "query": "synthetic complete fixture " + data["инн"]},
+            "coverage_complete": True, "effective_at": now, "date_locators": {"effective_at": "/fixture_asof"}}]
+    return ec.enrich(data, now=now, raw_refs=refs)
+
+def fin_ok(fetch, *flag_ids):
+    """Score actual synthetic scenario inputs, never manufacture output statuses."""
+    import fin_scoring
+    if flag_ids:
+        rows = sorted(fetch["финансы"]["отчётность_по_годам"], key=lambda r: r["год"], reverse=True)
+        for flag in flag_ids:
+            if flag == "ча_отрицательные_2года":
+                for row in rows[:2]:
+                    row["строки"]["1300"] = -100
+            elif flag == "коэффициент_автономии":
+                rows[0]["строки"]["1600"] = rows[0]["строки"]["1300"] * 20
+            elif flag == "текущая_ликвидность":
+                rows[0]["строки"]["1200"] = rows[0]["строки"]["1500"] / 2
+            elif flag == "убыток_2года":
+                for row in rows[:2]:
+                    row["строки"]["2400"] = -100
+            elif flag == "транзитный_профиль":
+                rows[0]["строки"]["2110"] = fin_scoring._строка(rows[1], "2110") * 5
+                fetch["риски"]["численность_сотрудников"] = 0
+            else:
+                raise AssertionError("unsupported synthetic scenario: " + flag)
+        verified = synthetic_verified(fetch)
+        fetch.clear()
+        fetch.update(verified)
+    return fin_scoring.score(fetch)
+
+
+def resolve_fixture(module, fetch, profile, *flag_ids):
+    return module.resolve(fetch, fin_ok(fetch, *flag_ids), profile)
 
 
 def fin_not_checked():
@@ -137,7 +202,7 @@ def fin_not_checked():
 
 def case_a_neutral(pf):
     errors = []
-    res = pf.resolve(fetch_clean(), fin_ok(), "нейтрально")
+    res = resolve_fixture(pf, fetch_clean(), "нейтрально")
     check(errors, res.get("профиль") == "нейтрально", "профиль %r" % res.get("профиль"))
     check(errors, res.get("светофор") is None,
           "нейтрально: светофор должен быть null, есть %r" % res.get("светофор"))
@@ -154,7 +219,7 @@ def case_a_neutral(pf):
     check(errors, res.get("проверка_состоялась") is True,
           "нейтрально: проверка_состоялась %r" % res.get("проверка_состоялась"))
     # даже с 🔴-флагом нейтральный профиль не выносит вердикт
-    res2 = pf.resolve(fetch_clean(), fin_ok("ча_отрицательные_2года"), "нейтрально")
+    res2 = resolve_fixture(pf, fetch_clean(), "нейтрально", "ча_отрицательные_2года")
     check(errors, res2.get("светофор") is None,
           "нейтрально с 🔴-флагом: светофор %r, ожидался null" % res2.get("светофор"))
     check(errors, any(f.get("сигнал") == "ча_отрицательные_2года"
@@ -172,7 +237,7 @@ def case_a_neutral(pf):
 
 def case_b_otsrochka_red(pf):
     errors = []
-    res = pf.resolve(fetch_clean(), fin_ok("ча_отрицательные_2года"), "отсрочка")
+    res = resolve_fixture(pf, fetch_clean(), "отсрочка", "ча_отрицательные_2года")
     check(errors, res.get("светофор") == "🔴",
           "отсрочка + ЧА<0 два года: светофор %r, ожидался 🔴" % res.get("светофор"))
     поднят = [s.get("сигнал") for s in res.get("поднят_сигналами", [])]
@@ -184,12 +249,12 @@ def case_b_otsrochka_red(pf):
     check(errors, res.get("проверка_состоялась") is True,
           "отсрочка: проверка_состоялась %r" % res.get("проверка_состоялась"))
     # чистая компания на отсрочке → 🟢 с рекомендацией профиля
-    res_g = pf.resolve(fetch_clean(), fin_ok(), "отсрочка")
+    res_g = resolve_fixture(pf, fetch_clean(), "отсрочка")
     check(errors, res_g.get("светофор") == "🟢",
           "отсрочка чистая: светофор %r, ожидался 🟢" % res_g.get("светофор"))
     check(errors, bool(res_g.get("рекомендация")), "отсрочка 🟢: пустая рекомендация")
     # 🟡-сигнал → 🟡, не выше
-    res_y = pf.resolve(fetch_clean(), fin_ok("текущая_ликвидность"), "отсрочка")
+    res_y = resolve_fixture(pf, fetch_clean(), "отсрочка", "текущая_ликвидность")
     check(errors, res_y.get("светофор") == "🟡",
           "отсрочка + ликвидность<1: светофор %r, ожидался 🟡" % res_y.get("светофор"))
     return errors
@@ -197,7 +262,7 @@ def case_b_otsrochka_red(pf):
 
 def case_c_dolya_yellow(pf):
     errors = []
-    res = pf.resolve(fetch_clean(), fin_ok("ча_отрицательные_2года"), "доля")
+    res = resolve_fixture(pf, fetch_clean(), "доля", "ча_отрицательные_2года")
     check(errors, res.get("светофор") in ("🟡", "🟢"),
           "доля + ЧА<0 два года: светофор %r, ожидался не выше 🟡" % res.get("светофор"))
     check(errors, res.get("светофор") == "🟡",
@@ -210,7 +275,7 @@ def case_c_dolya_yellow(pf):
     # но ликвидация — deal-killer и для доли
     fetch = fetch_clean()
     fetch["егрюл"]["статус"] = "в стадии ликвидации"
-    res_r = pf.resolve(fetch, fin_ok(), "доля")
+    res_r = resolve_fixture(pf, fetch, "доля")
     check(errors, res_r.get("светофор") == "🔴",
           "доля + ликвидация: светофор %r, ожидался 🔴" % res_r.get("светофор"))
     return errors
@@ -226,7 +291,7 @@ def case_d_not_happened(pf, profiles):
         fetch["_доступность"][src] = _av("не проверено", "не покрыто: нужен браузер")
         fetch[src] = None
     for pid in profiles["профили"]:
-        res = pf.resolve(fetch, fin_ok(), pid)
+        res = resolve_fixture(pf, fetch, pid)
         check(errors, res.get("светофор") is None,
               "%s: при проверка_состоялась=false светофор %r, ожидался null"
               % (pid, res.get("светофор")))
@@ -240,7 +305,7 @@ def case_d_not_happened(pf, profiles):
     # найденный deal-killer поднимает 🔴 даже при неполной проверке (только вверх)
     fetch2 = json.loads(json.dumps(fetch))
     fetch2["егрюл"]["статус"] = "в стадии ликвидации"
-    res2 = pf.resolve(fetch2, fin_ok(), "отсрочка")
+    res2 = resolve_fixture(pf, fetch2, "отсрочка")
     check(errors, res2.get("светофор") == "🔴",
           "отсрочка, ликвидация при неполной проверке: светофор %r, ожидался 🔴"
           % res2.get("светофор"))
@@ -274,13 +339,18 @@ def case_e_115fz_sanctions_unchecked(pf):
     fetch_hit["санкции"]["совпадений"] = 1
     fetch_hit["санкции"]["совпадения"] = [{"список": "Росфинмониторинг",
                                            "совпадение": "по ИНН (точное)"}]
-    res_hit = pf.resolve(fetch_hit, None, "клиент_115фз")
+    res_hit = pf.resolve(synthetic_verified(fetch_hit), None, "клиент_115фз")
     check(errors, res_hit.get("светофор") == "🔴",
           "клиент_115фз + совпадение РФМ: светофор %r, ожидался 🔴" % res_hit.get("светофор"))
-    # без fin-JSON профиль 115-ФЗ не требует финансов и выносит вердикт
-    res_clean = pf.resolve(fetch_clean(), None, "клиент_115фз")
-    check(errors, res_clean.get("светофор") == "🟢",
-          "клиент_115фз чистый без fin: светофор %r, ожидался 🟢" % res_clean.get("светофор"))
+    # Красный override транзита требует проверки самого сигнала даже тогда,
+    # когда финансовый источник не входит в обязательные источники профиля.
+    without_fin = fetch_clean()
+    without_fin["финансы"]["отчётность_по_годам"] = []
+    res_clean = pf.resolve(without_fin, None, "клиент_115фз")
+    check(errors, res_clean.get("светофор") is None,
+          "клиент_115фз без финансов: транзит не проверен, ожидался null")
+    check(errors, "транзитный_профиль" in res_clean.get("не_проверено_deal_killer", []),
+          "клиент_115фз: неизвестный красный override транзита потерян")
     return errors
 
 
@@ -341,11 +411,11 @@ def case_g_not_checked_vs_absent(pf):
     fetch["риски"] = None
     fetch["_доступность"]["спецреестры"] = _av("не проверено", "схема: не найдено поле t")
     fetch["спецреестры"] = None
-    сигналы = {s["id"]: s for s in pf.extract_signals(fetch, fin_ok())}
+    сигналы = {s["id"]: s for s in pf.extract_signals(fetch, fin_ok(fetch))}
     check(errors, сигналы.get("недостоверность_сведений", {}).get("статус") == "не проверен",
           "недостоверность из блока «не проверено» должна быть «не проверен», есть %r"
           % сигналы.get("недостоверность_сведений", {}).get("статус"))
-    check(errors, "гео" in (сигналы.get("недостоверность_сведений", {}).get("причина") or ""),
+    check(errors, "missing_required_field" in (сигналы.get("недостоверность_сведений", {}).get("причина") or ""),
           "у непроверенного сигнала нет причины из _доступность")
     check(errors, сигналы.get("ликвидация", {}).get("статус") == "отсутствует",
           "ликвидация при ok-ЕГРЮЛ должна быть «отсутствует», есть %r"
@@ -362,13 +432,13 @@ def case_g_not_checked_vs_absent(pf):
     fetch_old["_доступность"] = {k: "ok" for k in fetch_old["_доступность"]}
     fetch_old["_доступность"]["риски"] = "недоступен (URLError)"
     del fetch_old["_итог_проверки"]
-    сигналы3 = {s["id"]: s for s in pf.extract_signals(fetch_old, fin_ok())}
+    сигналы3 = {s["id"]: s for s in pf.extract_signals(fetch_old, fin_ok(fetch_old))}
     check(errors, сигналы3.get("массовый_адрес", {}).get("статус") == "не проверен",
           "строковая _доступность «недоступен» должна давать «не проверен»")
     # найденный сигнал несёт источник и дату
     fetch_hit = fetch_clean()
     fetch_hit["риски"]["массовый_адрес"] = True
-    сигналы4 = {s["id"]: s for s in pf.extract_signals(fetch_hit, fin_ok())}
+    сигналы4 = {s["id"]: s for s in pf.extract_signals(fetch_hit, fin_ok(fetch_hit))}
     m = сигналы4.get("массовый_адрес", {})
     check(errors, m.get("статус") == "найден" and m.get("дата") == ДАТА and m.get("источник"),
           "найденный массовый_адрес без источника/даты: %r" % m)
@@ -399,8 +469,10 @@ def case_h_cli(tmp):
     # нормальный прогон
     fpath = tmp / "fetch.json"
     fipath = tmp / "fin.json"
-    fpath.write_text(json.dumps(fetch_clean(), ensure_ascii=False), encoding="utf-8")
-    fipath.write_text(json.dumps(fin_ok("ча_отрицательные_2года"), ensure_ascii=False),
+    fetch = fetch_clean()
+    fin = fin_ok(fetch, "ча_отрицательные_2года")
+    fpath.write_text(json.dumps(fetch, ensure_ascii=False), encoding="utf-8")
+    fipath.write_text(json.dumps(fin, ensure_ascii=False),
                       encoding="utf-8")
     p2 = subprocess.run([sys.executable, str(script), "--профиль", "отсрочка",
                          "--fetch", str(fpath), "--fin", str(fipath)],
@@ -447,19 +519,19 @@ def case_m_green_needs_mandatory(pf):
     суды_нп["_доступность"]["суды"] = _av("не проверено", tier="🔴", требует="браузер")
     суды_нп["суды"] = None     # как в реальном сборе: блок со статусом «проверено» — ручной ввод
     for pid in ("отсрочка", "предоплата", "доля", "самопроверка"):
-        r = pf.resolve(суды_нп, fin_ok(), pid)
+        r = resolve_fixture(pf, суды_нп, pid)
         check(errors, r.get("светофор") is None,
               "%s: суды не проверены, а светофор %r (%s)"
               % (pid, r.get("светофор"), (r.get("рекомендация") or "")[:80]))
         check(errors, "суды" in (r.get("рекомендация") or ""),
               "%s: в рекомендации не названы непроверенные суды" % pid)
-    жёлтый = pf.resolve(суды_нп, fin_ok("коэффициент_автономии"), "отсрочка")
+    жёлтый = resolve_fixture(pf, суды_нп, "отсрочка", "коэффициент_автономии")
     check(errors, жёлтый.get("светофор") == "🟡",
           "найденный 🟡 при непроверенных судах должен остаться 🟡, есть %r"
           % жёлтый.get("светофор"))
     check(errors, "суды" in (жёлтый.get("рекомендация") or ""),
           "у 🟡 нет оговорки о непроверенных судах")
-    чистый = pf.resolve(fetch_clean(), fin_ok(), "отсрочка")
+    чистый = resolve_fixture(pf, fetch_clean(), "отсрочка")
     check(errors, чистый.get("светофор") == "🟢",
           "контроль: всё проверено и чисто — должен быть 🟢, есть %r" % чистый.get("светофор"))
     return errors
@@ -476,9 +548,10 @@ def case_i_poluchayu_predoplatu(pf):
     errors = []
     # Платёжеспособность: автономия и ликвидность — про «чем он будет платить».
     # Деньги уже пришли, поэтому здесь это ⚪, а у отсрочки — 🟡.
-    платёжеспособность = fin_ok("коэффициент_автономии", "текущая_ликвидность")
-    получаю = pf.resolve(fetch_clean(), платёжеспособность, "получаю_предоплату")
-    отсрочка = pf.resolve(fetch_clean(), платёжеспособность, "отсрочка")
+    fetch = fetch_clean()
+    платёжеспособность = fin_ok(fetch, "коэффициент_автономии", "текущая_ликвидность")
+    получаю = pf.resolve(fetch, платёжеспособность, "получаю_предоплату")
+    отсрочка = pf.resolve(fetch, платёжеспособность, "отсрочка")
     check(errors, отсрочка.get("светофор") == "🟡",
           "контроль: отсрочка на слабой платёжеспособности должна быть 🟡, есть %r"
           % отсрочка.get("светофор"))
@@ -488,18 +561,17 @@ def case_i_poluchayu_predoplatu(pf):
 
     # Но убыток два года подряд — не про «чем платить», а про «не уйдёт ли в
     # банкротство»: тогда полученный платёж оспорят. Это остаётся 🟡.
-    убыток = pf.resolve(fetch_clean(), fin_ok("убыток_2года"), "получаю_предоплату")
+    убыток = resolve_fixture(pf, fetch_clean(), "получаю_предоплату", "убыток_2года")
     check(errors, убыток.get("светофор") == "🟡",
           "получаю_предоплату + убыток 2 года: ожидался 🟡 (риск оспаривания "
           "платежа при банкротстве), есть %r" % убыток.get("светофор"))
 
     # А вот транзитный профиль — наоборот: входящие от транзитёра тянут под 115-ФЗ
-    транзит = pf.resolve(fetch_clean(), fin_ok("транзитный_профиль"),
-                         "получаю_предоплату")
+    транзит = resolve_fixture(pf, fetch_clean(), "получаю_предоплату", "транзитный_профиль")
     check(errors, транзит.get("светофор") == "🔴",
           "получаю_предоплату + транзитный профиль: ожидался 🔴, есть %r"
           % транзит.get("светофор"))
-    отс_транзит = pf.resolve(fetch_clean(), fin_ok("транзитный_профиль"), "отсрочка")
+    отс_транзит = resolve_fixture(pf, fetch_clean(), "отсрочка", "транзитный_профиль")
     check(errors, отс_транзит.get("светофор") == "🟡",
           "контроль: у отсрочки транзит — 🟡 (по умолчанию), есть %r"
           % отс_транзит.get("светофор"))
@@ -507,7 +579,7 @@ def case_i_poluchayu_predoplatu(pf):
     # Банкротство плательщика остаётся стоп-сигналом: платёж оспорят по ст. 61.3
     fetch = fetch_clean()
     fetch["банкротство"] = {"статус": "проверено", "процедура": True}
-    банкрот = pf.resolve(fetch, fin_ok(), "получаю_предоплату")
+    банкрот = resolve_fixture(pf, fetch, "получаю_предоплату")
     check(errors, банкрот.get("светофор") == "🔴",
           "получаю_предоплату + банкротство плательщика: ожидался 🔴, есть %r"
           % банкрот.get("светофор"))
@@ -524,21 +596,22 @@ def case_j_tender(pf):
     fetch = fetch_clean()
     fetch["рнп"] = {"в_реестре": True, "записей": 1}
     fetch["_доступность"]["рнп"] = _av("ok", tier="🟡", требует="кэш")
-    тендер = pf.resolve(fetch, fin_ok(), "тендер")
+    тендер = resolve_fixture(pf, fetch, "тендер")
     check(errors, тендер.get("светофор") == "🔴",
           "тендер + РНП: ожидался 🔴 (deal-killer), есть %r" % тендер.get("светофор"))
-    отсрочка = pf.resolve(fetch, fin_ok(), "отсрочка")
+    отсрочка = resolve_fixture(pf, fetch, "отсрочка")
     check(errors, отсрочка.get("светофор") != "🔴",
           "контроль: у отсрочки РНП не deal-killer, а вышло %r"
           % отсрочка.get("светофор"))
 
     # Ядро профиля — история контрактов по 44-ФЗ — скриптом не собирается.
     # Профиль, который об этом молчит, выглядит полнее, чем он есть.
-    чистый = pf.resolve(fetch_clean(), fin_ok(), "тендер")
+    чистый = resolve_fixture(pf, fetch_clean(), "тендер")
     ручное = " ".join(чистый.get("вручную") or [])
     check(errors, "44-ФЗ" in ручное and "zakupki" in ручное,
           "тендер: в «вручную» не названа несобираемая история контрактов: %r" % ручное)
-    check(errors, "контракт" in (чистый.get("рекомендация") or "").lower(),
+    check(errors, "контракт" in (чистый.get("рекомендация") or "").lower()
+          or not чистый["_decision"]["can_recommend"],
           "тендер 🟢: рекомендация молчит про непроверенную историю контрактов: %r"
           % чистый.get("рекомендация"))
 
@@ -547,7 +620,7 @@ def case_j_tender(pf):
     без_рнп["_доступность"]["рнп"] = _av("не проверено", "кэш: дамп не скачан",
                                          tier="🟡", требует="кэш")
     без_рнп["рнп"] = None
-    res = pf.resolve(без_рнп, fin_ok(), "тендер")
+    res = resolve_fixture(pf, без_рнп, "тендер")
     check(errors, "рнп" in (res.get("источники_обязательные_не_проверены") or []),
           "тендер: непроверенный РНП не попал в источники_обязательные_не_проверены: %r"
           % res.get("источники_обязательные_не_проверены"))
@@ -560,7 +633,7 @@ def case_j_tender(pf):
 def case_k_tsepochka(pf):
     """Светофор по одному звену читался бы как вердикт по цепочке — его нет."""
     errors = []
-    res = pf.resolve(fetch_clean(), fin_ok(), "цепочка_поставки")
+    res = resolve_fixture(pf, fetch_clean(), "цепочка_поставки")
     check(errors, res.get("формулировка") == "факты",
           "цепочка_поставки: формулировка %r, ожидались «факты»"
           % res.get("формулировка"))
@@ -574,8 +647,7 @@ def case_k_tsepochka(pf):
     check(errors, "affiliates_graph" in подсказка,
           "цепочка_поставки: подсказка не называет, чем строить связи: %r" % подсказка)
     # даже 🔴-сигнал вердикта не рождает — но в фактах он виден
-    res2 = pf.resolve(fetch_clean(), fin_ok("ча_отрицательные_2года"),
-                      "цепочка_поставки")
+    res2 = resolve_fixture(pf, fetch_clean(), "цепочка_поставки", "ча_отрицательные_2года")
     check(errors, res2.get("светофор") is None,
           "цепочка_поставки + 🔴-флаг: светофор %r, ожидался null" % res2.get("светофор"))
     check(errors, any(f.get("сигнал") == "ча_отрицательные_2года"
@@ -589,13 +661,13 @@ def case_n_efrsb(pf):
     errors = []
     net = ROOT / "eval" / "fixtures" / "net"
     ожидания = {"0266051268": "🔴", "0272023903": "🔴", "0276944817": "🔴",
-                "0107022399": "🟡", "7707083893": "🟢"}
+                "0107022399": None, "7707083893": None}
     for inn, цвет in ожидания.items():
         exp = json.loads((net / ("банкротство_%s.expected.json" % inn)).read_text(encoding="utf-8"))
         fetch = fetch_clean(банкротство=exp["данные"])
         fetch["_доступность"]["банкротство"] = _av(exp["_доступность"]["состояние"],
                                                    tier="🔴")
-        res = pf.resolve(fetch, fin_ok(), "отсрочка")
+        res = resolve_fixture(pf, fetch, "отсрочка")
         поднят = [x.get("сигнал") for x in res.get("поднят_сигналами", [])]
         check(errors, res.get("светофор") == цвет,
               "ЕФРСБ %s: светофор %r, ожидался %s (%r)" % (inn, res.get("светофор"), цвет, поднят))
@@ -607,7 +679,7 @@ def case_n_efrsb(pf):
             snap_mod = load_module("snapshot", SCRIPTS / "snapshot.py")
             retro = load_module("retro_verdict", SCRIPTS / "retro_verdict.py")
             восстановлено, _ = retro.восстановить(snap_mod.fingerprint(fetch))
-            рез = pf.resolve(восстановлено, fin_ok(), "отсрочка")
+            рез = resolve_fixture(pf, восстановлено, "отсрочка")
             check(errors, any(x.get("сигнал") == "банкротство_прекращено"
                               for x in рез.get("поднят_сигналами", [])),
                   "ЕФРСБ %s: после отпечатка сигнал прекращённого дела потерян: %r"
@@ -618,17 +690,17 @@ def case_n_efrsb(pf):
     fetch = fetch_clean(банкротство=None)
     fetch["_доступность"]["банкротство"] = _av("пусто", tier="🔴")
     восстановлено, _ = retro.восстановить(snap_mod.fingerprint(fetch))
-    факт = [x for x in pf.resolve(восстановлено, fin_ok(), "отсрочка").get("факты", [])
+    факт = [x for x in resolve_fixture(pf, восстановлено, "отсрочка").get("факты", [])
             if x.get("сигнал") == "банкротство"]
     check(errors, восстановлено["_доступность"]["банкротство"]["состояние"] == "пусто"
-          and факт and факт[0].get("статус") == "отсутствует",
-          "ЕФРСБ «пусто» после отпечатка — сигнал «отсутствует»: %r %r"
+          and факт and факт[0].get("статус") == "не проверен",
+          "ЕФРСБ unscoped «пусто» после отпечатка сохраняет unknown: %r %r"
           % (восстановлено["_доступность"]["банкротство"], факт))
     # незнакомая стадия: блок «не проверено» — 🟢 не выдаётся
     fetch = fetch_clean(банкротство=None)
     fetch["_доступность"]["банкротство"] = _av(
         "не проверено", "схема: стадия дела не распознана: X (x), дело А1", tier="🔴")
-    res = pf.resolve(fetch, fin_ok(), "отсрочка")
+    res = resolve_fixture(pf, fetch, "отсрочка")
     check(errors, res.get("светофор") != "🟢",
           "ЕФРСБ: нераспознанная стадия не должна давать 🟢: %r" % res.get("светофор"))
     return errors
@@ -647,11 +719,12 @@ def case_o_fedresurs(pf):
         return fetch
     for inn, профиль, цвет, сигнал in (
             ("5029169023", "отсрочка", "🔴", "намерение_кредитора_банкротство"),
-            ("5029169023", "предоплата", "🟡", "намерение_кредитора_банкротство"),
+            ("5029169023", "предоплата", None, "намерение_кредитора_банкротство"),
             ("9500007240", "отсрочка", "🔴", "ликвидация"),
             ("7713392265", "отсрочка", "🔴", "недостоверность_сведений"),
-            ("7707083893", "отсрочка", "🟢", None)):
-        res = pf.resolve(с_блоком(inn), fin_ok(), профиль)
+            # Усечённая выдача не проверяет красный override намерения кредитора.
+            ("7707083893", "отсрочка", None, None)):
+        res = resolve_fixture(pf, с_блоком(inn), профиль)
         поднят = [x.get("сигнал") for x in res.get("поднят_сигналами", [])]
         check(errors, res.get("светофор") == цвет and (сигнал is None or сигнал in поднят),
               "Федресурс %s/%s: %r %r, ждали %s %s" % (inn, профиль, res.get("светофор"),
@@ -660,14 +733,14 @@ def case_o_fedresurs(pf):
     fetch = с_блоком("9500007240")
     fetch["федресурс"] = dict(fetch["федресурс"], решение_о_ликвидации=False,
                               намерение_должника="2026-09-01: намерение должника (сообщение 1)")
-    res = pf.resolve(fetch, fin_ok(), "предоплата")
+    res = resolve_fixture(pf, fetch, "предоплата")
     check(errors, res.get("светофор") == "🔴" and "намерение_должника_банкротство" in
           [x.get("сигнал") for x in res.get("поднят_сигналами", [])],
           "намерение должника: %r %r" % (res.get("светофор"), res.get("поднят_сигналами")))
     # усечённый Федресурс при чистом реестре: ликвидация «отсутствует» по реестру
     # (первичный источник), но факт помечен неполным — не «доказанное отсутствие»
     fetch = с_блоком("7707083893")
-    факт = [x for x in pf.resolve(fetch, fin_ok(), "отсрочка").get("факты", [])
+    факт = [x for x in resolve_fixture(pf, fetch, "отсрочка").get("факты", [])
             if x.get("сигнал") == "ликвидация"]
     check(errors, факт and факт[0].get("статус") == "отсутствует"
           and "федресурс" in str(факт[0].get("неполно")),
@@ -793,7 +866,7 @@ def case_p_manual_contract(pf):
         блок = next(iter(правка))
         состояние, причина, _ = pf._состояние_блока(fetch, блок)
         check(errors, состояние == "ok", "%s: блок %s (%s)" % (имя, состояние, причина))
-        рез = pf.resolve(fetch, fin_ok(), "отсрочка")
+        рез = resolve_fixture(pf, fetch, "отсрочка")
         check(errors, рез.get("светофор") == ждём,
               "%s: светофор %r, ждали %r" % (имя, рез.get("светофор"), ждём))
         if ждём is None:
@@ -802,7 +875,7 @@ def case_p_manual_contract(pf):
                       имя, блок, рез.get("источники_обязательные_не_проверены")))
     # и светофор: без даты/URL суды не проверены — 🟢 не выдаётся
     fetch = fetch_clean(суды=dict(база))
-    res = pf.resolve(fetch, fin_ok(), "отсрочка")
+    res = resolve_fixture(pf, fetch, "отсрочка")
     check(errors, res.get("светофор") != "🟢", "ручной блок без даты дал 🟢: %r" % res.get("светофор"))
     check(errors, "суды" in str(res.get("рекомендация")),
           "рекомендация не называет непроверенные суды: %r" % res.get("рекомендация"))

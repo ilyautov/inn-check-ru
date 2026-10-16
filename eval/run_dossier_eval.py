@@ -664,7 +664,7 @@ def case_управляющие_символы(tmpdir):
     # строки после управляющего символа не начинается ни с «|», ни с «- »
     for l in хвосты:
         if not ((l.startswith("|") and l.rstrip().endswith("|"))
-                or (l.startswith("- ") and "не проверено (финансы:" in l)):
+                or (l.startswith("- ") and "не проверено (" in l and "финансы:" in l)):
             ошибки.append("управляющий символ разорвал строку: %r" % l[:90])
     try:
         сырьё = zipfile.ZipFile(docx).read("word/document.xml").decode("utf-8")

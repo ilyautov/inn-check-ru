@@ -59,6 +59,23 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+# Preserve flat installed imports and legacy absolute-file entry points.
+try:
+    from sibling_imports import load_sibling as _load_sibling
+except ModuleNotFoundError as _error:
+    if _error.name != "sibling_imports":
+        raise
+    import importlib.util as _import_util
+    import sys as _import_sys
+    from pathlib import Path as _ImportPath
+    _spec = _import_util.spec_from_file_location(
+        "sibling_imports", _ImportPath(__file__).resolve().with_name("sibling_imports.py"))
+    _helper = _import_util.module_from_spec(_spec)
+    _spec.loader.exec_module(_helper)
+    # Publish only the complete, stateless bootstrap. Concurrent bootstrap calls
+    # all select the same helper; dependency loads use Python's module locks.
+    _load_sibling = _import_sys.modules.setdefault("sibling_imports", _helper).load_sibling
+
 ПЕРЕМЕННЫЕ = ("INN_CHECK_PROXY", "HTTPS_PROXY", "https_proxy")
 СХЕМЫ = ("http", "https", "socks5", "socks5h", "iface")
 SOCKS = ("socks5", "socks5h")
@@ -299,7 +316,7 @@ def обработчики(url, context):
         return [urllib.request.ProxyHandler({}), _HTTPSчерезИнтерфейс(адрес, интерфейс, context),
                 _HTTPчерезИнтерфейс(адрес, интерфейс), _ТолькоHTTPчерезПрокси()]
     if url and urllib.parse.urlsplit(url).scheme in SOCKS:
-        import socks5
+        socks5 = _load_sibling("socks5")
         return [urllib.request.ProxyHandler({}), socks5.SocksHTTPSHandler(url, context),
                 socks5._ТолькоHTTPS()]
     if url:

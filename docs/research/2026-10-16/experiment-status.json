@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "protocol_version": 1,
+  "as_of": "2026-10-16",
+  "software_status": "in_progress",
+  "freeze_manifest": null,
+  "experiments": [
+    {"id": "E-HUMAN", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "8 observed interviews; 10 installations; 5 actual manual-resume tasks; 3 independent second tasks; voluntary four-week pilot"},
+    {"id": "E-DOCS", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "20 consented anonymized real documents; independent per-page role/candidate labels and adjudication"},
+    {"id": "E-EXPLAIN", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "Independent reconstruction of every decisive claim; observed explanation of comparison coverage and gaps"},
+    {"id": "E-FORMS", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "Checked primary examples for full, simplified, IP, bank, NPO and restricted-access segments"},
+    {"id": "E-ORACLE", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "Independent reference labels with provenance, disjoint subject/group split and adjudication"},
+    {"id": "E-VINTAGE", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "At least two genuinely dated editions with publication/observation provenance; no period-as-publication inference"},
+    {"id": "E-OUTCOME", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "Frozen prospective protocol, sufficient events and matured horizons; explicit censoring and separate outcome/green conditionals"},
+    {"id": "E-HOST", "status": "awaiting_external_evidence", "observed_count": 0, "evidence": [], "required": "Actual agent-client and Chrome/native-host journeys; authorized scheduler execution separately from plan generation"}
+  ]
+}

@@ -7,6 +7,7 @@
 """
 
 import argparse
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -24,23 +25,21 @@ def build_release_zip(repo_root: Path, output: Path) -> None:
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in INCLUDE_FILES:
             path = repo_root / name
-            if not path.is_file():
+            if path.is_symlink() or not path.is_file():
                 raise FileNotFoundError("нет обязательного файла: %s" % path)
             archive.write(path, name)
-        for dirname in INCLUDE_DIRS:
-            src = repo_root / dirname
-            if not src.is_dir():
-                raise FileNotFoundError("нет обязательной папки: %s" % src)
-            for path in sorted(src.rglob("*")):
-                if path.is_dir():
-                    continue
-                rel = path.relative_to(repo_root)
-                if any(part in BAD_NAMES for part in rel.parts) \
-                        or path.suffix in BAD_SUFFIXES \
-                        or rel.as_posix() in EXCLUDE_FILES \
-                        or rel.as_posix().startswith(EXCLUDE_PREFIXES):
-                    continue
-                archive.write(path, rel.as_posix())
+        tracked = subprocess.run(
+            ["git", "-C", str(repo_root), "ls-files", "-z", "--", *INCLUDE_DIRS],
+            check=True, capture_output=True).stdout.decode("utf-8").split("\0")
+        for name in sorted(filter(None, tracked)):
+            rel = Path(name)
+            path = repo_root / rel
+            if any(part in BAD_NAMES for part in rel.parts) or path.suffix in BAD_SUFFIXES \
+                    or name in EXCLUDE_FILES or name.startswith(EXCLUDE_PREFIXES):
+                continue
+            if path.is_symlink() or not path.is_file():
+                raise OSError("release input is missing or a symlink: %s" % name)
+            archive.write(path, name)
 
 
 def main() -> int:
@@ -59,7 +58,7 @@ def main() -> int:
 
     try:
         build_release_zip(repo_root, output)
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         print("ERROR: %s" % exc)
         print("RESULT: FAIL build-release-zip")
         return 1
