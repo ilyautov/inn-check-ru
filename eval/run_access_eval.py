@@ -353,6 +353,87 @@ def case_canaries(ca, src):
     return errors
 
 
+def case_canaries_no_access(ca, src):
+    """Нет доступа к источнику — «не проверено», код 0; сломанный парсер — провал, код 1."""
+    errors = []
+
+    class SourceUnavailable(Exception):
+        pass
+
+    class DeadlineExceeded(Exception):
+        pass
+
+    def raises(e):
+        def fetch(opener, inn):
+            raise e
+        return fetch
+
+    def returns_none(причина):
+        def fetch(opener, inn):
+            return None, {"состояние": "не проверено", "причина": причина}
+        return fetch
+
+    canary_ids = [k for k, v in src.SOURCES.items() if v.get("канарейка")]
+
+    def run(fetcher):
+        sid = canary_ids[0]
+        fc = types.SimpleNamespace(FETCHERS={sid: fetcher}, _make_opener=lambda: object())
+        res, code = ca.run_canaries(fc, src.SOURCES)
+        return res[sid], code
+
+    no_access = {
+        "сеть": raises(SourceUnavailable("сеть: таймаут")),
+        "гео": raises(SourceUnavailable("гео: HTTP 403")),
+        "tls": raises(SourceUnavailable("tls: сертификат не проверен")),
+        "капча": raises(SourceUnavailable("капча: egrul требует captcha на POST")),
+        "антибот": raises(SourceUnavailable("антибот: ЕФРСБ ответил 403")),
+        "дедлайн": raises(SourceUnavailable("дедлайн: бюджет времени 300 с исчерпан")),
+        "бюджет": raises(DeadlineExceeded("бюджет времени 300 с исчерпан")),
+        "кэш": returns_none("кэш: индекса нет"),
+        "сеть без исключения": returns_none("сеть: таймаут"),
+    }
+    for имя, fetcher in no_access.items():
+        row, code = run(fetcher)
+        check(errors, row["результат"] == "не проверено" and code == 0,
+              "%s: ожидалось «не проверено» и код 0, есть %r, код %r" % (имя, row, code))
+        check(errors, row["причина"],
+              "%s: «не проверено» обязано называть причину: %r" % (имя, row))
+
+    broken = {
+        "схема исключением": raises(SourceUnavailable("схема: POST egrul вернул не-JSON")),
+        "схема без исключения": returns_none("схема: карточка не получена"),
+        "причина без префикса": raises(SourceUnavailable("что-то новое")),
+        "причина без префикса в None": returns_none("что-то новое"),
+        "чужое исключение с префиксом": raises(RuntimeError("сеть: таймаут")),
+        "None без отчёта": lambda opener, inn: (None, "строка вместо отчёта"),
+    }
+    for имя, fetcher in broken.items():
+        row, code = run(fetcher)
+        check(errors, row["результат"] == "провал" and code == 1,
+              "%s: ожидался провал и код 1, есть %r, код %r" % (имя, row, code))
+
+    # провал хотя бы одного источника не тонет среди недоступных
+    a, b = canary_ids[:2]
+    fc = types.SimpleNamespace(
+        FETCHERS={a: raises(SourceUnavailable("сеть: таймаут")),
+                  b: raises(SourceUnavailable("схема: не-JSON"))},
+        _make_opener=lambda: object())
+    res, code = ca.run_canaries(fc, src.SOURCES)
+    check(errors, code == 1, "недоступный + сломанный — код выхода %r, ожидался 1" % code)
+
+    # итог различает «всё хорошо» и «ничего не проверили»
+    пусто = {"x": {"результат": "не проверено"}, "y": {"результат": "не запускалась"}}
+    check(errors, ca.canaries_verified_nothing(пусто), "ни одного ok — проверка пустая")
+    check(errors, not ca.canaries_verified_nothing({**пусто, "z": {"результат": "ok"}}),
+          "есть ok — проверка не пустая")
+    check(errors, not ca.canaries_verified_nothing({**пусто, "z": {"результат": "провал"}}),
+          "есть провал — это не пустая проверка, а падение")
+    итог = ca.canaries_summary({**пусто, "z": {"результат": "ok"}})
+    check(errors, "ok 1" in итог and "не проверено 1" in итог and "не запускалась 1" in итог,
+          "итог должен считать все состояния: %r" % итог)
+    return errors
+
+
 def case_nonempty(ca):
     errors = []
     check(errors, ca.is_nonempty(False) and ca.is_nonempty(0) and ca.is_nonempty("нет"),
@@ -484,6 +565,7 @@ def main():
         "формат-кэша": case_cache_format(ca),
         "ttl": case_ttl(ca),
         "канарейки-офлайн": case_canaries(ca, src),
+        "канарейки-нет-доступа": case_canaries_no_access(ca, src),
         "непустые-поля": case_nonempty(ca),
         "прокси-отмечен-в-отчёте": case_proxy_marks_report(ca),
         "прокси-негодный-это-отказ": case_proxy_hard_refusal(ca),

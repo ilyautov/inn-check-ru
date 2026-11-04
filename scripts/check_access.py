@@ -36,7 +36,8 @@ docs/superpowers/specs/2026-09-19-wave1-sources-registry-design.md, §4:
                              "причина": null}}}
 
 fetch_counterparty.py читает этот кэш (TTL 24 ч) и не дёргает источники в состоянии
-гео|tls|dns. Код выхода: 0 всегда, кроме --канарейки с провалом (1).
+гео|tls|dns. Код выхода: 0 всегда, кроме --канарейки с провалом (1): нет доступа к
+источнику — «не проверено», а не провал.
 
 TLS-контекст берётся из fetch_counterparty._build_ssl_context(), чтобы корень УЦ
 Минцифры подхватывался одинаково; если импорт не удался — ssl.create_default_context()
@@ -423,6 +424,41 @@ def is_nonempty(v):
     return True
 
 
+# Канарейка не дошла до парсера: о схеме источника такие причины ничего не говорят.
+# «схема:» сюда не входит, а незнакомый префикс считается провалом: лучше ложная тревога,
+# чем пропущенная смена схемы.
+ПРИЧИНЫ_НЕТ_ДОСТУПА = ("сеть:", "tls:", "гео:", "капча:", "антибот:", "дедлайн:", "кэш:",
+                       "не покрыто:", "профиль:", "probe:", "режим:", "ранний выход:")
+
+
+def _нет_доступа(причина):
+    return isinstance(причина, str) and причина.startswith(ПРИЧИНЫ_НЕТ_ДОСТУПА)
+
+
+def _причина_исключения_нет_доступа(e):
+    """Исключение движка из-за недоступности -> причина; всё остальное -> None (это провал).
+    Сверка по имени класса: check_access не требует импорта fetch_counterparty."""
+    имя = type(e).__name__
+    if имя == "DeadlineExceeded":
+        return "дедлайн: %s" % e
+    if имя == "SourceUnavailable" and _нет_доступа(str(e)):
+        return str(e)
+    return None
+
+
+def canaries_verified_nothing(report):
+    """True, если ни одна канарейка не дошла до вердикта: зелёный код тут ничего не значит."""
+    return not any(row.get("результат") in ("ok", "провал") for row in report.values())
+
+
+def canaries_summary(report):
+    counts = {}
+    for row in report.values():
+        counts[row.get("результат")] = counts.get(row.get("результат"), 0) + 1
+    порядок = ("ok", "провал", "не проверено", "не запускалась")
+    return "итого: " + ", ".join("%s %d" % (k, counts.get(k, 0)) for k in порядок)
+
+
 def _движок_для_канареек(прокси_флаг):
     """fetch_counterparty с той же сетью, что и probe: иначе --прокси проверил бы
     доступность через ноду, а канарейки пошли бы напрямую (ревью Codex)."""
@@ -442,6 +478,9 @@ def run_canaries(fc, registry):
 
     FETCHERS может ещё отсутствовать (другой поток дописывает) — тогда все источники
     «не запускалась» с причиной «не проверено: FETCHERS отсутствует», код 0.
+
+    Код 1 только за провал: парсер дошёл до источника и не разобрал ответ. Нет доступа
+    (сеть, гео, блок, дедлайн, нет индекса в кэше) — «не проверено» с причиной, код 0.
     """
     fetchers = getattr(fc, "FETCHERS", None)
     report = {}
@@ -472,11 +511,19 @@ def run_canaries(fc, registry):
         try:
             data, _av = fetcher(opener, inn)
         except Exception as e:
+            причина = _причина_исключения_нет_доступа(e)
+            if причина:
+                report[sid] = {"инн": inn, "результат": "не проверено", "причина": причина}
+                continue
             failed += 1
             report[sid] = {"инн": inn, "результат": "провал",
                            "причина": "%s: %s" % (type(e).__name__, e)}
             continue
         if not isinstance(data, dict):
+            причина = _av.get("причина") if isinstance(_av, dict) else None
+            if _нет_доступа(причина):
+                report[sid] = {"инн": inn, "результат": "не проверено", "причина": причина}
+                continue
             failed += 1
             report[sid] = {"инн": inn, "результат": "провал",
                            "причина": "fetcher вернул не dict (%s): %s"
@@ -498,6 +545,7 @@ def print_canaries(report, out=sys.stderr):
     for sid, row in report.items():
         out.write("%s  %-12s  %-14s  %s\n" % (sid.ljust(w), row.get("инн") or "—",
                                               row.get("результат"), row.get("причина") or ""))
+    out.write(canaries_summary(report) + "\n")
 
 
 # ---------------------------------------------------------------- CLI
@@ -595,6 +643,10 @@ def main(argv):
         out["канарейки"] = canaries
         if not quiet:
             print_canaries(canaries)
+        if os.environ.get("GITHUB_ACTIONS") and canaries_verified_nothing(canaries):
+            sys.stderr.write("::warning title=Канарейки ничего не проверили::"
+                             "Ни один источник не дошёл до парсера, зелёный статус "
+                             "не подтверждает схемы. Нужна сеть с РФ-IP.\n")
 
     sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
     return code
